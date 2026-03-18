@@ -2,32 +2,130 @@
 // ⚡ TOOL QUICK TOOLBAR - Floating toolbar for drawn tools
 // ================================================================
 
-export interface QuickToolbarCallbacks {
-  onColorChange:     (toolId: string, color: string) => void;
-  onLineWidthChange: (toolId: string, width: number) => void;
-  onLineStyleChange: (toolId: string, style: number) => void;
-  onSettingsClick:   (tool: any) => void;
-  onLockToggle:      (toolId: string, locked: boolean) => void;
-  onDelete:          (toolId: string) => void;
+import {
+  getSchemaForTool,
+  getPropertyValue,
+  PropertyField
+} from './tool-schemas';
+
+// ==================== QUICK TOOLBAR CONTROL TYPES ====================
+
+type ControlType = 'color' | 'width' | 'style';
+
+interface QuickControl {
+  type:    ControlType;
+  key:     string;
+  label:   string;
+  default: any;
 }
 
-export class ToolQuickToolbar {
-  private container:    HTMLElement | null = null;
-  private currentTool:  any = null;
-  private callbacks:    QuickToolbarCallbacks;
+// ==================== CONTROL MAP PER TOOL ====================
 
-  private isDragging:   boolean = false;
-  private dragOffsetX:  number  = 0;
-  private dragOffsetY:  number  = 0;
+const QUICK_CONTROLS: Record<string, QuickControl[]> = {
+  TrendLine:      lineControls(),
+  Ray:            lineControls(),
+  Arrow:          lineControls(),
+  ExtendedLine:   lineControls(),
+  HorizontalLine: lineControls(),
+  HorizontalRay:  lineControls(),
+  VerticalLine:   lineControls(),
+  CrossLine:      lineControls(),
+  Path:           lineControls(),
+  Text: [
+    { type: 'color', key: 'text.font.color', label: 'Text Color', default: '#2962ff' }
+  ],
+  Callout: [
+    { type: 'color', key: 'line.color',                label: 'Line Color',   default: '#2962ff' },
+    { type: 'color', key: 'text.font.color',           label: 'Text Color',   default: '#ffffff' },
+    { type: 'color', key: 'text.box.border.color',     label: 'Border Color', default: 'rgba(74,144,226,1)' },
+    { type: 'color', key: 'text.box.background.color', label: 'BG Color',     default: 'rgba(19,73,133,1)' },
+    { type: 'width', key: 'line.width',                label: 'Line Width',   default: 2 },
+    { type: 'style', key: 'line.style',                label: 'Line Style',   default: 0 },
+  ],
+  Rectangle: [
+    { type: 'color', key: 'rectangle.border.color',     label: 'Border Color', default: '#9c27b0' },
+    { type: 'color', key: 'rectangle.background.color', label: 'Fill Color',   default: 'rgba(156,39,176,0.2)' },
+    { type: 'width', key: 'rectangle.border.width',     label: 'Border Width', default: 1 },
+    { type: 'style', key: 'rectangle.border.style',     label: 'Border Style', default: 0 },
+  ],
+  Circle: [
+    { type: 'color', key: 'circle.border.color',     label: 'Border Color', default: '#9c27b0' },
+    { type: 'color', key: 'circle.background.color', label: 'Fill Color',   default: 'rgba(156,39,176,0.2)' },
+    { type: 'width', key: 'circle.border.width',     label: 'Border Width', default: 1 },
+    { type: 'style', key: 'circle.border.style',     label: 'Border Style', default: 0 },
+  ],
+  Triangle: [
+    { type: 'color', key: 'triangle.border.color',     label: 'Border Color', default: '#f57c00' },
+    { type: 'color', key: 'triangle.background.color', label: 'Fill Color',   default: 'rgba(245,123,0,0.2)' },
+    { type: 'width', key: 'triangle.border.width',     label: 'Border Width', default: 1 },
+    { type: 'style', key: 'triangle.border.style',     label: 'Border Style', default: 0 },
+  ],
+  ParallelChannel: [
+    { type: 'color', key: 'channelLine.color', label: 'Channel Color',  default: '#2962ff' },
+    { type: 'color', key: 'background.color',  label: 'Fill Color',     default: 'rgba(41,98,255,0.2)' },
+    { type: 'color', key: 'middleLine.color',  label: 'Mid Line Color', default: '#2962ff' },
+    { type: 'width', key: 'channelLine.width', label: 'Line Width',     default: 1 },
+    { type: 'style', key: 'channelLine.style', label: 'Line Style',     default: 0 },
+  ],
+  PriceRange: [
+    { type: 'color', key: 'priceRange.rectangle.border.color',     label: 'Border Color', default: '#9c27b0' },
+    { type: 'color', key: 'priceRange.rectangle.background.color', label: 'Fill Color',   default: 'rgba(156,39,176,0.2)' },
+    { type: 'width', key: 'priceRange.rectangle.border.width',     label: 'Border Width', default: 1 },
+    { type: 'style', key: 'priceRange.rectangle.border.style',     label: 'Border Style', default: 0 },
+  ],
+  FibRetracement: [
+    { type: 'width', key: 'line.width', label: 'Line Width', default: 1 },
+    { type: 'style', key: 'line.style', label: 'Line Style', default: 0 },
+  ],
+  Brush: [
+    { type: 'color', key: 'line.color',       label: 'Stroke Color', default: 'rgba(0,188,212,1)' },
+    { type: 'color', key: 'background.color', label: 'Fill Color',   default: 'rgba(0,0,0,0)' },
+    { type: 'width', key: 'line.width',        label: 'Stroke Width', default: 2 },
+  ],
+  Highlighter: [
+    { type: 'color', key: 'line.color',       label: 'Highlight Color', default: 'rgba(255,255,0,0.4)' },
+    { type: 'color', key: 'background.color', label: 'Fill Color',      default: 'rgba(0,0,0,0)' },
+    { type: 'width', key: 'line.width',        label: 'Highlight Width', default: 20 },
+  ],
+  LongShortPosition: [
+    { type: 'color', key: 'entryStopLossRectangle.background.color', label: 'Risk Fill',   default: 'rgba(255,0,0,0.2)' },
+    { type: 'color', key: 'entryPtRectangle.background.color',       label: 'Reward Fill', default: 'rgba(0,128,0,0.2)' },
+  ],
+};
+
+function lineControls(): QuickControl[] {
+  return [
+    { type: 'color', key: 'line.color', label: 'Line Color', default: '#2962ff' },
+    { type: 'width', key: 'line.width', label: 'Line Width', default: 2 },
+    { type: 'style', key: 'line.style', label: 'Line Style', default: 0 },
+  ];
+}
+
+// ==================== CALLBACKS ====================
+
+export interface QuickToolbarCallbacks {
+  onToolUpdate:    (toolId: string, updates: any) => void;
+  onSettingsClick: (tool: any) => void;
+  onLockToggle:    (toolId: string, locked: boolean) => void;
+  onDelete:        (toolId: string) => void;
+}
+
+// ==================== CLASS ====================
+
+export class ToolQuickToolbar {
+  private container:   HTMLElement | null = null;
+  private currentTool: any = null;
+  private callbacks:   QuickToolbarCallbacks;
+
+  private isDragging:  boolean = false;
+  private dragOffsetX: number  = 0;
+  private dragOffsetY: number  = 0;
 
   private savedX: number | null = null;
   private savedY: number | null = null;
 
-  private currentColor: string = '#3b82f6';
-  private currentWidth: number = 1;
-  private currentStyle: number = 0;
-
-  private activeDropdown: 'width' | 'style' | null = null;
+  private liveValues:     Record<string, any> = {};
+  private activeDropdown: string | null = null;
 
   constructor(callbacks: QuickToolbarCallbacks) {
     this.callbacks = callbacks;
@@ -39,63 +137,52 @@ export class ToolQuickToolbar {
   public show(tool: any): void {
     if (!tool) return;
 
+    const sameType   = this.currentTool?.toolType === tool.toolType;
     this.currentTool = tool;
-    this.extractToolValues(tool);
+    this.extractLiveValues(tool);
 
-    if (this.container) {
-      this.updateToolbarValues();
+    if (this.container && sameType) {
+      this.updateAllControls();
       return;
     }
 
+    if (this.container) this.removeContainer();
     this.createToolbar();
     this.positionToolbar();
   }
 
   public hide(): void {
     if (!this.container) return;
-
     this.container.classList.add('qtb-hiding');
-    setTimeout(() => {
-      if (this.container && document.body.contains(this.container)) {
-        document.body.removeChild(this.container);
-      }
-      this.container      = null;
-      this.activeDropdown = null;
-    }, 150);
-
+    setTimeout(() => { this.removeContainer(); }, 150);
     document.removeEventListener('mousedown', this.handleOutsideClick);
   }
 
   public updateTool(tool: any): void {
     if (!tool) return;
     this.currentTool = tool;
-    this.extractToolValues(tool);
-    if (this.container) this.updateToolbarValues();
+    this.extractLiveValues(tool);
+    if (this.container) this.updateAllControls();
   }
 
-  // ==================== EXTRACT TOOL VALUES ====================
+  private removeContainer(): void {
+    if (this.container && document.body.contains(this.container)) {
+      document.body.removeChild(this.container);
+    }
+    this.container      = null;
+    this.activeDropdown = null;
+  }
 
-  private extractToolValues(tool: any): void {
-    const options = tool.options || {};
+  // ==================== EXTRACT LIVE VALUES ====================
 
-    this.currentColor =
-      options.line?.color   ||
-      options.color         ||
-      options.border?.color ||
-      options.stroke?.color ||
-      '#3b82f6';
-
-    this.currentWidth =
-      options.line?.width  ||
-      options.lineWidth     ||
-      options.border?.width ||
-      1;
-
-    this.currentStyle =
-      options.line?.style  ||
-      options.lineStyle     ||
-      options.border?.style ||
-      0;
+  private extractLiveValues(tool: any): void {
+    const controls = QUICK_CONTROLS[tool.toolType] || [];
+    const options  = tool.options || {};
+    this.liveValues = {};
+    controls.forEach(ctrl => {
+      const val = getPropertyValue(options, ctrl.key);
+      this.liveValues[ctrl.key] = val !== undefined ? val : ctrl.default;
+    });
   }
 
   // ==================== CREATE TOOLBAR ====================
@@ -108,7 +195,7 @@ export class ToolQuickToolbar {
 
     this.setupDragging();
     this.setupButtons();
-    this.updateToolbarValues();
+    this.updateAllControls();
 
     setTimeout(() => {
       document.addEventListener('mousedown', this.handleOutsideClick);
@@ -116,65 +203,78 @@ export class ToolQuickToolbar {
   }
 
   private buildHTML(): string {
+    const toolType = this.currentTool?.toolType || '';
+    const controls = QUICK_CONTROLS[toolType] || [];
+
+    let controlsHTML = '';
+
+    controls.forEach(ctrl => {
+      const safeKey = ctrl.key.replace(/\./g, '_');
+      controlsHTML += `<div class="qtb-divider"></div>`;
+
+      if (ctrl.type === 'color') {
+        controlsHTML += `
+          <div class="qtb-item">
+            <button class="qtb-color-btn" id="qtbColor_${safeKey}"
+                    title="${ctrl.label}" data-key="${ctrl.key}">
+              <div class="qtb-color-dot" id="qtbDot_${safeKey}"></div>
+            </button>
+          </div>
+        `;
+      } else if (ctrl.type === 'width') {
+        controlsHTML += `
+          <div class="qtb-item qtb-dropdown-wrap" id="qtbWidthWrap_${safeKey}">
+            <button class="qtb-btn" id="qtbWidthBtn_${safeKey}"
+                    title="${ctrl.label}" data-key="${ctrl.key}">
+              <div class="qtb-width-preview" id="qtbWidthPrev_${safeKey}"></div>
+              <i class="fas fa-chevron-down qtb-chevron"></i>
+            </button>
+            <div class="qtb-dropdown" id="qtbWidthDd_${safeKey}">
+              ${[0.5, 1, 2, 3, 4].map(w => `
+                <div class="qtb-dropdown-item qtb-width-item"
+                     data-key="${ctrl.key}" data-width="${w}">
+                  <div class="qtb-width-line"
+                       style="height:${Math.max(1,w)}px;opacity:${w===0.5?0.6:1};"></div>
+                  <span class="qtb-width-label">${w}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (ctrl.type === 'style') {
+        controlsHTML += `
+          <div class="qtb-item qtb-dropdown-wrap" id="qtbStyleWrap_${safeKey}">
+            <button class="qtb-btn" id="qtbStyleBtn_${safeKey}"
+                    title="${ctrl.label}" data-key="${ctrl.key}">
+              <div class="qtb-style-preview" id="qtbStylePrev_${safeKey}"></div>
+              <i class="fas fa-chevron-down qtb-chevron"></i>
+            </button>
+            <div class="qtb-dropdown" id="qtbStyleDd_${safeKey}">
+              ${[
+                { value: 0, label: 'Solid',  cls: 'qtb-style-solid'  },
+                { value: 1, label: 'Dashed', cls: 'qtb-style-dashed' },
+                { value: 2, label: 'Dotted', cls: 'qtb-style-dotted' },
+              ].map(s => `
+                <div class="qtb-dropdown-item qtb-style-item"
+                     data-key="${ctrl.key}" data-style="${s.value}">
+                  <div class="qtb-style-line ${s.cls}"></div>
+                  <span class="qtb-style-label">${s.label}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+    });
+
     return `
       <div class="qtb-drag-handle" title="Drag">
         <i class="fas fa-grip-vertical"></i>
       </div>
 
-      <div class="qtb-divider"></div>
-
-      <!-- COLOR -->
-      <div class="qtb-item">
-        <button class="qtb-color-btn" id="qtbColorBtn" title="Color">
-          <div class="qtb-color-dot" id="qtbColorDot"></div>
-        </button>
-      </div>
+      ${controlsHTML}
 
       <div class="qtb-divider"></div>
-
-      <!-- LINE WIDTH -->
-      <div class="qtb-item qtb-dropdown-wrap" id="qtbWidthWrap">
-        <button class="qtb-btn" id="qtbWidthBtn" title="Line Width">
-          <div class="qtb-width-preview" id="qtbWidthPreview"></div>
-          <i class="fas fa-chevron-down qtb-chevron"></i>
-        </button>
-        <div class="qtb-dropdown" id="qtbWidthDropdown">
-          ${[0.5, 1, 2, 3, 4].map(w => `
-            <div class="qtb-dropdown-item qtb-width-item" data-width="${w}">
-              <div class="qtb-width-line" style="height: ${Math.max(1, w)}px; opacity: ${w === 0.5 ? 0.6 : 1};"></div>
-              <span class="qtb-width-label">${w}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <div class="qtb-divider"></div>
-
-      <!-- LINE STYLE -->
-      <div class="qtb-item qtb-dropdown-wrap" id="qtbStyleWrap">
-        <button class="qtb-btn" id="qtbStyleBtn" title="Line Style">
-          <div class="qtb-style-preview" id="qtbStylePreview"></div>
-          <i class="fas fa-chevron-down qtb-chevron"></i>
-        </button>
-        <div class="qtb-dropdown" id="qtbStyleDropdown">
-          <div class="qtb-dropdown-item qtb-style-item" data-style="0">
-            <div class="qtb-style-line qtb-style-solid"></div>
-            <span class="qtb-style-label">Solid</span>
-          </div>
-          <div class="qtb-dropdown-item qtb-style-item" data-style="1">
-            <div class="qtb-style-line qtb-style-dashed"></div>
-            <span class="qtb-style-label">Dashed</span>
-          </div>
-          <div class="qtb-dropdown-item qtb-style-item" data-style="2">
-            <div class="qtb-style-line qtb-style-dotted"></div>
-            <span class="qtb-style-label">Dotted</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="qtb-divider"></div>
-
-      <!-- SETTINGS -->
       <div class="qtb-item">
         <button class="qtb-btn" id="qtbSettingsBtn" title="Settings">
           <i class="fas fa-gear"></i>
@@ -182,8 +282,6 @@ export class ToolQuickToolbar {
       </div>
 
       <div class="qtb-divider"></div>
-
-      <!-- LOCK -->
       <div class="qtb-item">
         <button class="qtb-btn" id="qtbLockBtn" title="Lock tool">
           <i class="fas fa-lock-open" id="qtbLockIcon"></i>
@@ -191,8 +289,6 @@ export class ToolQuickToolbar {
       </div>
 
       <div class="qtb-divider"></div>
-
-      <!-- DELETE -->
       <div class="qtb-item">
         <button class="qtb-btn qtb-btn-danger" id="qtbDeleteBtn" title="Delete">
           <i class="fas fa-trash"></i>
@@ -201,169 +297,155 @@ export class ToolQuickToolbar {
     `;
   }
 
-  // ==================== POSITION ====================
+  // ==================== UPDATE ALL CONTROLS ====================
 
-  private positionToolbar(): void {
+  private updateAllControls(): void {
     if (!this.container) return;
+    const controls = QUICK_CONTROLS[this.currentTool?.toolType || ''] || [];
 
-    if (this.savedX !== null && this.savedY !== null) {
-      this.container.style.left = `${this.savedX}px`;
-      this.container.style.top  = `${this.savedY}px`;
-      return;
-    }
+    controls.forEach(ctrl => {
+      const safeKey = ctrl.key.replace(/\./g, '_');
+      const value   = this.liveValues[ctrl.key];
 
-    const chartArea    = document.getElementById('mainChartArea') || document.body;
-    const rect         = chartArea.getBoundingClientRect();
-    const toolbarWidth = 340;
-    const x = rect.left + (rect.width - toolbarWidth) / 2;
-    const y = rect.top + 48;
+      if (ctrl.type === 'color') {
+        const dot = this.container!.querySelector(`#qtbDot_${safeKey}`) as HTMLElement;
+        if (dot) dot.style.background = this.toDisplayColor(value);
 
-    this.container.style.left = `${x}px`;
-    this.container.style.top  = `${y}px`;
-  }
+      } else if (ctrl.type === 'width') {
+        const prev = this.container!.querySelector(`#qtbWidthPrev_${safeKey}`) as HTMLElement;
+        if (prev) {
+          const w = parseFloat(value) || 1;
+          prev.style.cssText = `width:20px;height:${Math.max(1,w)}px;background:var(--text-primary);border-radius:1px;opacity:${w===0.5?0.5:0.8};`;
+        }
 
-  // ==================== UPDATE VALUES ====================
-
-  private updateToolbarValues(): void {
-    if (!this.container) return;
-
-    const colorDot = this.container.querySelector('#qtbColorDot') as HTMLElement;
-    if (colorDot) colorDot.style.background = this.currentColor;
-
-    this.updateWidthPreview();
-    this.updateStylePreview();
-
-    const lockIcon = this.container.querySelector('#qtbLockIcon') as HTMLElement;
-    const lockBtn  = this.container.querySelector('#qtbLockBtn')  as HTMLElement;
-    if (lockIcon && lockBtn) {
-      const isLocked = this.currentTool?.options?.locked || false;
-
-      if (isLocked) {
-        // ✅ Tool is locked — show closed lock, highlight, tooltip says unlock
-        lockIcon.className = 'fas fa-lock';
-        lockBtn.title      = 'Unlock tool';
-        lockBtn.classList.add('qtb-btn-active');
-      } else {
-        // ✅ Tool is unlocked — show open lock, tooltip says lock
-        lockIcon.className = 'fas fa-lock-open';
-        lockBtn.title      = 'Lock tool';
-        lockBtn.classList.remove('qtb-btn-active');
+      } else if (ctrl.type === 'style') {
+        const prev = this.container!.querySelector(`#qtbStylePrev_${safeKey}`) as HTMLElement;
+        if (prev) {
+          const styles: Record<number, string> = { 0: 'solid', 1: 'dashed', 2: 'dotted' };
+          prev.style.cssText = `width:22px;height:0;border-top:2px ${styles[value] || 'solid'} var(--text-secondary);margin:auto 0;`;
+        }
       }
-    }
+    });
+
+    this.updateLockButton();
   }
 
-  private updateWidthPreview(): void {
-    const preview = this.container?.querySelector('#qtbWidthPreview') as HTMLElement;
-    if (!preview) return;
-    preview.style.cssText = `
-      width: 20px;
-      height: ${Math.max(1, this.currentWidth)}px;
-      background: var(--text-primary);
-      border-radius: 1px;
-      opacity: ${this.currentWidth === 0.5 ? 0.5 : 0.8};
-    `;
+  private updateLockButton(): void {
+    const lockIcon = this.container?.querySelector('#qtbLockIcon') as HTMLElement;
+    const lockBtn  = this.container?.querySelector('#qtbLockBtn')  as HTMLElement;
+    if (!lockIcon || !lockBtn) return;
+    const isLocked     = this.currentTool?.options?.locked || false;
+    lockIcon.className = isLocked ? 'fas fa-lock' : 'fas fa-lock-open';
+    lockBtn.title      = isLocked ? 'Unlock tool' : 'Lock tool';
+    lockBtn.classList.toggle('qtb-btn-active', isLocked);
   }
 
-  private updateStylePreview(): void {
-    const preview = this.container?.querySelector('#qtbStylePreview') as HTMLElement;
-    if (!preview) return;
-    const styles: Record<number, string> = { 0: 'solid', 1: 'dashed', 2: 'dotted' };
-    preview.style.cssText = `
-      width: 22px;
-      height: 0;
-      border-top: 2px ${styles[this.currentStyle] || 'solid'} var(--text-secondary);
-      margin: auto 0;
-    `;
-  }
-
-  // ==================== BUTTONS ====================
+  // ==================== SETUP BUTTONS ====================
 
   private setupButtons(): void {
     if (!this.container) return;
+    const controls = QUICK_CONTROLS[this.currentTool?.toolType || ''] || [];
 
-    // Color
-    const colorBtn = this.container.querySelector('#qtbColorBtn');
-    colorBtn?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      this.closeDropdowns();
+    controls.forEach(ctrl => {
+      const safeKey = ctrl.key.replace(/\./g, '_');
 
-      const { ColorPicker } = await import('../../../core/color-picker');
-      const picker = new ColorPicker({
-        color:   this.currentColor,
-        opacity: 1,
-        onChange: (hex: string) => {
-          this.currentColor = hex;
-          const dot = this.container?.querySelector('#qtbColorDot') as HTMLElement;
-          if (dot) dot.style.background = hex;
-          if (this.currentTool) this.callbacks.onColorChange(this.currentTool.id, hex);
-        }
-      });
-      picker.open(colorBtn as HTMLElement);
-    });
+      if (ctrl.type === 'color') {
+        const btn = this.container!.querySelector(`#qtbColor_${safeKey}`);
+        btn?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          this.closeDropdowns();
 
-    // Width button
-    const widthBtn = this.container.querySelector('#qtbWidthBtn');
-    widthBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleDropdown('width');
-    });
+          const { ColorPicker } = await import('../../../core/color-picker');
+          const current = this.parseToHexOpacity(this.liveValues[ctrl.key]);
 
-    // Width items
-    this.container.querySelectorAll('.qtb-width-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const width = parseFloat((item as HTMLElement).dataset.width || '1');
-        this.currentWidth = width;
-        this.updateWidthPreview();
-        this.closeDropdowns();
-        if (this.currentTool) this.callbacks.onLineWidthChange(this.currentTool.id, width);
-      });
-    });
+          const picker = new ColorPicker({
+            color:   current.hex,
+            opacity: current.opacity,
+            onChange: (hex: string, opacity: number) => {
+              const newVal = opacity < 1 ? this.hexToRgba(hex, opacity) : hex;
+              this.liveValues[ctrl.key] = newVal;
 
-    // Style button
-    const styleBtn = this.container.querySelector('#qtbStyleBtn');
-    styleBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleDropdown('style');
-    });
+              const dot = this.container?.querySelector(`#qtbDot_${safeKey}`) as HTMLElement;
+              if (dot) dot.style.background = this.toDisplayColor(newVal);
 
-    // Style items
-    this.container.querySelectorAll('.qtb-style-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const style = parseInt((item as HTMLElement).dataset.style || '0');
-        this.currentStyle = style;
-        this.updateStylePreview();
-        this.closeDropdowns();
-        if (this.currentTool) this.callbacks.onLineStyleChange(this.currentTool.id, style);
-      });
+              if (this.currentTool) {
+                const updates: any = {};
+                this.setNestedValue(updates, ctrl.key, newVal);
+                this.callbacks.onToolUpdate(this.currentTool.id, updates);
+              }
+            }
+          });
+          picker.open(btn as HTMLElement);
+        });
+
+      } else if (ctrl.type === 'width') {
+        const btn = this.container!.querySelector(`#qtbWidthBtn_${safeKey}`);
+        btn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleDropdown(`qtbWidthDd_${safeKey}`);
+        });
+
+        this.container!.querySelectorAll(`.qtb-width-item[data-key="${ctrl.key}"]`).forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const width = parseFloat((item as HTMLElement).dataset.width || '1');
+            this.liveValues[ctrl.key] = width;
+            this.updateAllControls();
+            this.closeDropdowns();
+            if (this.currentTool) {
+              const updates: any = {};
+              this.setNestedValue(updates, ctrl.key, width);
+              this.callbacks.onToolUpdate(this.currentTool.id, updates);
+            }
+          });
+        });
+
+      } else if (ctrl.type === 'style') {
+        const btn = this.container!.querySelector(`#qtbStyleBtn_${safeKey}`);
+        btn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleDropdown(`qtbStyleDd_${safeKey}`);
+        });
+
+        this.container!.querySelectorAll(`.qtb-style-item[data-key="${ctrl.key}"]`).forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const style = parseInt((item as HTMLElement).dataset.style || '0');
+            this.liveValues[ctrl.key] = style;
+            this.updateAllControls();
+            this.closeDropdowns();
+            if (this.currentTool) {
+              const updates: any = {};
+              this.setNestedValue(updates, ctrl.key, style);
+              this.callbacks.onToolUpdate(this.currentTool.id, updates);
+            }
+          });
+        });
+      }
     });
 
     // Settings
-    const settingsBtn = this.container.querySelector('#qtbSettingsBtn');
-    settingsBtn?.addEventListener('click', (e) => {
+    this.container.querySelector('#qtbSettingsBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.closeDropdowns();
       if (this.currentTool) this.callbacks.onSettingsClick(this.currentTool);
     });
 
     // Lock
-    const lockBtn = this.container.querySelector('#qtbLockBtn');
-    lockBtn?.addEventListener('click', (e) => {
+    this.container.querySelector('#qtbLockBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.closeDropdowns();
       if (this.currentTool) {
-        const isLocked = this.currentTool.options?.locked || false;
+        const isLocked                  = this.currentTool.options?.locked || false;
         this.currentTool.options        = this.currentTool.options || {};
         this.currentTool.options.locked = !isLocked;
-        this.updateToolbarValues();
+        this.updateLockButton();
         this.callbacks.onLockToggle(this.currentTool.id, !isLocked);
       }
     });
 
     // Delete
-    const deleteBtn = this.container.querySelector('#qtbDeleteBtn');
-    deleteBtn?.addEventListener('click', (e) => {
+    this.container.querySelector('#qtbDeleteBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.closeDropdowns();
       if (this.currentTool) {
@@ -379,28 +461,46 @@ export class ToolQuickToolbar {
 
   // ==================== DROPDOWNS ====================
 
-  private toggleDropdown(type: 'width' | 'style'): void {
-    if (this.activeDropdown === type) {
+  private toggleDropdown(ddId: string): void {
+    if (this.activeDropdown === ddId) {
       this.closeDropdowns();
       return;
     }
     this.closeDropdowns();
-    this.activeDropdown = type;
-
-    const dropdownId = type === 'width' ? 'qtbWidthDropdown' : 'qtbStyleDropdown';
-    const dropdown   = this.container?.querySelector(`#${dropdownId}`) as HTMLElement;
-    if (dropdown) dropdown.classList.add('qtb-dropdown-open');
-
-    const wrapId = type === 'width' ? 'qtbWidthWrap' : 'qtbStyleWrap';
-    const wrap   = this.container?.querySelector(`#${wrapId}`) as HTMLElement;
-    if (wrap) wrap.classList.add('qtb-wrap-active');
+    const dd = this.container?.querySelector(`#${ddId}`) as HTMLElement;
+    if (dd) {
+      dd.classList.add('qtb-dropdown-open');
+      this.activeDropdown = ddId;
+    }
   }
 
   private closeDropdowns(): void {
     if (!this.container) return;
-    this.container.querySelectorAll('.qtb-dropdown').forEach(d => d.classList.remove('qtb-dropdown-open'));
-    this.container.querySelectorAll('.qtb-dropdown-wrap').forEach(w => w.classList.remove('qtb-wrap-active'));
+    this.container.querySelectorAll('.qtb-dropdown').forEach(d =>
+      d.classList.remove('qtb-dropdown-open')
+    );
     this.activeDropdown = null;
+  }
+
+  // ==================== POSITION ====================
+
+  private positionToolbar(): void {
+    if (!this.container) return;
+
+    if (this.savedX !== null && this.savedY !== null) {
+      this.container.style.left = `${this.savedX}px`;
+      this.container.style.top  = `${this.savedY}px`;
+      return;
+    }
+
+    const chartArea    = document.getElementById('mainChartArea') || document.body;
+    const rect         = chartArea.getBoundingClientRect();
+    const toolbarWidth = this.container.offsetWidth || 300;
+    const x = rect.left + (rect.width - toolbarWidth) / 2;
+    const y = rect.top + 48;
+
+    this.container.style.left = `${x}px`;
+    this.container.style.top  = `${y}px`;
   }
 
   // ==================== DRAGGING ====================
@@ -444,13 +544,53 @@ export class ToolQuickToolbar {
 
   // ==================== OUTSIDE CLICK ====================
 
-private handleOutsideClick = (e: MouseEvent): void => {
+  private handleOutsideClick = (e: MouseEvent): void => {
     if (!this.container) return;
     if (this.container.contains(e.target as Node)) return;
-    
-    // ✅ Hide entire toolbar on outside click
+    // ✅ Don't close if clicking inside color picker
+    if ((e.target as HTMLElement).closest('.cp-container')) return;
     this.hide();
-};
+  };
+
+  // ==================== COLOR HELPERS ====================
+
+  private parseToHexOpacity(value: any): { hex: string; opacity: number } {
+    if (!value || typeof value !== 'string') return { hex: '#3b82f6', opacity: 1 };
+    const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (match) {
+      const r   = parseInt(match[1]);
+      const g   = parseInt(match[2]);
+      const b   = parseInt(match[3]);
+      const a   = match[4] !== undefined ? parseFloat(match[4]) : 1;
+      const hex = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+      return { hex, opacity: a };
+    }
+    return { hex: value.startsWith('#') ? value : '#3b82f6', opacity: 1 };
+  }
+
+  private hexToRgba(hex: string, opacity: number): string {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
+  private toDisplayColor(value: any): string {
+    if (!value) return '#3b82f6';
+    return this.parseToHexOpacity(value).hex;
+  }
+
+  private setNestedValue(obj: any, path: string, value: any): void {
+    const keys    = path.split('.');
+    const lastKey = keys.pop()!;
+    let target    = obj;
+    for (const key of keys) {
+      if (!(key in target) || typeof target[key] !== 'object') target[key] = {};
+      target = target[key];
+    }
+    target[lastKey] = value;
+  }
 
   // ==================== STYLES ====================
 
@@ -458,7 +598,7 @@ private handleOutsideClick = (e: MouseEvent): void => {
     if (document.getElementById('qtb-styles')) return;
 
     const style = document.createElement('style');
-    style.id = 'qtb-styles';
+    style.id    = 'qtb-styles';
     style.textContent = `
       .qtb-container {
         position: fixed;
@@ -505,9 +645,9 @@ private handleOutsideClick = (e: MouseEvent): void => {
         color: var(--text-muted);
         cursor: grab;
         border-radius: 4px;
-        transition: color 0.15s ease;
+        transition: color 0.15s;
         flex-shrink: 0;
-        font-size: var(--text-xs);
+        font-size: 11px;
       }
 
       .qtb-drag-handle:hover  { color: var(--text-secondary); background: var(--bg-hover); }
@@ -538,9 +678,9 @@ private handleOutsideClick = (e: MouseEvent): void => {
         border: 1px solid transparent;
         border-radius: 5px;
         color: var(--text-secondary);
-        font-size: var(--text-sm);
+        font-size: 12px;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: all 0.15s;
         min-width: 26px;
         font-family: var(--text-sans);
       }
@@ -573,7 +713,7 @@ private handleOutsideClick = (e: MouseEvent): void => {
         border: 1px solid transparent;
         border-radius: 5px;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: all 0.15s;
         padding: 0;
       }
 
@@ -587,21 +727,15 @@ private handleOutsideClick = (e: MouseEvent): void => {
         height: 14px;
         border-radius: 50%;
         border: 2px solid var(--border-light);
-        transition: border-color 0.15s ease;
+        transition: border-color 0.15s;
         flex-shrink: 0;
       }
 
       .qtb-color-btn:hover .qtb-color-dot { border-color: var(--text-muted); }
 
-      .qtb-chevron { font-size: 0.5rem !important; color: var(--text-muted); }
+      .qtb-chevron { font-size: 8px !important; color: var(--text-muted); }
 
       .qtb-dropdown-wrap { position: relative; }
-
-      .qtb-wrap-active .qtb-btn {
-        background: var(--bg-hover);
-        border-color: var(--border-light);
-        color: var(--text-primary);
-      }
 
       .qtb-dropdown {
         position: absolute;
@@ -629,7 +763,7 @@ private handleOutsideClick = (e: MouseEvent): void => {
         padding: 7px 10px;
         border-radius: 5px;
         cursor: pointer;
-        transition: background 0.15s ease;
+        transition: background 0.15s;
         white-space: nowrap;
       }
 
@@ -643,19 +777,19 @@ private handleOutsideClick = (e: MouseEvent): void => {
       }
 
       .qtb-width-label {
-        font-size: var(--text-xs);
+        font-size: 11px;
         color: var(--text-muted);
         font-family: var(--text-mono);
         min-width: 20px;
       }
 
-      .qtb-style-line  { width: 50px; height: 0; flex-shrink: 0; }
+      .qtb-style-line   { width: 50px; height: 0; flex-shrink: 0; }
       .qtb-style-solid  { border-top: 2px solid var(--text-secondary); }
       .qtb-style-dashed { border-top: 2px dashed var(--text-secondary); }
       .qtb-style-dotted { border-top: 2px dotted var(--text-secondary); }
 
       .qtb-style-label {
-        font-size: var(--text-xs);
+        font-size: 11px;
         color: var(--text-muted);
         font-family: var(--text-sans);
       }
@@ -667,7 +801,7 @@ private handleOutsideClick = (e: MouseEvent): void => {
   // ==================== DESTROY ====================
 
   public destroy(): void {
-    this.hide();
     document.removeEventListener('mousedown', this.handleOutsideClick);
+    this.removeContainer();
   }
 }

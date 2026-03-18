@@ -79,20 +79,18 @@ export class DrawingToolbar {
   private applyToolOptions(updates: any): void {
     if (!this.selectedTool || !this.drawingModule?.applyLineToolOptions) return;
 
+    // ✅ Deep merge to preserve nested properties
+    const mergedOptions = this.deepMerge(this.selectedTool.options || {}, updates);
+
     this.drawingModule.applyLineToolOptions({
       id:       this.selectedTool.id,
       toolType: this.selectedTool.toolType,
       points:   this.selectedTool.points,
-      options:  {
-        ...this.selectedTool.options,
-        ...updates
-      }
+      options:  mergedOptions
     });
 
-    this.selectedTool.options = {
-      ...this.selectedTool.options,
-      ...updates
-    };
+    // ✅ Keep selectedTool in sync
+    this.selectedTool.options = mergedOptions;
   }
 
   private saveTemplate(toolType: string, options: any): void {
@@ -106,29 +104,12 @@ export class DrawingToolbar {
     const { ToolQuickToolbar } = await import('./tool-quick-toolbar');
 
     this.quickToolbar = new ToolQuickToolbar({
-
-      onColorChange: (toolId: string, color: string) => {
-        if (!this.selectedTool) return;
-        this.applyToolOptions({
-          line: { ...(this.selectedTool.options?.line || {}), color }
-        });
-        this.saveTemplate(this.selectedTool.toolType, this.selectedTool.options);
-      },
-
-      onLineWidthChange: (toolId: string, width: number) => {
-        if (!this.selectedTool) return;
-        this.applyToolOptions({
-          line: { ...(this.selectedTool.options?.line || {}), width }
-        });
-        this.saveTemplate(this.selectedTool.toolType, this.selectedTool.options);
-      },
-
-      onLineStyleChange: (toolId: string, style: number) => {
-        if (!this.selectedTool) return;
-        this.applyToolOptions({
-          line: { ...(this.selectedTool.options?.line || {}), style }
-        });
-        this.saveTemplate(this.selectedTool.toolType, this.selectedTool.options);
+      // ✅ Single onToolUpdate replaces old color/width/style callbacks
+      onToolUpdate: (toolId: string, updates: any) => {
+        this.applyToolOptions(updates);
+        if (this.selectedTool?.toolType) {
+          this.saveTemplate(this.selectedTool.toolType, this.selectedTool.options);
+        }
       },
 
       onSettingsClick: (tool: any) => {
@@ -255,7 +236,10 @@ export class DrawingToolbar {
           return;
         }
         const tool = payload?.selectedLineTool || payload;
-        if (tool?.id) this.selectedTool = tool;
+        if (tool?.id) {
+          this.selectedTool = tool;
+          this.quickToolbar?.updateTool(tool);
+        }
       });
     }
 
@@ -305,7 +289,6 @@ export class DrawingToolbar {
       }
 
       // ✅ p — open tool properties only when a tool is selected
-      // stopPropagation prevents hotkey-manager from also catching p
       if ((e.key === 'p' || e.key === 'P') && this.selectedTool) {
         e.preventDefault();
         e.stopPropagation();
@@ -374,6 +357,30 @@ export class DrawingToolbar {
   private hideToolProperties(): void {
     this.propertiesModal?.hide();
     this.selectedTool = null;
+  }
+
+  // ==================== HELPERS ====================
+
+  private deepMerge(target: any, source: any): any {
+    const output = { ...target };
+    if (this.isObject(target) && this.isObject(source)) {
+      Object.keys(source).forEach(key => {
+        if (this.isObject(source[key])) {
+          if (!(key in target)) {
+            Object.assign(output, { [key]: source[key] });
+          } else {
+            output[key] = this.deepMerge(target[key], source[key]);
+          }
+        } else {
+          Object.assign(output, { [key]: source[key] });
+        }
+      });
+    }
+    return output;
+  }
+
+  private isObject(item: any): boolean {
+    return item && typeof item === 'object' && !Array.isArray(item);
   }
 
   // ==================== PUBLIC API ====================

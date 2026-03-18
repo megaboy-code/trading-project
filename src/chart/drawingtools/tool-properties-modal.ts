@@ -13,35 +13,35 @@ import {
 } from './tool-schemas';
 
 export class ToolPropertiesModal {
-  private modal:         HTMLElement | null = null;
-  private currentTool:   any = null;
+  private modal: HTMLElement | null = null;
+  private currentTool: any = null;
   private drawingModule: any = null;
 
-  private isDragging:  boolean = false;
-  private dragOffsetX: number  = 0;
-  private dragOffsetY: number  = 0;
+  private isDragging: boolean = false;
+  private dragOffsetX: number = 0;
+  private dragOffsetY: number = 0;
 
-  private activeTab:    string             = 'style';
+  private activeTab: string = 'style';
   private openDropdown: HTMLElement | null = null;
 
   private liveColorValues: Record<string, { hex: string; opacity: number }> = {};
 
   private onToolUpdate?: (toolId: string, updates: any) => void;
-  private onToolLock?:   (toolId: string, locked: boolean) => void;
+  private onToolLock?: (toolId: string, locked: boolean) => void;
   private onToolDelete?: (toolId: string) => void;
 
   constructor(
     drawingModule: any,
     callbacks?: {
       onToolUpdate?: (toolId: string, updates: any) => void;
-      onToolLock?:   (toolId: string, locked: boolean) => void;
+      onToolLock?: (toolId: string, locked: boolean) => void;
       onToolDelete?: (toolId: string) => void;
     }
   ) {
     this.drawingModule = drawingModule;
-    this.onToolUpdate  = callbacks?.onToolUpdate;
-    this.onToolLock    = callbacks?.onToolLock;
-    this.onToolDelete  = callbacks?.onToolDelete;
+    this.onToolUpdate = callbacks?.onToolUpdate;
+    this.onToolLock = callbacks?.onToolLock;
+    this.onToolDelete = callbacks?.onToolDelete;
     this.injectStyles();
   }
 
@@ -52,6 +52,7 @@ export class ToolPropertiesModal {
 
     const toolType = tool.toolType;
 
+    // ✅ Merge saved template silently
     const savedTemplate = loadToolTemplate(toolType);
     if (savedTemplate) {
       tool = {
@@ -60,8 +61,8 @@ export class ToolPropertiesModal {
       };
     }
 
-    this.currentTool     = tool;
-    this.activeTab       = 'style';
+    this.currentTool = tool;
+    this.activeTab = 'style';
     this.liveColorValues = {};
 
     if (this.modal) this.destroyModal();
@@ -76,7 +77,7 @@ export class ToolPropertiesModal {
   public hide(): void {
     document.removeEventListener('mousedown', this.handleOutsideClick);
     this.destroyModal();
-    this.currentTool     = null;
+    this.currentTool = null;
     this.liveColorValues = {};
   }
 
@@ -84,15 +85,15 @@ export class ToolPropertiesModal {
     if (this.modal && document.body.contains(this.modal)) {
       document.body.removeChild(this.modal);
     }
-    this.modal        = null;
+    this.modal = null;
     this.openDropdown = null;
   }
 
   // ==================== BUILD MODAL ====================
 
   private buildModal(tool: any): void {
-    const schema    = getSchemaForTool(tool.toolType);
-    const hasText   = schema?.properties.some(p => p.tab === 'text');
+    const schema = getSchemaForTool(tool.toolType);
+    const hasText = schema?.properties.some(p => p.tab === 'text');
     const hasCoords = tool.points && tool.points.length > 0;
 
     this.modal = document.createElement('div');
@@ -106,7 +107,7 @@ export class ToolPropertiesModal {
 
       <div class="tpm-tabs">
         <button class="tpm-tab active" data-tab="style">Style</button>
-        ${hasText   ? `<button class="tpm-tab" data-tab="text">Text</button>`          : ''}
+        ${hasText ? `<button class="tpm-tab" data-tab="text">Text</button>` : ''}
         ${hasCoords ? `<button class="tpm-tab" data-tab="coords">Coordinates</button>` : ''}
       </div>
 
@@ -146,6 +147,8 @@ export class ToolPropertiesModal {
     document.body.appendChild(this.modal);
     this.setupEvents(tool, schema);
     this.setupDragging();
+
+    // ✅ Seed live color values then attach color pickers
     this.seedLiveColorValues(tool, schema);
     this.attachColorListeners(schema);
   }
@@ -154,22 +157,12 @@ export class ToolPropertiesModal {
 
   private seedLiveColorValues(tool: any, schema: ToolSchema | null): void {
     if (!schema) return;
-
-    // ✅ Standard color properties
     schema.properties.forEach(prop => {
       if (prop.type !== 'color') return;
-      const value  = getPropertyValue(tool.options, prop.key) ?? prop.defaultValue;
-      this.liveColorValues[prop.key] = this.parseColor(value);
+      const value = getPropertyValue(tool.options, prop.key) ?? prop.defaultValue;
+      const parsed = this.parseColor(value);
+      this.liveColorValues[prop.key] = parsed;
     });
-
-    // ✅ Fib level colors
-    const hasFib = schema.properties.some(p => p.type === 'levelArray');
-    if (hasFib) {
-      const levels = getPropertyValue(tool.options, 'levels') || [];
-      levels.forEach((level: any, index: number) => {
-        this.liveColorValues[`fib_level_${index}`] = this.parseColor(level.color || '#ffffff');
-      });
-    }
   }
 
   // ==================== ATTACH COLOR LISTENERS ====================
@@ -178,76 +171,48 @@ export class ToolPropertiesModal {
     if (!this.modal || !schema) return;
     const { ColorPicker } = await import('../../../core/color-picker');
 
-    // ✅ Standard color swatches
-    this.modal.querySelectorAll('.tpm-color-swatch-wrap[data-key]:not([data-fib-index])').forEach(el => {
+    this.modal.querySelectorAll('.tpm-color-swatch-wrap[data-key]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        const wrap    = el as HTMLElement;
-        const key     = wrap.dataset.key!;
+        const wrap = el as HTMLElement;
+        const key = wrap.dataset.key!;
         const current = this.liveColorValues[key] || { hex: '#3b82f6', opacity: 1 };
 
         const picker = new ColorPicker({
-          color:   current.hex,
+          color: current.hex,
           opacity: current.opacity,
           onChange: (hex: string, opacity: number) => {
+            // ✅ Update live store
             this.liveColorValues[key] = { hex, opacity };
 
+            // ✅ Update swatch visual
             const inner = wrap.querySelector('.tpm-color-swatch-inner') as HTMLElement;
             if (inner) {
               inner.style.background = hex;
-              inner.style.opacity    = `${opacity}`;
+              inner.style.opacity = `${opacity}`;
             }
 
+            // ✅ Update opacity label
             const safeKey = key.replace(/\./g, '_');
             const opLabel = this.modal?.querySelector(`#op_${safeKey}`) as HTMLElement;
             if (opLabel) opLabel.textContent = `${Math.round(opacity * 100)}%`;
 
+            // ✅ Live preview on chart
             if (this.currentTool && this.onToolUpdate) {
               const preview: any = {};
-              setPropertyValue(preview, key, opacity < 1 ? this.hexToRgba(hex, opacity) : hex);
+              setPropertyValue(
+                preview,
+                key,
+                opacity < 1 ? this.hexToRgba(hex, opacity) : hex
+              );
               this.onToolUpdate(this.currentTool.id, preview);
             }
-          }
-        });
-
-        picker.open(wrap);
-      });
-    });
-
-    // ✅ Fib level color swatches
-    this.modal.querySelectorAll('.tpm-color-swatch-wrap[data-fib-index]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const wrap  = el as HTMLElement;
-        const index = parseInt(wrap.dataset.fibIndex!);
-        const key   = `fib_level_${index}`;
-        const current = this.liveColorValues[key] || { hex: '#ffffff', opacity: 1 };
-
-        const picker = new ColorPicker({
-          color:   current.hex,
-          opacity: current.opacity,
-          onChange: (hex: string, opacity: number) => {
-            this.liveColorValues[key] = { hex, opacity };
-
-            const inner = wrap.querySelector('.tpm-color-swatch-inner') as HTMLElement;
-            if (inner) {
-              inner.style.background = hex;
-              inner.style.opacity    = `${opacity}`;
-            }
-
-            const opLabel = this.modal?.querySelector(`#op_fib_level_${index}`) as HTMLElement;
-            if (opLabel) opLabel.textContent = `${Math.round(opacity * 100)}%`;
-
-            // ✅ Live preview — update specific fib level
-            if (this.currentTool && this.onToolUpdate) {
-              const levels = JSON.parse(JSON.stringify(
-                getPropertyValue(this.currentTool.options, 'levels') || []
-              ));
-              if (levels[index]) {
-                levels[index].color   = hex;
-                levels[index].opacity = opacity;
-              }
-              this.onToolUpdate(this.currentTool.id, { levels });
+          },
+          onClose: () => {
+            // ✅ Save recent color on close
+            const live = this.liveColorValues[key];
+            if (live) {
+              // recent color saving handled inside ColorPicker itself
             }
           }
         });
@@ -328,16 +293,16 @@ export class ToolPropertiesModal {
   // ==================== PROPERTY ROW ====================
 
   private buildPropertyRow(prop: PropertyField, tool: any): string {
-    const value  = getPropertyValue(tool.options, prop.key) ?? prop.defaultValue;
-    const rowId  = `row_${prop.key.replace(/\./g, '_')}`;
+    const value = getPropertyValue(tool.options, prop.key) ?? prop.defaultValue;
+    const rowId = `row_${prop.key.replace(/\./g, '_')}`;
     const ctrlId = `ctrl_${prop.key.replace(/\./g, '_')}`;
-    const chkId  = `chk_${prop.key.replace(/\./g, '_')}`;
+    const chkId = `chk_${prop.key.replace(/\./g, '_')}`;
 
     switch (prop.type) {
 
       case 'color': {
         const swatchId = `swatch_${prop.key.replace(/\./g, '_')}`;
-        const parsed   = this.parseColor(value);
+        const parsed = this.parseColor(value);
         return `
           <div class="tpm-row" id="${rowId}" data-key="${prop.key}">
             <input type="checkbox" class="tpm-checkbox tpm-row-chk" id="${chkId}" checked
@@ -348,7 +313,7 @@ export class ToolPropertiesModal {
                 <div class="tpm-color-swatch-inner"
                      style="background:${parsed.hex};opacity:${parsed.opacity};"></div>
               </div>
-              <span class="tpm-opacity-label" id="op_${prop.key.replace(/\./g,'_')}">${Math.round(parsed.opacity * 100)}%</span>
+              <span class="tpm-opacity-label" id="op_${prop.key.replace(/\./g, '_')}">${Math.round(parsed.opacity * 100)}%</span>
             </div>
           </div>
         `;
@@ -362,29 +327,29 @@ export class ToolPropertiesModal {
                    data-ctrl="${ctrlId}">
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
-              ${this.buildDropdownHTML(ddId, [0.5,1,2,3,4].map(w => ({
-                value: `${w}`,
-                html:  `<div class="tpm-width-preview" style="height:${Math.max(1,w)}px;opacity:${w===0.5?0.5:0.8}"></div><span>${w}</span>`
-              })), `${value}`, `${value}px`)}
+              ${this.buildDropdownHTML(ddId, [0.5, 1, 2, 3, 4].map(w => ({
+          value: `${w}`,
+          html: `<div class="tpm-width-preview" style="height:${Math.max(1, w)}px;opacity:${w === 0.5 ? 0.5 : 0.8}"></div><span>${w}</span>`
+        })), `${value}`, `${value}px`)}
             </div>
           </div>
         `;
       }
 
       case 'line-style': {
-        const ddId    = `dd_${prop.key.replace(/\./g, '_')}`;
-        const labels  = ['Solid','Dashed','Dotted'];
-        const classes = ['tpm-style-solid','tpm-style-dashed','tpm-style-dotted'];
+        const ddId = `dd_${prop.key.replace(/\./g, '_')}`;
+        const labels = ['Solid', 'Dashed', 'Dotted'];
+        const classes = ['tpm-style-solid', 'tpm-style-dashed', 'tpm-style-dotted'];
         return `
           <div class="tpm-row" id="${rowId}" data-key="${prop.key}">
             <input type="checkbox" class="tpm-checkbox tpm-row-chk" id="${chkId}" checked
                    data-ctrl="${ctrlId}">
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
-              ${this.buildDropdownHTML(ddId, [0,1,2].map(s => ({
-                value: `${s}`,
-                html:  `<div class="tpm-style-line ${classes[s]}"></div><span>${labels[s]}</span>`
-              })), `${value}`, labels[value] || 'Solid')}
+              ${this.buildDropdownHTML(ddId, [0, 1, 2].map(s => ({
+          value: `${s}`,
+          html: `<div class="tpm-style-line ${classes[s]}"></div><span>${labels[s]}</span>`
+        })), `${value}`, labels[value] || 'Solid')}
             </div>
           </div>
         `;
@@ -398,9 +363,9 @@ export class ToolPropertiesModal {
                    data-ctrl="${ctrlId}">
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
-              ${this.buildDropdownHTML(ddId, [0,2,4,8,12,20].map(r => ({
-                value: `${r}`, html: `<span>${r}px</span>`
-              })), `${value}`, `${value}px`)}
+              ${this.buildDropdownHTML(ddId, [0, 2, 4, 8, 12, 20].map(r => ({
+          value: `${r}`, html: `<span>${r}px</span>`
+        })), `${value}`, `${value}px`)}
             </div>
           </div>
         `;
@@ -414,17 +379,17 @@ export class ToolPropertiesModal {
                    data-ctrl="${ctrlId}">
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
-              ${this.buildDropdownHTML(ddId, [8,10,12,14,16,18,20,24,28,32].map(f => ({
-                value: `${f}`, html: `<span>${f}px</span>`
-              })), `${value}`, `${value}px`)}
+              ${this.buildDropdownHTML(ddId, [8, 10, 12, 14, 16, 18, 20, 24, 28, 32].map(f => ({
+          value: `${f}`, html: `<span>${f}px</span>`
+        })), `${value}`, `${value}px`)}
             </div>
           </div>
         `;
       }
 
       case 'select': {
-        const ddId     = `dd_${prop.key.replace(/\./g, '_')}`;
-        const opts     = prop.options || [];
+        const ddId = `dd_${prop.key.replace(/\./g, '_')}`;
+        const opts = prop.options || [];
         const selLabel = opts.find(o => o.value === value)?.label || `${value}`;
         return `
           <div class="tpm-row" id="${rowId}" data-key="${prop.key}">
@@ -433,8 +398,8 @@ export class ToolPropertiesModal {
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
               ${this.buildDropdownHTML(ddId, opts.map(o => ({
-                value: `${o.value}`, html: `<span>${o.label}</span>`
-              })), `${value}`, selLabel)}
+          value: `${o.value}`, html: `<span>${o.label}</span>`
+        })), `${value}`, selLabel)}
             </div>
           </div>
         `;
@@ -455,8 +420,8 @@ export class ToolPropertiesModal {
       }
 
       case 'extend': {
-        const ddId     = `dd_${prop.key.replace(/\./g, '_')}`;
-        const extLeft  = getPropertyValue(tool.options, `${prop.keyPrefix}.extend.left`)  || false;
+        const ddId = `dd_${prop.key.replace(/\./g, '_')}`;
+        const extLeft = getPropertyValue(tool.options, `${prop.keyPrefix}.extend.left`) || false;
         const extRight = getPropertyValue(tool.options, `${prop.keyPrefix}.extend.right`) || false;
         const extLabel = extLeft && extRight ? 'Both' : extLeft ? 'Left' : extRight ? 'Right' : 'None';
         return `
@@ -519,7 +484,7 @@ export class ToolPropertiesModal {
       }
 
       case 'bold-italic': {
-        const bold   = getPropertyValue(tool.options, `${prop.keyPrefix}.font.bold`)   || false;
+        const bold = getPropertyValue(tool.options, `${prop.keyPrefix}.font.bold`) || false;
         const italic = getPropertyValue(tool.options, `${prop.keyPrefix}.font.italic`) || false;
         return `
           <div class="tpm-row" id="${rowId}" data-key="${prop.key}">
@@ -527,13 +492,13 @@ export class ToolPropertiesModal {
                    data-ctrl="${ctrlId}">
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
-              <button class="tpm-toggle-btn ${bold   ? 'active' : ''}"
-                      id="btnBold_${prop.key.replace(/\./g,'_')}"
+              <button class="tpm-toggle-btn ${bold ? 'active' : ''}"
+                      id="btnBold_${prop.key.replace(/\./g, '_')}"
                       data-prefix="${prop.keyPrefix}" data-type="bold">
                 <b>B</b>
               </button>
               <button class="tpm-toggle-btn ${italic ? 'active' : ''}"
-                      id="btnItalic_${prop.key.replace(/\./g,'_')}"
+                      id="btnItalic_${prop.key.replace(/\./g, '_')}"
                       data-prefix="${prop.keyPrefix}" data-type="italic">
                 <i>I</i>
               </button>
@@ -543,8 +508,8 @@ export class ToolPropertiesModal {
       }
 
       case 'alignment': {
-        const ddVId  = `ddAlignV_${prop.key.replace(/\./g,'_')}`;
-        const ddHId  = `ddAlignH_${prop.key.replace(/\./g,'_')}`;
+        const ddVId = `ddAlignV_${prop.key.replace(/\./g, '_')}`;
+        const ddHId = `ddAlignH_${prop.key.replace(/\./g, '_')}`;
         const alignV = getPropertyValue(tool.options, `${prop.keyPrefix}.alignV`) || 'middle';
         const alignH = getPropertyValue(tool.options, `${prop.keyPrefix}.alignH`) || 'center';
         const vLabel = alignV.charAt(0).toUpperCase() + alignV.slice(1);
@@ -555,45 +520,13 @@ export class ToolPropertiesModal {
                    data-ctrl="${ctrlId}">
             <span class="tpm-row-label">${prop.label}</span>
             <div class="tpm-row-controls" id="${ctrlId}">
-              ${this.buildDropdownHTML(ddVId, ['Top','Middle','Bottom'].map(v => ({
-                value: v.toLowerCase(), html: `<span>${v}</span>`
-              })), alignV, vLabel)}
-              ${this.buildDropdownHTML(ddHId, ['Left','Center','Right'].map(h => ({
-                value: h.toLowerCase(), html: `<span>${h}</span>`
-              })), alignH, hLabel)}
+              ${this.buildDropdownHTML(ddVId, ['Top', 'Middle', 'Bottom'].map(v => ({
+          value: v.toLowerCase(), html: `<span>${v}</span>`
+        })), alignV, vLabel)}
+              ${this.buildDropdownHTML(ddHId, ['Left', 'Center', 'Right'].map(h => ({
+          value: h.toLowerCase(), html: `<span>${h}</span>`
+        })), alignH, hLabel)}
             </div>
-          </div>
-        `;
-      }
-
-      case 'levelArray': {
-        const levels = getPropertyValue(tool.options, 'levels') || [];
-        if (!levels.length) return '';
-
-        const levelRows = levels.map((level: any, index: number) => {
-          const parsed = this.parseColor(level.color || '#ffffff');
-          return `
-            <div class="tpm-fib-row">
-              <span class="tpm-fib-coeff">${level.coeff ?? index}</span>
-              <div class="tpm-color-swatch-wrap"
-                   data-key="fib_level_${index}"
-                   data-fib-index="${index}">
-                <div class="tpm-color-swatch-inner"
-                     style="background:${parsed.hex};opacity:${parsed.opacity};"></div>
-              </div>
-              <span class="tpm-opacity-label" id="op_fib_level_${index}">${Math.round(parsed.opacity * 100)}%</span>
-            </div>
-          `;
-        }).join('');
-
-        return `
-          <div class="tpm-row" id="${rowId}" data-key="${prop.key}">
-            <input type="checkbox" class="tpm-checkbox tpm-row-chk" id="${chkId}" checked
-                   data-ctrl="${ctrlId}">
-            <span class="tpm-row-label">${prop.label}</span>
-          </div>
-          <div class="tpm-row-controls tpm-fib-levels" id="${ctrlId}">
-            ${levelRows}
           </div>
         `;
       }
@@ -635,7 +568,7 @@ export class ToolPropertiesModal {
     if (!this.modal) return;
 
     // Close
-    this.modal.querySelector('#tpmClose')?.addEventListener('click',  () => this.hide());
+    this.modal.querySelector('#tpmClose')?.addEventListener('click', () => this.hide());
     this.modal.querySelector('#tpmCancel')?.addEventListener('click', () => this.hide());
 
     // OK
@@ -647,7 +580,7 @@ export class ToolPropertiesModal {
     // Tabs
     this.modal.querySelectorAll('.tpm-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        this.modal!.querySelectorAll('.tpm-tab').forEach(t  => t.classList.remove('active'));
+        this.modal!.querySelectorAll('.tpm-tab').forEach(t => t.classList.remove('active'));
         this.modal!.querySelectorAll('.tpm-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         const tabName = (tab as HTMLElement).dataset.tab!;
@@ -655,12 +588,12 @@ export class ToolPropertiesModal {
       });
     });
 
-    // Row checkboxes — toggle disabled
+    // Row checkboxes
     this.modal.querySelectorAll('.tpm-row-chk').forEach(chk => {
       chk.addEventListener('change', (e) => {
-        const input  = e.target as HTMLInputElement;
+        const input = e.target as HTMLInputElement;
         const ctrlId = input.dataset.ctrl!;
-        const ctrl   = this.modal!.querySelector(`#${ctrlId}`) as HTMLElement;
+        const ctrl = this.modal!.querySelector(`#${ctrlId}`) as HTMLElement;
         if (ctrl) ctrl.classList.toggle('disabled', !input.checked);
       });
     });
@@ -669,9 +602,9 @@ export class ToolPropertiesModal {
     this.modal.querySelectorAll('.tpm-dropdown-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const btnEl  = btn as HTMLElement;
+        const btnEl = btn as HTMLElement;
         const menuId = btnEl.id.replace('Btn', 'Menu');
-        const menu   = this.modal!.querySelector(`#${menuId}`) as HTMLElement;
+        const menu = this.modal!.querySelector(`#${menuId}`) as HTMLElement;
         if (!menu) return;
         const isOpen = menu.classList.contains('open');
         this.closeDropdowns();
@@ -687,27 +620,27 @@ export class ToolPropertiesModal {
     this.modal.querySelectorAll('.tpm-dropdown-item').forEach(item => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
-        const el    = item as HTMLElement;
-        const ddId  = el.dataset.ddid!;
+        const el = item as HTMLElement;
+        const ddId = el.dataset.ddid!;
         const value = el.dataset.value!;
-        const menu  = this.modal!.querySelector(`#${ddId}Menu`) as HTMLElement;
+        const menu = this.modal!.querySelector(`#${ddId}Menu`) as HTMLElement;
         const label = this.modal!.querySelector(`#${ddId}Label`) as HTMLElement;
-        if (menu)  menu.querySelectorAll('.tpm-dropdown-item').forEach(i => i.classList.remove('selected'));
+        if (menu) menu.querySelectorAll('.tpm-dropdown-item').forEach(i => i.classList.remove('selected'));
         if (label) label.textContent = el.querySelector('span:last-child')?.textContent || value;
         el.classList.add('selected');
         this.closeDropdowns();
 
         // ✅ Live preview
         if (this.currentTool && this.onToolUpdate) {
-          const currentSchema = getSchemaForTool(this.currentTool.toolType);
-          if (!currentSchema) return;
+          const schema = getSchemaForTool(this.currentTool.toolType);
+          if (!schema) return;
 
           const preview: any = {};
 
           // ── Alignment dropdowns ──
           if (ddId.startsWith('ddAlignV_') || ddId.startsWith('ddAlignH_')) {
             const safeKey = ddId.replace(/^ddAlignV_/, '').replace(/^ddAlignH_/, '');
-            const prop    = currentSchema.properties.find(p => p.key.replace(/\./g, '_') === safeKey);
+            const prop = schema.properties.find(p => p.key.replace(/\./g, '_') === safeKey);
             if (prop?.keyPrefix) {
               const subKey = ddId.startsWith('ddAlignV_')
                 ? `${prop.keyPrefix}.alignV`
@@ -720,7 +653,7 @@ export class ToolPropertiesModal {
 
           // ── Standard dropdowns ──
           const safeKey = ddId.replace(/^dd_/, '');
-          const prop    = currentSchema.properties.find(p => p.key.replace(/\./g, '_') === safeKey);
+          const prop = schema.properties.find(p => p.key.replace(/\./g, '_') === safeKey);
           if (!prop) return;
 
           let parsedValue: any = value;
@@ -740,13 +673,13 @@ export class ToolPropertiesModal {
     this.modal.querySelectorAll('.tpm-ext-chk').forEach(chk => {
       chk.addEventListener('change', (e) => {
         e.stopPropagation();
-        const input  = e.target as HTMLInputElement;
+        const input = e.target as HTMLInputElement;
         const prefix = input.dataset.prefix!;
         const menuEl = input.closest('.tpm-dropdown-menu') as HTMLElement;
         const labelEl = this.modal!.querySelector(
           `#${menuEl?.id.replace('Menu', 'Label')}`
         ) as HTMLElement;
-        const leftChk  = this.modal!.querySelector(`[data-prefix="${prefix}"][data-side="left"]`)  as HTMLInputElement;
+        const leftChk = this.modal!.querySelector(`[data-prefix="${prefix}"][data-side="left"]`) as HTMLInputElement;
         const rightChk = this.modal!.querySelector(`[data-prefix="${prefix}"][data-side="right"]`) as HTMLInputElement;
 
         if (labelEl) {
@@ -757,18 +690,11 @@ export class ToolPropertiesModal {
         // ✅ Live preview
         if (this.currentTool && this.onToolUpdate) {
           const preview: any = {};
-          setPropertyValue(preview, `${prefix}.extend.left`,  leftChk?.checked  || false);
+          setPropertyValue(preview, `${prefix}.extend.left`, leftChk?.checked || false);
           setPropertyValue(preview, `${prefix}.extend.right`, rightChk?.checked || false);
           this.onToolUpdate(this.currentTool.id, preview);
         }
       });
-    });
-
-    // Extend menus — prevent close on inner click
-    this.modal.querySelectorAll('.tpm-dropdown-menu').forEach(menu => {
-      if ((menu as HTMLElement).querySelector('.tpm-extend-item')) {
-        menu.addEventListener('mousedown', e => e.stopPropagation());
-      }
     });
 
     // Bold / Italic — live preview
@@ -778,20 +704,19 @@ export class ToolPropertiesModal {
 
         // ✅ Live preview
         if (this.currentTool && this.onToolUpdate) {
-          const el     = btn as HTMLElement;
+          const el = btn as HTMLElement;
           const prefix = el.dataset.prefix!;
-          const type   = el.dataset.type!;
+          const type = el.dataset.type!;
           if (!prefix || !type) return;
-          const active   = el.classList.contains('active');
+          const active = el.classList.contains('active');
           const preview: any = {};
           setPropertyValue(preview, `${prefix}.font.${type}`, active);
           this.onToolUpdate(this.currentTool.id, preview);
         }
       });
     });
-
     // Template
-    const tmplBtn  = this.modal.querySelector('#tpmTemplateBtn') as HTMLElement;
+    const tmplBtn = this.modal.querySelector('#tpmTemplateBtn') as HTMLElement;
     const tmplMenu = this.modal.querySelector('#tpmTemplateMenu') as HTMLElement;
 
     tmplBtn?.addEventListener('click', (e) => {
@@ -836,7 +761,7 @@ export class ToolPropertiesModal {
     const updates: any = {};
 
     schema.properties.forEach(prop => {
-      const key     = prop.key;
+      const key = prop.key;
       const safeKey = key.replace(/\./g, '_');
 
       switch (prop.type) {
@@ -886,47 +811,29 @@ export class ToolPropertiesModal {
         }
 
         case 'extend': {
-          const prefix   = prop.keyPrefix!;
-          const leftChk  = this.modal!.querySelector(`[data-prefix="${prefix}"][data-side="left"]`)  as HTMLInputElement;
+          const prefix = prop.keyPrefix!;
+          const leftChk = this.modal!.querySelector(`[data-prefix="${prefix}"][data-side="left"]`) as HTMLInputElement;
           const rightChk = this.modal!.querySelector(`[data-prefix="${prefix}"][data-side="right"]`) as HTMLInputElement;
-          setPropertyValue(updates, `${prefix}.extend.left`,  leftChk?.checked  || false);
+          setPropertyValue(updates, `${prefix}.extend.left`, leftChk?.checked || false);
           setPropertyValue(updates, `${prefix}.extend.right`, rightChk?.checked || false);
           break;
         }
 
         case 'bold-italic': {
-          const prefix    = prop.keyPrefix!;
-          const boldBtn   = this.modal!.querySelector(`#btnBold_${safeKey}`)   as HTMLElement;
+          const prefix = prop.keyPrefix!;
+          const boldBtn = this.modal!.querySelector(`#btnBold_${safeKey}`) as HTMLElement;
           const italicBtn = this.modal!.querySelector(`#btnItalic_${safeKey}`) as HTMLElement;
-          setPropertyValue(updates, `${prefix}.font.bold`,   boldBtn?.classList.contains('active')   || false);
+          setPropertyValue(updates, `${prefix}.font.bold`, boldBtn?.classList.contains('active') || false);
           setPropertyValue(updates, `${prefix}.font.italic`, italicBtn?.classList.contains('active') || false);
           break;
         }
 
         case 'alignment': {
           const prefix = prop.keyPrefix!;
-          const selV   = this.modal!.querySelector(`#ddAlignV_${safeKey}Menu .tpm-dropdown-item.selected`) as HTMLElement;
-          const selH   = this.modal!.querySelector(`#ddAlignH_${safeKey}Menu .tpm-dropdown-item.selected`) as HTMLElement;
+          const selV = this.modal!.querySelector(`#ddAlignV_${safeKey}Menu .tpm-dropdown-item.selected`) as HTMLElement;
+          const selH = this.modal!.querySelector(`#ddAlignH_${safeKey}Menu .tpm-dropdown-item.selected`) as HTMLElement;
           if (selV) setPropertyValue(updates, `${prefix}.alignV`, selV.dataset.value);
           if (selH) setPropertyValue(updates, `${prefix}.alignH`, selH.dataset.value);
-          break;
-        }
-
-        case 'levelArray': {
-          // ✅ Collect fib levels from live color values
-          const levels = JSON.parse(JSON.stringify(
-            getPropertyValue(this.currentTool.options, 'levels') || []
-          ));
-          Object.keys(this.liveColorValues).forEach(liveKey => {
-            if (!liveKey.startsWith('fib_level_')) return;
-            const index = parseInt(liveKey.replace('fib_level_', ''));
-            if (levels[index]) {
-              const live = this.liveColorValues[liveKey];
-              levels[index].color   = live.hex;
-              levels[index].opacity = live.opacity;
-            }
-          });
-          setPropertyValue(updates, 'levels', levels);
           break;
         }
       }
@@ -951,8 +858,8 @@ export class ToolPropertiesModal {
 
     header.addEventListener('mousedown', (e: MouseEvent) => {
       if ((e.target as HTMLElement).id === 'tpmClose') return;
-      this.isDragging  = true;
-      const rect       = this.modal!.getBoundingClientRect();
+      this.isDragging = true;
+      const rect = this.modal!.getBoundingClientRect();
       this.dragOffsetX = e.clientX - rect.left;
       this.dragOffsetY = e.clientY - rect.top;
       document.body.style.userSelect = 'none';
@@ -961,12 +868,12 @@ export class ToolPropertiesModal {
 
     document.addEventListener('mousemove', (e: MouseEvent) => {
       if (!this.isDragging || !this.modal) return;
-      const x    = e.clientX - this.dragOffsetX;
-      const y    = e.clientY - this.dragOffsetY;
-      const maxX = window.innerWidth  - this.modal.offsetWidth;
+      const x = e.clientX - this.dragOffsetX;
+      const y = e.clientY - this.dragOffsetY;
+      const maxX = window.innerWidth - this.modal.offsetWidth;
       const maxY = window.innerHeight - this.modal.offsetHeight;
       this.modal.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
-      this.modal.style.top  = `${Math.max(0, Math.min(y, maxY))}px`;
+      this.modal.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
     });
 
     document.addEventListener('mouseup', () => {
@@ -984,10 +891,10 @@ export class ToolPropertiesModal {
     if (!this.modal) return;
     requestAnimationFrame(() => {
       if (!this.modal) return;
-      const w = this.modal.offsetWidth  || 380;
+      const w = this.modal.offsetWidth || 380;
       const h = this.modal.offsetHeight || 520;
-      this.modal.style.left = `${Math.max(0, (window.innerWidth  - w) / 2)}px`;
-      this.modal.style.top  = `${Math.max(0, (window.innerHeight - h) / 2)}px`;
+      this.modal.style.left = `${Math.max(0, (window.innerWidth - w) / 2)}px`;
+      this.modal.style.top = `${Math.max(0, (window.innerHeight - h) / 2)}px`;
     });
   }
 
@@ -996,7 +903,7 @@ export class ToolPropertiesModal {
   private closeDropdowns(): void {
     if (!this.modal) return;
     this.modal.querySelectorAll('.tpm-dropdown-menu').forEach(m => m.classList.remove('open'));
-    this.modal.querySelectorAll('.tpm-dropdown-btn').forEach(b  => b.classList.remove('open'));
+    this.modal.querySelectorAll('.tpm-dropdown-btn').forEach(b => b.classList.remove('open'));
     this.modal.querySelector('#tpmTemplateMenu')?.classList.remove('open');
     this.openDropdown = null;
   }
@@ -1006,16 +913,17 @@ export class ToolPropertiesModal {
   private handleOutsideClick = (e: MouseEvent): void => {
     if (!this.modal) return;
 
-    // ✅ Don't close if clicking inside color picker
+    // ✅ Fix 1 — Don't close if clicking inside color picker
     if ((e.target as HTMLElement).closest('.cp-container')) return;
 
     if (this.modal.contains(e.target as Node)) {
       const inDropdown = (e.target as HTMLElement).closest('.tpm-dropdown-wrap') ||
-                         (e.target as HTMLElement).closest('.tpm-footer-left');
+        (e.target as HTMLElement).closest('.tpm-footer-left');
       if (!inDropdown) this.closeDropdowns();
       return;
     }
 
+    // ✅ Click outside modal — close everything
     this.closeDropdowns();
     this.hide();
   };
@@ -1026,11 +934,11 @@ export class ToolPropertiesModal {
     if (!value || typeof value !== 'string') return { hex: '#3b82f6', opacity: 1 };
     const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
     if (match) {
-      const r   = parseInt(match[1]);
-      const g   = parseInt(match[2]);
-      const b   = parseInt(match[3]);
-      const a   = match[4] !== undefined ? parseFloat(match[4]) : 1;
-      const hex = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+      const r = parseInt(match[1]);
+      const g = parseInt(match[2]);
+      const b = parseInt(match[3]);
+      const a = match[4] !== undefined ? parseFloat(match[4]) : 1;
+      const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
       return { hex, opacity: a };
     }
     return { hex: value.startsWith('#') ? value : '#3b82f6', opacity: 1 };
@@ -1051,7 +959,7 @@ export class ToolPropertiesModal {
     for (const key of Object.keys(override)) {
       if (
         override[key] && typeof override[key] === 'object' && !Array.isArray(override[key]) &&
-        base[key]     && typeof base[key]     === 'object'
+        base[key] && typeof base[key] === 'object'
       ) {
         result[key] = this.deepMerge(base[key], override[key]);
       } else {
@@ -1073,8 +981,8 @@ export class ToolPropertiesModal {
   private injectStyles(): void {
     if (document.getElementById('tpm-styles')) return;
 
-    const style  = document.createElement('style');
-    style.id     = 'tpm-styles';
+    const style = document.createElement('style');
+    style.id = 'tpm-styles';
     style.textContent = `
       .tpm-modal {
         position: fixed;
@@ -1441,35 +1349,6 @@ export class ToolPropertiesModal {
         padding: 30px 20px;
         color: var(--text-muted);
         font-size: var(--text-sm);
-      }
-
-      /* ── FIB LEVELS ── */
-      .tpm-fib-levels {
-        padding: 6px 8px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        margin-bottom: 10px;
-        max-height: 220px;
-        overflow-y: auto;
-      }
-
-      .tpm-fib-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 0;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .tpm-fib-row:last-child { border-bottom: none; }
-
-      .tpm-fib-coeff {
-        min-width: 48px;
-        font-size: var(--text-xs);
-        color: var(--text-muted);
-        font-family: var(--text-mono);
-        flex-shrink: 0;
       }
 
       .tpm-footer {
