@@ -1,6 +1,4 @@
-// ================================================================
-// 📐 CHART DRAWING MODULE - Orchestrator
-// ================================================================
+// src/chart/drawing/chart-drawing-module.ts
 
 import { 
   IChartApi, 
@@ -34,13 +32,10 @@ const TOOL_GROUP_MAP: Record<string, string> = {
   Brush:             'freehand',
   Highlighter:       'freehand',
   LongShortPosition: 'position',
-  // ✅ Trade signal arrows — programmatic only, never persisted
   TradeArrow:        'signals',
 };
 
-// ✅ Tool types that must never be saved to localStorage
 const NON_PERSISTENT_TOOLS = new Set<string>(['TradeArrow']);
-
 const registeredGroups = new Set<string>();
 
 export interface DrawingToolsConfig {
@@ -76,11 +71,9 @@ export class ChartDrawingModule {
   private currentSymbol:    string;
   private currentTimeframe: string;
 
-  // ✅ Track arrow visibility state from settings
   private showBuyArrows:  boolean = true;
   private showSellArrows: boolean = true;
 
-  // ✅ Default colors for future arrows — updated when user changes color in settings
   private defaultBuyArrowColor:  string = '#238636';
   private defaultSellArrowColor: string = '#da3633';
 
@@ -135,7 +128,7 @@ export class ChartDrawingModule {
       this.wireChartEvents();
       this.subscribeToToolEvents();
       this.setupThemeListener();
-      this.setupSettingsListeners(); // ✅ Wire buy/sell arrow toggle
+      this.setupSettingsListeners();
 
       await this.initializeToolbar();
 
@@ -197,7 +190,6 @@ export class ChartDrawingModule {
   // ==================== SETTINGS LISTENERS ====================
 
   private setupSettingsListeners(): void {
-    // ✅ Buy/sell arrow visibility toggle
     document.addEventListener('chart-setting-toggle', (e: Event) => {
       const { key, value } = (e as CustomEvent).detail;
 
@@ -205,7 +197,11 @@ export class ChartDrawingModule {
         this.showBuyArrows = value as boolean;
         if (!value) {
           this.removeTradeArrows('buy');
-          console.log('🚫 Buy arrows hidden and removed');
+        } else {
+          // ✅ Flag turned ON — notify module-manager to re-inject buy arrows
+          document.dispatchEvent(new CustomEvent('chart-arrows-toggle-on', {
+            detail: { type: 'buy' }
+          }));
         }
       }
 
@@ -213,12 +209,15 @@ export class ChartDrawingModule {
         this.showSellArrows = value as boolean;
         if (!value) {
           this.removeTradeArrows('sell');
-          console.log('🚫 Sell arrows hidden and removed');
+        } else {
+          // ✅ Flag turned ON — notify module-manager to re-inject sell arrows
+          document.dispatchEvent(new CustomEvent('chart-arrows-toggle-on', {
+            detail: { type: 'sell' }
+          }));
         }
       }
     });
 
-    // ✅ Arrow price line mode change — update all existing arrows
     document.addEventListener('chart-arrow-priceline-change', (e: Event) => {
       const { priceLine } = (e as CustomEvent).detail as { priceLine: 'hover' | 'always' };
       if (!this.lineTools || !this.isInitialized) return;
@@ -236,19 +235,15 @@ export class ChartDrawingModule {
             options:  { arrow: { priceLine } },
           });
         });
-
-        console.log(`✅ Arrow price line mode updated: ${priceLine}`);
       } catch (error) {
         console.error('❌ Failed to update arrow price line mode:', error);
       }
     });
 
-    // ✅ Arrow color change — update all existing arrows of that type
     document.addEventListener('chart-arrow-color-change', (e: Event) => {
       const { type, color } = (e as CustomEvent).detail as { type: 'buy' | 'sell'; color: string };
       if (!this.lineTools || !this.isInitialized) return;
 
-      // ✅ Update default color for future arrows
       if (type === 'buy')  this.defaultBuyArrowColor  = color;
       if (type === 'sell') this.defaultSellArrowColor = color;
 
@@ -266,8 +261,6 @@ export class ChartDrawingModule {
             options:  { arrow: { color } },
           });
         });
-
-        console.log(`✅ Arrow color updated: ${type} → ${color}`);
       } catch (error) {
         console.error('❌ Failed to update arrow color:', error);
       }
@@ -326,7 +319,6 @@ export class ChartDrawingModule {
           });
           break;
         }
-        // ✅ Trade signal arrows
         case 'signals': {
           const { SIGNAL_TOOLS } = await import('./tools/signals');
           Object.entries(SIGNAL_TOOLS).forEach(([name, tool]) => {
@@ -486,7 +478,6 @@ export class ChartDrawingModule {
     if (this.currentTimeframe === timeframe) return;
     this.saveDrawings();
     this.currentTimeframe = timeframe;
-    // ✅ Remove all trade arrows on TF change — re-injected fresh
     this.removeTradeArrows();
     console.log(`📐 TF tracking updated: ${timeframe}`);
   }
@@ -495,7 +486,6 @@ export class ChartDrawingModule {
     if (this.currentSymbol === symbol) return;
     this.saveDrawings();
     this.currentSymbol = symbol;
-    // ✅ Remove all trade arrows on symbol change
     this.removeTradeArrows();
     console.log(`📐 Symbol tracking updated: ${symbol}`);
   }
@@ -505,7 +495,6 @@ export class ChartDrawingModule {
     try {
       if (typeof this.lineTools.removeAllLineTools === 'function') {
         this.lineTools.removeAllLineTools();
-        console.log('🧹 Tools cleared before series removal');
       }
     } catch (error) {
       console.error('❌ clearToolsOnly failed:', error);
@@ -523,6 +512,11 @@ export class ChartDrawingModule {
 
       await this.loadDrawings();
       console.log(`📐 Drawings restored for ${this.currentSymbol} ${this.currentTimeframe}`);
+
+      // ✅ Notify module-manager that drawings are ready
+      // module-manager listens to re-inject trade arrows at the right time
+      document.dispatchEvent(new CustomEvent('chart-drawings-ready'));
+
     } catch (error) {
       console.error('❌ onDataReady failed:', error);
     }
@@ -541,8 +535,6 @@ export class ChartDrawingModule {
       if (groupName) {
         await this.loadAndRegisterGroup(groupName);
       }
-
-      console.log(`🖍️ Starting drawing tool: ${toolType}`);
 
       if (options) {
         this.lineTools.addLineTool(toolType, [], options);
@@ -582,7 +574,6 @@ export class ChartDrawingModule {
 
   // ==================== TRADE ARROWS ====================
 
-  // ✅ Place a trade signal arrow programmatically
   public async placeTradeArrow(params: {
     id:          string;
     type:        'buy' | 'sell';
@@ -594,14 +585,12 @@ export class ChartDrawingModule {
   }): Promise<void> {
     if (!this.lineTools || !this.isInitialized) return;
 
-    // ✅ Respect settings toggle
     if (params.type === 'buy'  && !this.showBuyArrows)  return;
     if (params.type === 'sell' && !this.showSellArrows) return;
 
     try {
       await this.loadAndRegisterGroup('signals');
 
-      // ✅ Use default color from settings if not explicitly passed
       const color = params.color ?? (
         params.type === 'buy'
           ? this.defaultBuyArrowColor
@@ -631,7 +620,6 @@ export class ChartDrawingModule {
     }
   }
 
-  // ✅ Remove trade arrows by type or all
   public removeTradeArrows(type?: 'buy' | 'sell'): void {
     if (!this.lineTools || !this.isInitialized) return;
     try {
@@ -640,7 +628,6 @@ export class ChartDrawingModule {
           ? new RegExp(`^trade-arrow-${type}`)
           : /^trade-arrow/;
         this.lineTools.removeLineToolsByIdRegex(pattern);
-        console.log(`🗑️ Trade arrows removed: ${type ?? 'all'}`);
       }
     } catch (error) {
       console.error('❌ Failed to remove trade arrows:', error);
@@ -824,7 +811,6 @@ export class ChartDrawingModule {
       const allDrawings = this.exportDrawings();
       const tools       = JSON.parse(allDrawings);
 
-      // ✅ Filter out non-persistent tools before saving
       const persistable = Array.isArray(tools)
         ? tools.filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
         : [];
@@ -847,7 +833,6 @@ export class ChartDrawingModule {
         if (Array.isArray(tools) && tools.length > 0) {
           const groupsNeeded = new Set<string>();
           tools.forEach((tool: any) => {
-            // ✅ Skip non-persistent tools during load
             if (NON_PERSISTENT_TOOLS.has(tool.toolType)) return;
             const group = TOOL_GROUP_MAP[tool.toolType];
             if (group) groupsNeeded.add(group);
@@ -858,7 +843,6 @@ export class ChartDrawingModule {
           );
         }
 
-        // ✅ Only import persistable tools
         const persistable = Array.isArray(tools)
           ? tools.filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
           : [];
@@ -881,7 +865,6 @@ export class ChartDrawingModule {
   public clearSavedDrawings(): void {
     try {
       localStorage.removeItem(this.STORAGE_KEY);
-      console.log('🗑️ Saved drawings cleared');
     } catch (error) {
       console.error('❌ Failed to clear saved drawings:', error);
     }
@@ -989,10 +972,8 @@ export class ChartDrawingModule {
       registeredGroups.clear();
       this.setupToolOptions();
       this.subscribeToToolEvents();
-
       this.toolbar?.resubscribeCoreEvents();
 
-      // ✅ Only restore persistable tools after series update
       if (savedDrawings && savedDrawings !== '[]') {
         try {
           const tools = JSON.parse(savedDrawings);
