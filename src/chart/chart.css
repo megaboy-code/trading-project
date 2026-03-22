@@ -178,13 +178,14 @@
   color: var(--text-primary);
 }
 
+/* sm — badge */
 .ctrl-badge {
   position: absolute;
   top: 4px;
   right: 3px;
   background: var(--accent-info);
   color: #ffffff;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 700;
   min-width: 13px;
   height: 13px;
@@ -250,6 +251,7 @@
   flex-shrink: 0;
 }
 
+/* base — timeframe buttons */
 .tf-btn {
   display: flex;
   align-items: center;
@@ -259,7 +261,7 @@
   border: none;
   border-right: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: 600;
   font-family: var(--text-sans);
   cursor: pointer;
@@ -455,8 +457,9 @@
   overflow: hidden;
 }
 
+/* sm — group label */
 .symbol-modal-group-label {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -634,6 +637,7 @@
   overflow: hidden;
 }
 
+/* sm — favorites header */
 .indicators-favorites-header {
   display: flex;
   align-items: center;
@@ -668,6 +672,7 @@
   overflow: hidden;
 }
 
+/* sm — category header */
 .indicators-category-header {
   display: flex;
   align-items: center;
@@ -688,7 +693,7 @@
 .indicators-category-header:hover { color: var(--text-primary); }
 
 .indicators-category-header > i:first-child {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-muted);
   transition: transform 0.2s ease;
   flex-shrink: 0;
@@ -698,9 +703,10 @@
   transform: rotate(90deg);
 }
 
+/* sm — count badge */
 .indicators-count {
   margin-left: auto;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-muted);
   background: var(--bg-elevated);
   padding: 2px 6px;
@@ -743,8 +749,9 @@
 .indicator-name { flex: 1; min-width: 0; }
 
 /* ==================== BADGES ==================== */
+/* sm — indicator badge */
 .indicator-badge {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 700;
   padding: 2px 6px;
   text-transform: uppercase;

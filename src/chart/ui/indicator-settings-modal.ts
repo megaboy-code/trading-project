@@ -11,10 +11,14 @@ export class IndicatorSettingsModal {
     private settings: Record<string, any> = {};
     private color:    string;
 
+    // ==================== DRAGGING ====================
+    private isDragging:  boolean = false;
+    private dragOffsetX: number  = 0;
+    private dragOffsetY: number  = 0;
+
     constructor(item: LegendItem) {
         this.item     = item;
         this.color    = item.color;
-        // ✅ Read from settings object — no more ID parsing
         this.settings = item.settings ? { ...item.settings } : this.extractSettingsFallback();
     }
 
@@ -31,30 +35,38 @@ export class IndicatorSettingsModal {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(15, 23, 42, 0.98);
+            background: var(--bg-elevated);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            border-radius: 8px;
-            padding: 20px;
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0;
             width: 320px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+            box-shadow: var(--card-shadow);
             z-index: 10001;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: var(--text-sans);
+            overflow: hidden;
         `;
 
         this.modal.appendChild(this.createHeader(config?.name || this.item.name));
-        this.modal.appendChild(this.createColorRow());
+
+        const body = document.createElement('div');
+        body.style.cssText = `padding: 14px 16px;`;
+
+        body.appendChild(this.createColorRow());
 
         if (config) {
             config.fields.forEach(field => {
                 const currentValue = this.settings[field.key] ?? field.defaultValue;
-                this.modal!.appendChild(this.createField(field, currentValue));
+                body.appendChild(this.createField(field, currentValue));
             });
         }
 
+        this.modal.appendChild(body);
         this.modal.appendChild(this.createFooter());
 
         document.body.appendChild(this.modal);
+        this.setupDragging();
         this.setupCloseOnOutsideClick();
     }
 
@@ -67,7 +79,6 @@ export class IndicatorSettingsModal {
 
     // ==================== SETTINGS FALLBACK ====================
 
-    // ✅ Fallback only if settings not passed in LegendItem
     private extractSettingsFallback(): Record<string, any> {
         const parts    = this.item.id.split('_');
         const settings: Record<string, any> = {};
@@ -84,34 +95,66 @@ export class IndicatorSettingsModal {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            padding: 11px 14px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            cursor: grab;
+            user-select: none;
+            flex-shrink: 0;
         `;
 
-        const titleEl = document.createElement('h3');
+        const left = document.createElement('div');
+        left.style.cssText = `display: flex; align-items: center; gap: 8px;`;
+
+        const dragIcon = document.createElement('i');
+        dragIcon.className = 'fas fa-grip-vertical';
+        dragIcon.style.cssText = `
+            color: var(--text-muted);
+            font-size: var(--text-base);
+            flex-shrink: 0;
+        `;
+
+        const titleEl = document.createElement('span');
         titleEl.style.cssText = `
-            margin: 0;
-            font-size: 14px;
+            font-size: var(--text-xl);
             font-weight: 600;
-            color: #e2e8f0;
+            color: var(--text-primary);
         `;
         titleEl.textContent = title;
 
+        left.appendChild(dragIcon);
+        left.appendChild(titleEl);
+
         const closeBtn = document.createElement('button');
         closeBtn.style.cssText = `
-            background: none;
-            border: none;
-            color: #94a3b8;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            color: var(--text-muted);
             cursor: pointer;
-            font-size: 16px;
-            padding: 0;
+            font-size: var(--text-xl);
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             line-height: 1;
+            transition: all 0.15s ease;
         `;
         closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background   = `rgba(var(--accent-sell-rgb), 0.1)`;
+            closeBtn.style.borderColor  = `var(--accent-sell)`;
+            closeBtn.style.color        = `var(--accent-sell)`;
+        });
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background   = `var(--bg-base)`;
+            closeBtn.style.borderColor  = `var(--border)`;
+            closeBtn.style.color        = `var(--text-muted)`;
+        });
         closeBtn.addEventListener('click', () => this.close());
 
-        header.appendChild(titleEl);
+        header.appendChild(left);
         header.appendChild(closeBtn);
         return header;
     }
@@ -125,51 +168,56 @@ export class IndicatorSettingsModal {
             align-items: center;
             justify-content: space-between;
             margin-bottom: 12px;
+            padding: 7px 0;
+            border-bottom: 1px solid var(--border-light);
         `;
 
         const label = document.createElement('span');
-        label.style.cssText = `font-size: 12px; color: #94a3b8;`;
-        label.textContent   = 'Color';
+        label.style.cssText = `
+            font-size: var(--text-lg);
+            color: var(--text-secondary);
+            font-weight: 500;
+        `;
+        label.textContent = 'Color';
 
-        const colorWrap = document.createElement('div');
-        colorWrap.style.cssText = `display: flex; align-items: center; gap: 8px;`;
-
+        // ✅ Color swatch only — no hex label
         const preview = document.createElement('div');
         preview.style.cssText = `
             width: 32px;
             height: 24px;
-            border-radius: 4px;
+            border-radius: var(--radius-xs);
             background-color: ${this.color};
-            border: 1px solid rgba(148, 163, 184, 0.3);
+            border: 1px solid var(--border);
             cursor: pointer;
+            transition: border-color 0.15s ease;
         `;
 
-        const input   = document.createElement('input');
-        input.type    = 'color';
-        input.value   = this.color;
-        input.style.cssText = `opacity: 0; width: 0; height: 0; position: absolute;`;
-
-        const hexLabel = document.createElement('span');
-        hexLabel.style.cssText = `
-            font-size: 11px;
-            font-family: 'JetBrains Mono', monospace;
-            color: #64748b;
-        `;
-        hexLabel.textContent = this.color;
-
-        preview.addEventListener('click', () => input.click());
-        input.addEventListener('input', (e) => {
-            this.color                    = (e.target as HTMLInputElement).value;
-            preview.style.backgroundColor = this.color;
-            hexLabel.textContent          = this.color;
+        preview.addEventListener('mouseenter', () => {
+            preview.style.borderColor = `var(--accent-info)`;
+        });
+        preview.addEventListener('mouseleave', () => {
+            preview.style.borderColor = `var(--border)`;
         });
 
-        colorWrap.appendChild(preview);
-        colorWrap.appendChild(input);
-        colorWrap.appendChild(hexLabel);
+        // ✅ Lazy load color picker on click
+        preview.addEventListener('click', async () => {
+            const { ColorPicker } = await import('../../core/color-picker');
+            const current = this.parseToHexOpacity(this.color);
+
+            const picker = new ColorPicker({
+                color:   current.hex,
+                opacity: current.opacity,
+                onChange: (hex: string, opacity: number) => {
+                    const newVal              = opacity < 1 ? this.hexToRgba(hex, opacity) : hex;
+                    this.color                = newVal;
+                    preview.style.backgroundColor = this.toDisplayColor(newVal);
+                }
+            });
+            picker.open(preview);
+        });
 
         row.appendChild(label);
-        row.appendChild(colorWrap);
+        row.appendChild(preview);
         return row;
     }
 
@@ -181,12 +229,17 @@ export class IndicatorSettingsModal {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 12px;
+            padding: 7px 0;
+            border-bottom: 1px solid var(--border-light);
         `;
 
         const label = document.createElement('span');
-        label.style.cssText  = `font-size: 12px; color: #94a3b8;`;
-        label.textContent    = field.label;
+        label.style.cssText = `
+            font-size: var(--text-lg);
+            color: var(--text-secondary);
+            font-weight: 500;
+        `;
+        label.textContent = field.label;
 
         let input: HTMLElement;
 
@@ -210,13 +263,19 @@ export class IndicatorSettingsModal {
         input.style.cssText = `
             width: 80px;
             padding: 4px 8px;
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            border-radius: 4px;
-            color: #e2e8f0;
-            font-size: 12px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            color: var(--text-primary);
+            font-size: var(--text-lg);
+            font-family: var(--text-mono);
             text-align: right;
+            outline: none;
+            transition: border-color 0.15s ease;
         `;
+
+        input.addEventListener('focus', () => input.style.borderColor = `var(--accent-info)`);
+        input.addEventListener('blur',  () => input.style.borderColor = `var(--border)`);
 
         if (field.options && !Array.isArray(field.options)) {
             const opts  = field.options as { min: number; max: number; step: number };
@@ -236,13 +295,19 @@ export class IndicatorSettingsModal {
         const select = document.createElement('select');
         select.style.cssText = `
             padding: 4px 8px;
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            border-radius: 4px;
-            color: #e2e8f0;
-            font-size: 12px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            color: var(--text-primary);
+            font-size: var(--text-lg);
+            font-family: var(--text-sans);
             cursor: pointer;
+            outline: none;
+            transition: border-color 0.15s ease;
         `;
+
+        select.addEventListener('focus', () => select.style.borderColor = `var(--accent-info)`);
+        select.addEventListener('blur',  () => select.style.borderColor = `var(--border)`);
 
         (field.options as string[]).forEach(opt => {
             const option       = document.createElement('option');
@@ -263,7 +328,12 @@ export class IndicatorSettingsModal {
         const input     = document.createElement('input');
         input.type      = 'checkbox';
         input.checked   = value === true;
-        input.style.cssText = `width: 16px; height: 16px; cursor: pointer;`;
+        input.style.cssText = `
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent-info);
+        `;
         input.addEventListener('change', () => {
             this.settings[field.key] = input.checked;
         });
@@ -277,44 +347,59 @@ export class IndicatorSettingsModal {
         footer.style.cssText = `
             display: flex;
             gap: 8px;
-            margin-top: 20px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            padding: 10px 14px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-card);
+            flex-shrink: 0;
         `;
 
         const cancelBtn       = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
         cancelBtn.style.cssText = `
             flex: 1;
-            padding: 8px;
-            background: transparent;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 4px;
-            color: #94a3b8;
-            font-size: 12px;
+            padding: 7px;
+            background: var(--glass-gradient), var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            color: var(--text-secondary);
+            font-size: var(--text-lg);
+            font-family: var(--text-sans);
             cursor: pointer;
-            transition: all 150ms ease;
+            transition: all 0.15s ease;
         `;
+        cancelBtn.addEventListener('mouseenter', () => {
+            cancelBtn.style.borderColor = `var(--text-secondary)`;
+            cancelBtn.style.color       = `var(--text-primary)`;
+        });
+        cancelBtn.addEventListener('mouseleave', () => {
+            cancelBtn.style.borderColor = `var(--border)`;
+            cancelBtn.style.color       = `var(--text-secondary)`;
+        });
         cancelBtn.addEventListener('click', () => this.close());
 
         const applyBtn       = document.createElement('button');
         applyBtn.textContent = 'Apply';
         applyBtn.style.cssText = `
             flex: 1;
-            padding: 8px;
-            background: #3b82f6;
-            border: 1px solid #3b82f6;
-            border-radius: 4px;
-            color: white;
-            font-size: 12px;
+            padding: 7px;
+            background: rgba(var(--accent-info-rgb), 0.1);
+            border: 1px solid rgba(var(--accent-info-rgb), 0.3);
+            border-radius: var(--radius-xs);
+            color: var(--accent-info);
+            font-size: var(--text-lg);
             font-weight: 600;
+            font-family: var(--text-sans);
             cursor: pointer;
-            transition: all 150ms ease;
+            transition: all 0.15s ease;
         `;
-
-        applyBtn.addEventListener('mouseenter', () => applyBtn.style.background = '#2563eb');
-        applyBtn.addEventListener('mouseleave', () => applyBtn.style.background = '#3b82f6');
-
+        applyBtn.addEventListener('mouseenter', () => {
+            applyBtn.style.background   = `rgba(var(--accent-info-rgb), 0.2)`;
+            applyBtn.style.borderColor  = `var(--accent-info)`;
+        });
+        applyBtn.addEventListener('mouseleave', () => {
+            applyBtn.style.background   = `rgba(var(--accent-info-rgb), 0.1)`;
+            applyBtn.style.borderColor  = `rgba(var(--accent-info-rgb), 0.3)`;
+        });
         applyBtn.addEventListener('click', () => {
             this.applySettings();
             this.close();
@@ -332,7 +417,6 @@ export class IndicatorSettingsModal {
             indicatorId: this.item.id
         };
 
-        // ✅ Only include what changed
         if (this.color !== this.item.color) {
             detail.color = this.color;
         }
@@ -341,8 +425,45 @@ export class IndicatorSettingsModal {
             detail.settings = { ...this.settings };
         }
 
-        // ✅ Single consolidated event
         document.dispatchEvent(new CustomEvent('indicator-settings-changed', { detail }));
+    }
+
+    // ==================== DRAGGING ====================
+
+    private setupDragging(): void {
+        const header = this.modal?.querySelector('div') as HTMLElement;
+        if (!header || !this.modal) return;
+
+        header.addEventListener('mousedown', (e: MouseEvent) => {
+            e.preventDefault();
+            this.isDragging  = true;
+            const rect       = this.modal!.getBoundingClientRect();
+            this.dragOffsetX = e.clientX - rect.left;
+            this.dragOffsetY = e.clientY - rect.top;
+            this.modal!.style.transform = 'none';
+            this.modal!.style.cursor    = 'grabbing';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e: MouseEvent) => {
+            if (!this.isDragging || !this.modal) return;
+            const x      = e.clientX - this.dragOffsetX;
+            const y      = e.clientY - this.dragOffsetY;
+            const maxX   = window.innerWidth  - this.modal.offsetWidth;
+            const maxY   = window.innerHeight - this.modal.offsetHeight;
+            const boundX = Math.max(0, Math.min(x, maxX));
+            const boundY = Math.max(0, Math.min(y, maxY));
+            this.modal.style.left = `${boundX}px`;
+            this.modal.style.top  = `${boundY}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (this.isDragging) {
+                this.isDragging             = false;
+                this.modal!.style.cursor    = '';
+                document.body.style.userSelect = '';
+            }
+        });
     }
 
     // ==================== OUTSIDE CLICK ====================
@@ -351,11 +472,41 @@ export class IndicatorSettingsModal {
         setTimeout(() => {
             const handler = (e: MouseEvent) => {
                 if (this.modal && !this.modal.contains(e.target as Node)) {
+                    if ((e.target as HTMLElement).closest('.cp-container')) return;
                     this.close();
                     document.removeEventListener('click', handler);
                 }
             };
             document.addEventListener('click', handler);
         }, 100);
+    }
+
+    // ==================== COLOR HELPERS ====================
+
+    private parseToHexOpacity(value: any): { hex: string; opacity: number } {
+        if (!value || typeof value !== 'string') return { hex: '#3b82f6', opacity: 1 };
+        const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+        if (match) {
+            const r   = parseInt(match[1]);
+            const g   = parseInt(match[2]);
+            const b   = parseInt(match[3]);
+            const a   = match[4] !== undefined ? parseFloat(match[4]) : 1;
+            const hex = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+            return { hex, opacity: a };
+        }
+        return { hex: value.startsWith('#') ? value : '#3b82f6', opacity: 1 };
+    }
+
+    private hexToRgba(hex: string, opacity: number): string {
+        const h = hex.replace('#', '');
+        const r = parseInt(h.substring(0, 2), 16);
+        const g = parseInt(h.substring(2, 4), 16);
+        const b = parseInt(h.substring(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+
+    private toDisplayColor(value: any): string {
+        if (!value) return '#3b82f6';
+        return this.parseToHexOpacity(value).hex;
     }
 }

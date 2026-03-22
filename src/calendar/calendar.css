@@ -20,9 +20,10 @@
 
 .cal-settings-drop.show { display: flex; }
 
+/* sm — settings label */
 .cal-settings-label {
     padding: 8px 12px 4px;
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -30,6 +31,7 @@
     border-bottom: 1px solid var(--border);
 }
 
+/* base — settings option */
 .cal-settings-option {
     display: flex;
     align-items: center;
@@ -37,7 +39,7 @@
     padding: 8px 12px;
     cursor: pointer;
     transition: background 0.15s ease;
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--text-secondary);
 }
 
@@ -77,10 +79,11 @@
     flex-shrink: 0;
 }
 
+/* base — day tab */
 .cal-day-tab {
     flex: 1;
     padding: 6px 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 600;
     font-family: var(--text-sans);
     background: transparent;
@@ -108,11 +111,12 @@
 .cal-event-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 /* ── Group header ── */
+/* base — group header */
 .cal-group-header {
     padding: 5px 10px;
     background: var(--bg-base);
     border-bottom: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -152,9 +156,10 @@
     gap: 5px;
 }
 
+/* base — event time */
 .cal-event-time {
     font-family: var(--text-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--text-muted);
     width: 38px;
     flex-shrink: 0;
@@ -193,9 +198,10 @@
 .cal-impact-dot.filled.high   { background: var(--accent-sell); }
 
 /* ── Event name ── */
+/* base — event name */
 .cal-event-name {
     flex: 1;
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
@@ -204,8 +210,9 @@
 }
 
 /* ── Currency badge ── */
+/* sm — currency badge */
 .cal-event-currency {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 700;
     font-family: var(--text-mono);
     padding: 1px 5px;
@@ -217,8 +224,9 @@
 }
 
 /* ── Chevron ── */
+/* base — chevron */
 .cal-event-chevron {
-    font-size: 0.6rem;
+    font-size: var(--text-base);
     color: var(--text-muted);
     transition: transform 0.2s ease;
     flex-shrink: 0;
@@ -243,16 +251,18 @@
     gap: 2px;
 }
 
+/* sm — val label */
 .cal-val-label {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.3px;
 }
 
+/* base — val number */
 .cal-val-num {
     font-family: var(--text-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 600;
     color: var(--text-secondary);
 }
@@ -275,6 +285,7 @@
 .cal-event-detail.show { display: flex; }
 
 /* ── Countdown ── */
+/* base — countdown */
 .cal-countdown {
     display: flex;
     align-items: center;
@@ -284,17 +295,19 @@
     background: rgba(var(--accent-warn-rgb), 0.06);
     border: 1px solid rgba(var(--accent-warn-rgb), 0.2);
     border-radius: 5px;
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--accent-warning);
     font-weight: 600;
     font-family: var(--text-mono);
 }
 
-.cal-countdown i { font-size: 0.75rem; }
+/* base — countdown icon */
+.cal-countdown i { font-size: var(--text-base); }
 
 /* ── Description ── */
+/* base — description */
 .cal-detail-desc {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--text-secondary);
     line-height: 1.6;
     padding: 6px 8px;
@@ -304,8 +317,9 @@
 }
 
 /* ── History ── */
+/* sm — history label */
 .cal-history-label {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -317,8 +331,9 @@
     border-collapse: collapse;
 }
 
+/* sm — history table header */
 .cal-history-table th {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -330,8 +345,9 @@
 
 .cal-history-table th:first-child { text-align: left; }
 
+/* sm — history table data */
 .cal-history-table td {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-family: var(--text-mono);
     padding: 4px 4px;
     text-align: right;
@@ -357,16 +373,21 @@
 }
 
 .cal-empty i { font-size: 1.5rem; opacity: 0.3; }
-.cal-empty p { font-size: var(--text-sm); line-height: 1.5; }
+/* base — empty text */
+.cal-empty p { font-size: var(--text-base); line-height: 1.5; }
 
 /* ── Footer ── */
+/* sm — footer info */
 .cal-footer-info {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 5px;
 }
 
-.cal-footer-info i { color: var(--accent-buy); font-size: 0.55rem; }
-.cal-footer-tz { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--text-mono); }
+/* sm — footer icon */
+.cal-footer-info i { color: var(--accent-buy); font-size: var(--text-sm); }
+
+/* sm — footer timezone */
+.cal-footer-tz { font-size: var(--text-sm); color: var(--text-muted); font-family: var(--text-mono); }

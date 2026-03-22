@@ -76,11 +76,10 @@
 
     /* ── TEXT ── */
     --text-primary:   #0a0c12;
-    --text-secondary: #2e3347;
-    /* ✅ Fixed — was #6b7294 (too light on white cards) */
-    --text-muted:     #4a5270;
-    /* ✅ Fixed — was #9ba3be (too light on light bg) */
-    --text-dim:       #4a5068;
+    --text-secondary: #06070c;
+    /* ✅ Darkened for better readability */
+    --text-muted:     #333650;
+    --text-dim:       #030306;
 
     /* ── ACCENTS ── */
     --accent-buy:     #0a7a50;
@@ -127,9 +126,9 @@
     --sidebar-right-width: 48px;
 
     /* ── TYPE SCALE — 8 levels, clear hierarchy ── */
-    --text-xs:      0.625rem;    /* 10px — badges, axis labels, timestamps */
-    --text-sm:      0.6875rem;   /* 11px — secondary labels, captions */
-    --text-base:    0.75rem;     /* 12px — body text, panel content */
+    --text-xs:      0.625rem;    /* 10px — reserved, not for text */
+    --text-sm:      0.6875rem;   /* 11px — reserved, not for text */
+    --text-base:    0.75rem;     /* 12px — minimum body text */
     --text-md:      0.8125rem;   /* 13px — buttons, tabs, primary UI */
     --text-lg:      0.875rem;    /* 14px — section titles, panel headers */
     --text-xl:      1rem;        /* 16px — card titles, modal headers */
@@ -289,9 +288,9 @@ body {
     text-overflow: ellipsis;
 }
 
-/* xs — user role */
+/* base — user role */
 .user-role {
-    font-size: var(--text-xs);
+    font-size: var(--text-base);
     color: var(--accent-info);
     font-weight: 500;
 }
@@ -357,7 +356,7 @@ body {
 }
 
 .user-menu-chevron {
-    font-size: var(--text-xs) !important;
+    font-size: var(--text-base) !important;
     color: var(--text-muted) !important;
     transition: transform 0.2s ease !important;
     width: auto !important;
@@ -375,14 +374,14 @@ body {
     display: flex;
 }
 
-/* sm — theme options */
+/* base — theme options */
 .user-theme-option {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 8px 14px 8px 24px;
     cursor: pointer;
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--text-secondary);
     transition: background 0.15s ease, color 0.15s ease;
 }
@@ -405,7 +404,7 @@ body {
 
 .user-theme-check {
     margin-left: auto;
-    font-size: var(--text-xs);
+    font-size: var(--text-base);
     color: var(--accent-info);
     opacity: 0;
 }
@@ -447,7 +446,6 @@ body {
     color: var(--text-primary);
 }
 
-/* ✅ Active tab indicator on TOP */
 .tab.active {
     background: var(--bg-body);
     color: var(--text-primary);
@@ -473,9 +471,9 @@ body {
 }
 
 /* ==================== LIVE TAB PRICE ==================== */
-/* xs — live price */
+/* base — live price */
 .tab-live-price {
-    font-size: var(--text-xs);
+    font-size: var(--text-base);
     font-weight: 500;
     font-family: var(--text-mono);
     transition: color 0.3s ease;
@@ -502,7 +500,7 @@ body {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    font-size: var(--text-xs);
+    font-size: var(--text-base);
     cursor: pointer;
     padding: 0;
     margin-left: 4px;
@@ -588,14 +586,14 @@ body {
 
 .notification-bell-tab:hover { color: var(--text-primary); }
 
-/* xs — alert count badge */
+/* base — alert count badge */
 .notification-bell-tab .alert-count {
     position: absolute;
     top: -2px;
     right: -2px;
     background: var(--accent-sell);
     color: #ffffff;
-    font-size: var(--text-xs);
+    font-size: var(--text-base);
     font-weight: 700;
     min-width: 13px;
     height: 13px;

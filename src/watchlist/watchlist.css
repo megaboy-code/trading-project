@@ -20,21 +20,23 @@
     align-items: center;
 }
 
+/* base — search icon */
 .search-input-wrap i {
     position: absolute;
     left: 8px;
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: var(--text-base);
     pointer-events: none;
 }
 
+/* base — search input */
 .search-input {
     width: 100%;
     background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: 5px;
     color: var(--text-primary);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-family: var(--text-sans);
     padding: 5px 8px 5px 26px;
     outline: none;
@@ -69,15 +71,17 @@
     border-color: var(--accent-info);
 }
 
+/* base — result name */
 .search-result-name {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 600;
     font-family: var(--text-mono);
     color: var(--text-primary);
     flex: 1;
 }
 
-.search-result-cat { font-size: var(--text-xs); color: var(--text-muted); }
+/* sm — result category */
+.search-result-cat { font-size: var(--text-sm); color: var(--text-muted); }
 
 /* ── Column headers ── */
 .watchlist-cols {
@@ -88,9 +92,10 @@
     background: var(--bg-base);
 }
 
-.wl-col-symbol { flex: 1; font-size: var(--text-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
-.wl-col-price  { width: 68px; text-align: right; font-size: var(--text-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
-.wl-col-change { width: 46px; text-align: right; font-size: var(--text-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+/* sm — column headers */
+.wl-col-symbol { flex: 1; font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+.wl-col-price  { width: 68px; text-align: right; font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+.wl-col-change { width: 46px; text-align: right; font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
 
 /* ── Watchlist items ── */
 .watchlist-items {
@@ -170,7 +175,8 @@
 }
 
 .wl-symbol-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-.wl-symbol-icon i   { font-size: 0.75rem; }
+/* base — symbol icon */
+.wl-symbol-icon i   { font-size: var(--text-base); }
 
 .wl-symbol-icon.gold   { border-color: #c0a060; background: rgba(192,160,96,0.1); color: #c0a060; }
 .wl-symbol-icon.silver { border-color: #a0a8b8; background: rgba(160,168,184,0.1); color: #a0a8b8; }
@@ -179,15 +185,17 @@
 
 /* ── Symbol info ── */
 .watch-symbol-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.watch-symbol      { font-size: var(--text-md); font-weight: 700; color: var(--text-primary); font-family: var(--text-mono); }
-.watch-category    { font-size: var(--text-xs); color: var(--text-muted); }
+/* lg — symbol name */
+.watch-symbol      { font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); font-family: var(--text-mono); }
+/* sm — category */
+.watch-category    { font-size: var(--text-sm); color: var(--text-muted); }
 
 /* ── Price ── */
 .watch-price {
     width: 68px;
     text-align: right;
     font-family: var(--text-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 600;
     color: var(--text-primary);
     transition: color 0.3s ease;
@@ -197,7 +205,8 @@
 .watch-price.flash-down { color: var(--accent-sell); }
 
 /* ── Change ── */
-.watch-change { width: 46px; text-align: right; font-family: var(--text-mono); font-size: var(--text-xs); font-weight: 600; }
+/* sm — change */
+.watch-change { width: 46px; text-align: right; font-family: var(--text-mono); font-size: var(--text-sm); font-weight: 600; }
 .watch-change.up   { color: var(--accent-buy); }
 .watch-change.down { color: var(--accent-sell); }
 
@@ -216,7 +225,7 @@
     border: none;
     border-radius: 3px;
     color: var(--text-muted);
-    font-size: 0.55rem;
+    font-size: var(--text-base);
     cursor: pointer;
     opacity: 0;
     transition: all 0.15s ease;
@@ -238,21 +247,24 @@
 }
 
 .wl-empty i { font-size: 1.5rem; opacity: 0.3; }
-.wl-empty p { font-size: var(--text-sm); line-height: 1.5; }
+/* base — empty text */
+.wl-empty p { font-size: var(--text-base); line-height: 1.5; }
 
 /* ── Footer ── */
-.wl-footer-info { font-size: var(--text-xs); color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
-.wl-footer-info i { color: var(--accent-buy); font-size: 0.5rem; }
+/* sm — footer info */
+.wl-footer-info { font-size: var(--text-sm); color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+.wl-footer-info i { color: var(--accent-buy); font-size: var(--text-sm); }
 
 .wl-footer-sort { display: flex; align-items: center; gap: 3px; }
 
+/* sm — sort button */
 .wl-sort-btn {
     padding: 3px 6px;
     background: transparent;
     border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--text-muted);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-family: var(--text-sans);
     cursor: pointer;
     transition: all 0.15s ease;
