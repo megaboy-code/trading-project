@@ -1,59 +1,61 @@
 // ================================================================
-// 📋 WATCHLIST MODULE - Mock
+// 📋 WATCHLIST MODULE
+// Real MT5 prices via WebSocket
+// localStorage persists watchlist state
 // ================================================================
 
 interface WatchlistSymbol {
-    id:       string;
-    name:     string;
-    cat:      string;
-    type:     'forex' | 'metal' | 'crypto' | 'index';
-    base?:    string;  // forex only
-    quote?:   string;  // forex only
-    img?:     string;  // non-forex icon
-    price:    string;
-    chg:      string;
+    id:     string;
+    name:   string;
+    cat:    string;
+    type:   'forex' | 'metal' | 'crypto' | 'index';
+    base?:  string;
+    quote?: string;
+    img?:   string;
+    price:  string;
+    chg:    string;
 }
+
+const DEFAULT_SYMBOLS = ['BTCUSD', 'EURUSD', 'XAUUSD', 'ETHUSD', 'USDJPY'];
+const STORAGE_KEY     = 'watchlist_symbols';
 
 export class WatchlistModule {
 
-    private container:    HTMLElement | null = null;
-    private itemsEl:      HTMLElement | null = null;
-    private searchEl:     HTMLElement | null = null;
-    private searchInput:  HTMLInputElement | null = null;
-    private searchResults:HTMLElement | null = null;
+    private container:     HTMLElement | null = null;
+    private itemsEl:       HTMLElement | null = null;
+    private searchEl:      HTMLElement | null = null;
+    private searchInput:   HTMLInputElement | null = null;
+    private searchResults: HTMLElement | null = null;
 
-    private added: Set<string> = new Set(['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'US30']);
+    private added: Set<string> = new Set();
     private currentSort: 'az' | 'chg' = 'az';
 
-    // ── Mock symbol database ──
+    private priceUpdateHandler:     ((e: Event) => void) | null = null;
+    private watchlistUpdateHandler: ((e: Event) => void) | null = null;
+
+    // ── Full symbol database ──
     private readonly SYMBOLS: WatchlistSymbol[] = [
-        { id: 'EURUSD',  name: 'EUR/USD',  cat: 'Forex · Major',   type: 'forex',  base: 'eu', quote: 'us', price: '1.08497', chg: '+0.12' },
-        { id: 'GBPUSD',  name: 'GBP/USD',  cat: 'Forex · Major',   type: 'forex',  base: 'gb', quote: 'us', price: '1.26854', chg: '-0.08' },
-        { id: 'USDJPY',  name: 'USD/JPY',  cat: 'Forex · Major',   type: 'forex',  base: 'us', quote: 'jp', price: '151.240', chg: '+0.24' },
-        { id: 'AUDUSD',  name: 'AUD/USD',  cat: 'Forex · Major',   type: 'forex',  base: 'au', quote: 'us', price: '0.65430', chg: '-0.15' },
-        { id: 'USDCAD',  name: 'USD/CAD',  cat: 'Forex · Major',   type: 'forex',  base: 'us', quote: 'ca', price: '1.35420', chg: '+0.10' },
-        { id: 'NZDUSD',  name: 'NZD/USD',  cat: 'Forex · Major',   type: 'forex',  base: 'nz', quote: 'us', price: '0.60150', chg: '-0.05' },
-        { id: 'USDCHF',  name: 'USD/CHF',  cat: 'Forex · Major',   type: 'forex',  base: 'us', quote: 'ch', price: '0.89240', chg: '+0.08' },
-        { id: 'EURGBP',  name: 'EUR/GBP',  cat: 'Forex · Cross',   type: 'forex',  base: 'eu', quote: 'gb', price: '0.85420', chg: '+0.03' },
-        { id: 'EURJPY',  name: 'EUR/JPY',  cat: 'Forex · Cross',   type: 'forex',  base: 'eu', quote: 'jp', price: '163.850', chg: '+0.36' },
-        { id: 'GBPJPY',  name: 'GBP/JPY',  cat: 'Forex · Cross',   type: 'forex',  base: 'gb', quote: 'jp', price: '191.240', chg: '+0.16' },
-        { id: 'XAUUSD',  name: 'XAU/USD',  cat: 'Metal · Gold',    type: 'metal',  img: 'https://assets.coincap.io/assets/icons/xau@2x.png',  price: '2024.50', chg: '+0.45' },
-        { id: 'XAGUSD',  name: 'XAG/USD',  cat: 'Metal · Silver',  type: 'metal',  img: 'https://assets.coincap.io/assets/icons/xag@2x.png',  price: '22.840',  chg: '+0.22' },
-        { id: 'BTCUSD',  name: 'BTC/USD',  cat: 'Crypto',          type: 'crypto', img: 'https://assets.coincap.io/assets/icons/btc@2x.png',  price: '67420',   chg: '-1.23' },
-        { id: 'ETHUSD',  name: 'ETH/USD',  cat: 'Crypto',          type: 'crypto', img: 'https://assets.coincap.io/assets/icons/eth@2x.png',  price: '3420',    chg: '-0.87' },
-        { id: 'SOLUSD',  name: 'SOL/USD',  cat: 'Crypto',          type: 'crypto', img: 'https://assets.coincap.io/assets/icons/sol@2x.png',  price: '182.40',  chg: '+2.14' },
-        { id: 'US30',    name: 'US30',     cat: 'Index · Dow',     type: 'index',  img: 'https://flagcdn.com/w320/us.png',                     price: '38924',   chg: '+0.31' },
-        { id: 'US500',   name: 'US500',    cat: 'Index · S&P500',  type: 'index',  img: 'https://flagcdn.com/w320/us.png',                     price: '5248',    chg: '+0.28' },
-        { id: 'NAS100',  name: 'NAS100',   cat: 'Index · Nasdaq',  type: 'index',  img: 'https://flagcdn.com/w320/us.png',                     price: '18420',   chg: '+0.42' },
-        { id: 'GER40',   name: 'GER40',    cat: 'Index · DAX',     type: 'index',  img: 'https://flagcdn.com/w320/de.png',                     price: '17820',   chg: '+0.18' },
-        { id: 'UK100',   name: 'UK100',    cat: 'Index · FTSE',    type: 'index',  img: 'https://flagcdn.com/w320/gb.png',                     price: '7940',    chg: '-0.12' },
+        { id: 'EURUSD',  name: 'EUR/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'eu', quote: 'us', price: '--', chg: '0.00' },
+        { id: 'GBPUSD',  name: 'GBP/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'gb', quote: 'us', price: '--', chg: '0.00' },
+        { id: 'USDJPY',  name: 'USD/JPY',  cat: 'Forex · Major',  type: 'forex',  base: 'us', quote: 'jp', price: '--', chg: '0.00' },
+        { id: 'AUDUSD',  name: 'AUD/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'au', quote: 'us', price: '--', chg: '0.00' },
+        { id: 'USDCAD',  name: 'USD/CAD',  cat: 'Forex · Major',  type: 'forex',  base: 'us', quote: 'ca', price: '--', chg: '0.00' },
+        { id: 'NZDUSD',  name: 'NZD/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'nz', quote: 'us', price: '--', chg: '0.00' },
+        { id: 'USDCHF',  name: 'USD/CHF',  cat: 'Forex · Major',  type: 'forex',  base: 'us', quote: 'ch', price: '--', chg: '0.00' },
+        { id: 'EURGBP',  name: 'EUR/GBP',  cat: 'Forex · Cross',  type: 'forex',  base: 'eu', quote: 'gb', price: '--', chg: '0.00' },
+        { id: 'EURJPY',  name: 'EUR/JPY',  cat: 'Forex · Cross',  type: 'forex',  base: 'eu', quote: 'jp', price: '--', chg: '0.00' },
+        { id: 'GBPJPY',  name: 'GBP/JPY',  cat: 'Forex · Cross',  type: 'forex',  base: 'gb', quote: 'jp', price: '--', chg: '0.00' },
+        { id: 'XAUUSD',  name: 'XAU/USD',  cat: 'Metal · Gold',   type: 'metal',  img: 'https://assets.coincap.io/assets/icons/xau@2x.png',  price: '--', chg: '0.00' },
+        { id: 'XAGUSD',  name: 'XAG/USD',  cat: 'Metal · Silver', type: 'metal',  img: 'https://assets.coincap.io/assets/icons/xag@2x.png',  price: '--', chg: '0.00' },
+        { id: 'BTCUSD',  name: 'BTC/USD',  cat: 'Crypto',         type: 'crypto', img: 'https://assets.coincap.io/assets/icons/btc@2x.png',  price: '--', chg: '0.00' },
+        { id: 'ETHUSD',  name: 'ETH/USD',  cat: 'Crypto',         type: 'crypto', img: 'https://assets.coincap.io/assets/icons/eth@2x.png',  price: '--', chg: '0.00' },
+        { id: 'SOLUSD',  name: 'SOL/USD',  cat: 'Crypto',         type: 'crypto', img: 'https://assets.coincap.io/assets/icons/sol@2x.png',  price: '--', chg: '0.00' },
+        { id: 'US30',    name: 'US30',     cat: 'Index · Dow',    type: 'index',  img: 'https://flagcdn.com/w320/us.png',                     price: '--', chg: '0.00' },
+        { id: 'US500',   name: 'US500',    cat: 'Index · S&P500', type: 'index',  img: 'https://flagcdn.com/w320/us.png',                     price: '--', chg: '0.00' },
+        { id: 'NAS100',  name: 'NAS100',   cat: 'Index · Nasdaq', type: 'index',  img: 'https://flagcdn.com/w320/us.png',                     price: '--', chg: '0.00' },
+        { id: 'GER40',   name: 'GER40',    cat: 'Index · DAX',    type: 'index',  img: 'https://flagcdn.com/w320/de.png',                     price: '--', chg: '0.00' },
+        { id: 'UK100',   name: 'UK100',    cat: 'Index · FTSE',   type: 'index',  img: 'https://flagcdn.com/w320/gb.png',                     price: '--', chg: '0.00' },
     ];
-
-    // ── Price tick listener reference for cleanup ──
-    private priceUpdateHandler: ((e: Event) => void) | null = null;
-
-    // ── Mock tick interval for testing ──
-    private mockTickInterval: ReturnType<typeof setInterval> | null = null;
 
     // ================================================================
     // INITIALIZE
@@ -71,41 +73,73 @@ export class WatchlistModule {
             return;
         }
 
-        this.renderDefaultSymbols();
-        this.bindEvents();
-        this.startMockTicks(); // remove when real WebSocket is wired
+        // ── Load saved watchlist or use defaults ──
+        this.loadFromStorage();
 
-        console.log('✅ Watchlist Module initialized (mock)');
+        this.renderSymbols();
+        this.bindEvents();
+
+        // ── Tell C++ about all watchlist symbols ──
+        this.added.forEach(symbol => {
+            this.notifyBackendAdd(symbol);
+        });
+
+        console.log('✅ Watchlist Module initialized');
     }
 
     // ================================================================
-    // DESTROY
+    // STORAGE
     // ================================================================
 
-    public destroy(): void {
-        if (this.priceUpdateHandler) {
-            document.removeEventListener('price-update', this.priceUpdateHandler);
-            this.priceUpdateHandler = null;
-        }
+    private loadFromStorage(): void {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const symbols: string[] = JSON.parse(saved);
+                if (Array.isArray(symbols) && symbols.length > 0) {
+                    this.added = new Set(symbols);
+                    return;
+                }
+            }
+        } catch {}
 
-        if (this.mockTickInterval) {
-            clearInterval(this.mockTickInterval);
-            this.mockTickInterval = null;
-        }
+        // ── Defaults ──
+        this.added = new Set(DEFAULT_SYMBOLS);
+        this.saveToStorage();
+    }
 
-        console.log('🗑️ Watchlist Module destroyed');
+    private saveToStorage(): void {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(Array.from(this.added))
+            );
+        } catch {}
+    }
+
+    // ── Notify C++ backend ──
+    private notifyBackendAdd(symbol: string): void {
+        document.dispatchEvent(new CustomEvent('watchlist-add', {
+            detail: { symbol }
+        }));
+    }
+
+    private notifyBackendRemove(symbol: string): void {
+        document.dispatchEvent(new CustomEvent('watchlist-remove', {
+            detail: { symbol }
+        }));
     }
 
     // ================================================================
     // RENDER
     // ================================================================
 
-    private renderDefaultSymbols(): void {
+    private renderSymbols(): void {
         if (!this.itemsEl) return;
         this.itemsEl.innerHTML = '';
 
-        const defaults = this.SYMBOLS.filter(s => this.added.has(s.id));
-        defaults.forEach((sym, idx) => {
+        const symbols = this.SYMBOLS.filter(s => this.added.has(s.id));
+        symbols.forEach((sym, idx) => {
             const item = this.buildWatchItem(sym);
             if (idx === 0) item.classList.add('active');
             this.itemsEl!.appendChild(item);
@@ -113,10 +147,6 @@ export class WatchlistModule {
     }
 
     private buildWatchItem(sym: WatchlistSymbol): HTMLElement {
-        const chgNum   = parseFloat(sym.chg);
-        const chgClass = chgNum >= 0 ? 'up' : 'down';
-        const chgText  = (chgNum >= 0 ? '+' : '') + sym.chg + '%';
-
         const item = document.createElement('div');
         item.className = 'watch-item';
         item.setAttribute('data-symbol', sym.id);
@@ -126,19 +156,17 @@ export class WatchlistModule {
                 <div class="watch-symbol">${sym.name}</div>
                 <div class="watch-category">${sym.cat}</div>
             </div>
-            <div class="watch-price" data-price-id="${sym.id}">${sym.price}</div>
-            <div class="watch-change ${chgClass}" data-chg-id="${sym.id}">${chgText}</div>
+            <div class="watch-price" data-price-id="${sym.id}">--</div>
+            <div class="watch-change" data-chg-id="${sym.id}">--</div>
             <button class="watch-delete"><i class="fas fa-times"></i></button>
         `;
 
-        // Click → switch chart symbol
         item.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('.watch-delete')) return;
             this.setActive(sym.id);
-            this.switchChartSymbol(sym.name);
+            this.switchChartSymbol(sym.id);
         });
 
-        // Delete
         item.querySelector('.watch-delete')!.addEventListener('click', (e) => {
             e.stopPropagation();
             this.removeSymbol(sym.id, item);
@@ -158,13 +186,9 @@ export class WatchlistModule {
                 </div>`;
         }
 
-        const iconClass = sym.type === 'metal'
-            ? (sym.id.includes('XAU') ? 'gold' : 'silver')
-            : sym.type;
-
         return `
             <div class="wl-symbol-icon-wrap">
-                <div class="wl-symbol-icon ${iconClass}">
+                <div class="wl-symbol-icon ${sym.type}">
                     <img src="${sym.img}"
                          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
                          alt="${sym.name}">
@@ -190,7 +214,8 @@ export class WatchlistModule {
             btn.addEventListener('click', () => {
                 const sort = btn.getAttribute('data-sort') as 'az' | 'chg';
                 this.setSort(sort);
-                document.querySelectorAll('.wl-sort-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.wl-sort-btn')
+                    .forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
         });
@@ -203,12 +228,26 @@ export class WatchlistModule {
             }
         });
 
-        // Price update from WebSocket (real)
+        // ── Real price update from active chart symbol ──
         this.priceUpdateHandler = (e: Event) => {
-            const { symbol, bid, chg } = (e as CustomEvent).detail;
-            this.updatePrice(symbol, bid, chg);
+            const { symbol, bid } = (e as CustomEvent).detail;
+            if (symbol && bid !== undefined) {
+                this.updatePrice(symbol, bid);
+            }
         };
         document.addEventListener('price-update', this.priceUpdateHandler);
+
+        // ── Watchlist prices from C++ backend ──
+        this.watchlistUpdateHandler = (e: Event) => {
+            const { prices } = (e as CustomEvent).detail;
+            if (!prices) return;
+            Object.entries(prices).forEach(([symbol, data]: [string, any]) => {
+                if (data.bid !== undefined) {
+                    this.updatePrice(symbol, data.bid);
+                }
+            });
+        };
+        document.addEventListener('watchlist-prices-update', this.watchlistUpdateHandler);
     }
 
     // ================================================================
@@ -235,7 +274,6 @@ export class WatchlistModule {
         const q = this.searchInput?.value.trim().toLowerCase() || '';
         if (!this.searchResults) return;
         this.searchResults.innerHTML = '';
-
         if (!q) return;
 
         const matches = this.SYMBOLS.filter(s =>
@@ -245,7 +283,7 @@ export class WatchlistModule {
 
         if (!matches.length) {
             this.searchResults.innerHTML = `
-                <div style="font-size:0.65rem; color:var(--text-muted); padding:4px 8px;">
+                <div style="font-size:0.65rem;color:var(--text-muted);padding:4px 8px;">
                     No results found
                 </div>`;
             return;
@@ -270,20 +308,33 @@ export class WatchlistModule {
 
     private addSymbol(sym: WatchlistSymbol): void {
         this.added.add(sym.id);
+        this.saveToStorage();
+
         const item = this.buildWatchItem(sym);
         this.itemsEl?.appendChild(item);
         this.closeSearch();
+
+        // ── Tell C++ to add to watchlist ──
+        this.notifyBackendAdd(sym.id);
+
+        console.log(`➕ Watchlist add: ${sym.id}`);
     }
 
     private removeSymbol(id: string, el: HTMLElement): void {
         this.added.delete(id);
+        this.saveToStorage();
         el.remove();
 
-        // If removed item was active — set first item as active
+        // ── Tell C++ to remove from watchlist ──
+        this.notifyBackendRemove(id);
+
+        // If removed was active → set first as active
         const first = this.itemsEl?.querySelector('.watch-item');
         if (first && !this.itemsEl?.querySelector('.watch-item.active')) {
             first.classList.add('active');
         }
+
+        console.log(`➖ Watchlist remove: ${id}`);
     }
 
     // ================================================================
@@ -292,7 +343,10 @@ export class WatchlistModule {
 
     private setActive(id: string): void {
         this.itemsEl?.querySelectorAll('.watch-item').forEach(item => {
-            item.classList.toggle('active', item.getAttribute('data-symbol') === id);
+            item.classList.toggle(
+                'active',
+                item.getAttribute('data-symbol') === id
+            );
         });
     }
 
@@ -300,39 +354,30 @@ export class WatchlistModule {
     // CHART SWITCH
     // ================================================================
 
-    private switchChartSymbol(symbolName: string): void {
-        // Normalize: EUR/USD → EURUSD for chart
-        const symbol = symbolName.replace('/', '');
+    private switchChartSymbol(symbol: string): void {
         document.dispatchEvent(new CustomEvent('symbol-changed', {
             detail: { symbol }
         }));
-        console.log(`📊 Watchlist → switch chart to ${symbol}`);
+        console.log(`📊 Watchlist → chart: ${symbol}`);
     }
 
     // ================================================================
-    // PRICE UPDATE (real WebSocket)
+    // PRICE UPDATE — called from WebSocket data
     // ================================================================
 
-    public updatePrice(symbolId: string, price: number, chg?: number): void {
-        const priceEl = this.itemsEl?.querySelector(`[data-price-id="${symbolId}"]`);
-        const chgEl   = this.itemsEl?.querySelector(`[data-chg-id="${symbolId}"]`);
-
+    public updatePrice(symbolId: string, price: number): void {
+        const priceEl = this.itemsEl?.querySelector(
+            `[data-price-id="${symbolId}"]`
+        );
         if (!priceEl) return;
 
-        const currentPrice = parseFloat(priceEl.textContent || '0');
-        const goUp = price >= currentPrice;
+        const current  = parseFloat(priceEl.textContent || '0');
+        const goUp     = price >= current;
 
         priceEl.textContent = price.toString();
         priceEl.classList.remove('flash-up', 'flash-down');
         priceEl.classList.add(goUp ? 'flash-up' : 'flash-down');
         setTimeout(() => priceEl.classList.remove('flash-up', 'flash-down'), 400);
-
-        if (chgEl && chg !== undefined) {
-            const chgClass = chg >= 0 ? 'up' : 'down';
-            const chgText  = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
-            chgEl.textContent = chgText;
-            chgEl.className = `watch-change ${chgClass}`;
-        }
     }
 
     // ================================================================
@@ -343,7 +388,9 @@ export class WatchlistModule {
         this.currentSort = sort;
         if (!this.itemsEl) return;
 
-        const items = Array.from(this.itemsEl.querySelectorAll('.watch-item'));
+        const items = Array.from(
+            this.itemsEl.querySelectorAll('.watch-item')
+        );
 
         items.sort((a, b) => {
             if (sort === 'az') {
@@ -351,8 +398,12 @@ export class WatchlistModule {
                 const nameB = b.querySelector('.watch-symbol')?.textContent || '';
                 return nameA.localeCompare(nameB);
             } else {
-                const chgA = parseFloat(a.querySelector('.watch-change')?.textContent || '0');
-                const chgB = parseFloat(b.querySelector('.watch-change')?.textContent || '0');
+                const chgA = parseFloat(
+                    a.querySelector('.watch-change')?.textContent || '0'
+                );
+                const chgB = parseFloat(
+                    b.querySelector('.watch-change')?.textContent || '0'
+                );
                 return chgB - chgA;
             }
         });
@@ -361,22 +412,16 @@ export class WatchlistModule {
     }
 
     // ================================================================
-    // MOCK TICKS — remove when real WebSocket is wired
+    // DESTROY
     // ================================================================
 
-    private startMockTicks(): void {
-        this.mockTickInterval = setInterval(() => {
-            this.itemsEl?.querySelectorAll('.watch-item').forEach(item => {
-                const id      = item.getAttribute('data-symbol') || '';
-                const priceEl = item.querySelector('.watch-price');
-                if (!priceEl) return;
-
-                const current = parseFloat(priceEl.textContent || '0');
-                const delta   = (Math.random() - 0.5) * 0.001 * current;
-                const newPrice = (current + delta);
-
-                this.updatePrice(id, parseFloat(newPrice.toFixed(5)));
-            });
-        }, 1500);
+    public destroy(): void {
+        if (this.priceUpdateHandler) {
+            document.removeEventListener('price-update', this.priceUpdateHandler);
+        }
+        if (this.watchlistUpdateHandler) {
+            document.removeEventListener('watchlist-prices-update', this.watchlistUpdateHandler);
+        }
+        console.log('🗑️ Watchlist Module destroyed');
     }
 }

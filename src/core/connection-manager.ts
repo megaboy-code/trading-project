@@ -2,10 +2,10 @@
 // ⚡ CONNECTION MANAGER - WebSocket Pipe Only
 // ================================================================
 
-import { 
+import {
     WebSocketMessage,
-    AccountInfo, 
-    PositionData 
+    AccountInfo,
+    PositionData
 } from '../types';
 
 export interface ConnectionCallbacks {
@@ -81,9 +81,9 @@ export class ConnectionManager {
         if (this.ws) {
             this.ws.onclose = null;
             this.ws.close();
-            this.ws                   = null;
-            this.wsConnected          = false;
-            this.currentSubscription  = null;
+            this.ws                  = null;
+            this.wsConnected         = false;
+            this.currentSubscription = null;
             this.notifyConnectionStatus('disconnected');
         }
     }
@@ -159,7 +159,6 @@ export class ConnectionManager {
         tp: number | null = null,
         sl: number | null = null
     ): void {
-        // ✅ sl first, tp second — matches trade_handler parsing
         const slStr = sl !== null ? String(sl) : '0';
         const tpStr = tp !== null ? String(tp) : '0';
         this.sendCommand(`TRADE_${direction}_${symbol}_${volume}_${price}_${slStr}_${tpStr}`);
@@ -252,11 +251,30 @@ export class ConnectionManager {
             this.wsConnected = true;
             this.notifyConnectionStatus('connected');
 
+            // ── Initial requests ──
             this.sendCommand('GET_ACCOUNT_INFO');
             this.sendCommand('GET_POSITIONS');
 
+            // ── Subscribe to last symbol/TF ──
             this.currentSubscription = `${this.currentSymbol}_${this.currentTimeframe}`;
             this.sendCommand(`SUBSCRIBE_${this.currentSymbol}_${this.currentTimeframe}`);
+
+            // ✅ Re-send watchlist symbols to C++ on every connect
+            // Ensures C++ watchlist matches frontend localStorage
+            try {
+                const saved = localStorage.getItem('watchlist_symbols');
+                if (saved) {
+                    const symbols: string[] = JSON.parse(saved);
+                    if (Array.isArray(symbols)) {
+                        symbols.forEach(symbol => {
+                            this.sendCommand(`WATCHLIST_ADD_${symbol}`);
+                        });
+                        console.log(`📡 Watchlist synced to backend: ${symbols.join(', ')}`);
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Failed to sync watchlist to backend');
+            }
         };
 
         this.ws.onmessage = (event: MessageEvent) => {
@@ -311,9 +329,9 @@ export class ConnectionManager {
                 break;
 
             case 'trade_executed':
-            case 'position_modified':  // ✅ added
-            case 'position_closed':    // ✅ added
-            case 'positions_closed':   // ✅ added
+            case 'position_modified':
+            case 'position_closed':
+            case 'positions_closed':
                 if (this.callbacks.onTradeExecuted) this.callbacks.onTradeExecuted(data);
                 break;
 
@@ -330,6 +348,13 @@ export class ConnectionManager {
                 if (data.account && this.callbacks.onAccountUpdate) {
                     this.callbacks.onAccountUpdate(data.account);
                 }
+                break;
+
+            // ✅ Watchlist prices from C++ backend
+            case 'watchlist_update':
+                document.dispatchEvent(new CustomEvent('watchlist-prices-update', {
+                    detail: data
+                }));
                 break;
 
             case 'strategy_response':
