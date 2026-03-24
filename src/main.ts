@@ -90,6 +90,11 @@ class MegaFlowzApp {
 // ================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ✅ Destroy existing instance before creating new one
+    // Prevents HMR duplicate connections during development
+    if ((window as any).megaFlowzApp) {
+        (window as any).megaFlowzApp.destroy();
+    }
     new MegaFlowzApp();
     console.log('🚀 MEGA FLOWZ TypeScript Edition Initialized');
 });

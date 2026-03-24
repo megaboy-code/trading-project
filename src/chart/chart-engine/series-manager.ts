@@ -43,7 +43,7 @@ export class SeriesManager {
     private askLine: any = null;
     private bidAskVisible: { bid: boolean; ask: boolean } = { bid: true, ask: true };
 
-    public onDataReady:          (() => void) | null = null;
+    public onDataReady:           (() => void) | null = null;
     public onBeforeSeriesRemoved: (() => void) | null = null;
 
     constructor(colors: SeriesColors, symbol: string) {
@@ -74,18 +74,19 @@ export class SeriesManager {
         }
 
         try {
-            const precision   = getDecimalPrecision(this.currentSymbol);
-            const minMove     = getMinMove(this.currentSymbol);
+            const precision = getDecimalPrecision(this.currentSymbol);
+            const minMove   = getMinMove(this.currentSymbol);
 
-            // ✅ Use custom formatter for consistent price display
+            // ✅ Use type: 'price' for correct coordinate mapping
+            // type: 'custom' breaks priceToCoordinate() used by line tools core
+            // localization.priceFormatter handles visual display separately
             const priceFormat = {
-                type:      'custom' as const,
-                formatter: (price: number) => price.toFixed(precision),
+                type:      'price' as const,
+                precision,
                 minMove
             };
 
-            // ✅ Apply chart localization formatter
-            // This is what drawing tools use for price axis labels
+            // ✅ Apply chart localization formatter for visual display
             this.chart.applyOptions({
                 localization: {
                     priceFormatter: getPriceFormatter(this.currentSymbol)

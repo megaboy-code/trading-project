@@ -14,7 +14,7 @@
     background: transparent;
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 1.1rem;
+    font-size: var(--text-lg);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -27,13 +27,14 @@
 
 .notification-bell.has-unread { color: var(--accent-info); }
 
+/* sm — bell count badge */
 .bell-count {
     position: absolute;
     top: -4px;
     right: -4px;
     background: var(--accent-sell);
     color: #ffffff;
-    font-size: 0.65rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     min-width: 18px;
     height: 18px;
@@ -87,8 +88,9 @@
     flex-shrink: 0;
 }
 
+/* lg — header title */
 .notification-header h3 {
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--text-primary);
     display: flex;
@@ -105,6 +107,7 @@
     gap: 4px;
 }
 
+/* base — sound toggle */
 .notification-sound-toggle {
     width: 28px;
     height: 28px;
@@ -115,7 +118,7 @@
     border: none;
     border-radius: 6px;
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -130,6 +133,7 @@
     background: rgba(var(--accent-info-rgb), 0.1);
 }
 
+/* base — close button */
 .close-notifications {
     width: 28px;
     height: 28px;
@@ -140,7 +144,7 @@
     border: none;
     border-radius: 6px;
     color: var(--text-muted);
-    font-size: 1rem;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -192,6 +196,7 @@
 .notification-item.empty:hover { background: transparent; }
 
 /* ==================== NOTIFICATION ICON ==================== */
+/* lg — notification icon */
 .notification-icon {
     width: 32px;
     height: 32px;
@@ -200,7 +205,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 1rem;
+    font-size: var(--text-lg);
 }
 
 .notification-icon.success {
@@ -230,22 +235,25 @@
 /* ==================== NOTIFICATION CONTENT ==================== */
 .notification-content { flex: 1; min-width: 0; }
 
+/* lg — notification title */
 .notification-title {
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: var(--text-lg);
     color: var(--text-primary);
     margin-bottom: 4px;
 }
 
+/* base — notification text */
 .notification-text {
-    font-size: 0.75rem;
+    font-size: var(--text-base);
     color: var(--text-muted);
     line-height: 1.4;
     margin-bottom: 4px;
 }
 
+/* base — notification time */
 .notification-time {
-    font-size: 0.65rem;
+    font-size: var(--text-base);
     color: var(--text-muted);
     opacity: 0.7;
 }
@@ -262,6 +270,7 @@
 
 .notification-item:hover .notification-actions { opacity: 1; }
 
+/* base — action buttons */
 .notification-mark-read,
 .notification-dismiss {
     width: 22px;
@@ -273,7 +282,7 @@
     border: none;
     border-radius: 4px;
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -299,13 +308,14 @@
     flex-shrink: 0;
 }
 
+/* base — clear all button */
 .clear-all {
     background: rgba(var(--accent-sell-rgb), 0.1);
     border: 1px solid rgba(var(--accent-sell-rgb), 0.2);
     color: var(--accent-sell);
     padding: 6px 12px;
     border-radius: 6px;
-    font-size: 0.75rem;
+    font-size: var(--text-base);
     font-family: var(--text-sans);
     cursor: pointer;
     transition: all 0.15s ease;
@@ -316,13 +326,14 @@
     border-color: var(--accent-sell);
 }
 
+/* base — notification count */
 .notification-count {
-    font-size: 0.75rem;
+    font-size: var(--text-base);
     color: var(--text-muted);
     font-weight: 500;
 }
 
-/* ==================== TOAST CONTAINER — bottom right ==================== */
+/* ==================== TOAST CONTAINER ==================== */
 .notification-toast-container {
     position: fixed;
     bottom: 20px;
@@ -337,12 +348,9 @@
 
 /* ==================== TOAST ==================== */
 .notification-toast {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 16px;
     width: 320px;
-    box-shadow: var(--card-shadow);
+    border-radius: 10px;
+    padding: 16px 20px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -350,6 +358,27 @@
     opacity: 0;
     transform: translateX(100%);
     transition: opacity 0.3s ease, transform 0.3s ease;
+
+    /* ✅ Glass effect — theme-aware via CSS variables */
+    background: var(--toast-bg);
+    backdrop-filter: blur(32px) saturate(220%);
+    -webkit-backdrop-filter: blur(32px) saturate(220%);
+    border: 1px solid var(--toast-border);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.12);
+}
+
+/* ✅ Light theme toast glass */
+[data-theme="light"] .notification-toast {
+    --toast-bg: rgba(255,255,255,0.20);
+    --toast-border: rgba(255,255,255,0.45);
+}
+
+/* ✅ Dark theme toast glass */
+:root .notification-toast,
+[data-theme="dark"] .notification-toast,
+[data-theme="system"] .notification-toast {
+    --toast-bg: rgba(15, 20, 35, 0.45);
+    --toast-border: rgba(255,255,255,0.14);
 }
 
 .notification-toast.show {
@@ -358,31 +387,27 @@
 }
 
 .notification-toast.success {
-    background: linear-gradient(90deg,
-        rgba(var(--accent-buy-rgb), 0.15) 0%,
-        var(--bg-card) 100%);
-    border-color: rgba(var(--accent-buy-rgb), 0.3);
+    border-color: rgba(var(--accent-buy-rgb), 0.35);
+    box-shadow: 0 8px 32px rgba(var(--accent-buy-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
+                inset 0 0 0 1px rgba(var(--accent-buy-rgb), 0.12);
 }
 
 .notification-toast.error {
-    background: linear-gradient(90deg,
-        rgba(var(--accent-sell-rgb), 0.15) 0%,
-        var(--bg-card) 100%);
-    border-color: rgba(var(--accent-sell-rgb), 0.3);
+    border-color: rgba(var(--accent-sell-rgb), 0.35);
+    box-shadow: 0 8px 32px rgba(var(--accent-sell-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
+                inset 0 0 0 1px rgba(var(--accent-sell-rgb), 0.12);
 }
 
 .notification-toast.warning {
-    background: linear-gradient(90deg,
-        rgba(var(--accent-warn-rgb), 0.15) 0%,
-        var(--bg-card) 100%);
-    border-color: rgba(var(--accent-warn-rgb), 0.3);
+    border-color: rgba(var(--accent-warn-rgb), 0.35);
+    box-shadow: 0 8px 32px rgba(var(--accent-warn-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
+                inset 0 0 0 1px rgba(var(--accent-warn-rgb), 0.12);
 }
 
 .notification-toast.info {
-    background: linear-gradient(90deg,
-        rgba(var(--accent-info-rgb), 0.15) 0%,
-        var(--bg-card) 100%);
-    border-color: rgba(var(--accent-info-rgb), 0.3);
+    border-color: rgba(var(--accent-info-rgb), 0.35);
+    box-shadow: 0 8px 32px rgba(var(--accent-info-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
+                inset 0 0 0 1px rgba(var(--accent-info-rgb), 0.12);
 }
 
 /* ==================== TOAST CONTENT ==================== */
@@ -394,8 +419,9 @@
     min-width: 0;
 }
 
+/* lg — toast icon */
 .notification-toast-content > i {
-    font-size: 1rem;
+    font-size: var(--text-lg);
     flex-shrink: 0;
 }
 
@@ -406,9 +432,10 @@
 
 .notification-toast-text { flex: 1; min-width: 0; }
 
+/* lg — toast title */
 .notification-toast-title {
     font-weight: 600;
-    font-size: 0.8rem;
+    font-size: var(--text-lg);
     color: var(--text-primary);
     margin-bottom: 2px;
     white-space: nowrap;
@@ -416,14 +443,16 @@
     text-overflow: ellipsis;
 }
 
+/* base — toast message */
 .notification-toast-message {
-    font-size: 0.7rem;
+    font-size: var(--text-base);
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+/* base — action and close buttons */
 .notification-action-btn,
 .notification-close-btn {
     width: 24px;
@@ -435,7 +464,7 @@
     border: none;
     border-radius: 4px;
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: var(--text-base);
     cursor: pointer;
     flex-shrink: 0;
     transition: all 0.15s ease;

@@ -1,4 +1,3 @@
-
 // ================================================================
 // ⚡ MODULE MANAGER - Orchestrator
 // ================================================================
@@ -41,6 +40,7 @@ export class ModuleManager {
     private notifications = Notification;
     private panels = Panels;
 
+    // ✅ In-memory trade arrow store
     private tradeArrowStore: TradeArrowEntry[] = [];
 
     constructor(private connectionManager: ConnectionManager) {}
@@ -75,39 +75,43 @@ export class ModuleManager {
 
     // ==================== TRADE ARROW STORE ====================
 
-    private resolveArrowTimestamp(dataTimestamp?: number): number {
+    // ✅ Round data.timestamp (MT5 server time) to nearest bar boundary
+    // for the current timeframe
+    private resolveArrowTimestamp(dataTimestamp: number): number {
+        const tf = this.connectionManager.getCurrentTimeframe();
+        const tfSeconds: Record<string, number> = {
+            M1:  60,
+            M5:  300,
+            M15: 900,
+            H1:  3600,
+            H4:  14400,
+            D1:  86400,
+        };
+
+        const interval      = tfSeconds[tf] ?? 60;
+        const rounded       = Math.floor(dataTimestamp / interval) * interval;
         const latestBar     = this.chart?.getDataManager()?.getLatestOHLC();
         const latestBarTime = latestBar?.time as number;
 
-        if (!dataTimestamp || dataTimestamp <= 0) {
-            return latestBarTime ?? Math.floor(Date.now() / 1000);
-        }
-
-        const tf = this.connectionManager.getCurrentTimeframe();
-        const tfSeconds: Record<string, number> = {
-            M1: 60, M5: 300, M15: 900,
-            H1: 3600, H4: 14400, D1: 86400,
-        };
-
-        const interval = tfSeconds[tf] ?? 60;
-        const rounded  = Math.floor(dataTimestamp / interval) * interval;
-
+        // ✅ If rounded is ahead of latest bar — use latest bar
         if (latestBarTime && rounded > latestBarTime) {
             return latestBarTime;
-        }
-
-        if (tf === 'M5' && latestBarTime && rounded === latestBarTime) {
-            return rounded - interval;
         }
 
         return rounded;
     }
 
+    // ✅ Convert stored raw timestamp to correct bar for new TF
+    // Used when re-injecting arrows after TF switch
     private convertTimestampToCurrentTF(rawTimestamp: number): number {
         const tf = this.connectionManager.getCurrentTimeframe();
         const tfSeconds: Record<string, number> = {
-            M1: 60, M5: 300, M15: 900,
-            H1: 3600, H4: 14400, D1: 86400,
+            M1:  60,
+            M5:  300,
+            M15: 900,
+            H1:  3600,
+            H4:  14400,
+            D1:  86400,
         };
 
         const interval      = tfSeconds[tf] ?? 60;
@@ -119,25 +123,24 @@ export class ModuleManager {
             return latestBarTime;
         }
 
-        if (tf === 'M5' && latestBarTime && rounded === latestBarTime) {
-            return rounded - interval;
-        }
-
         return rounded;
     }
 
+    // ✅ Add arrow to store and place on chart
     private addTradeArrow(entry: TradeArrowEntry): void {
         if (!this.tradeArrowStore.find(a => a.id === entry.id)) {
             this.tradeArrowStore.push(entry);
         }
 
-        const timestamp = this.convertTimestampToCurrentTF(entry.timestamp);
+        const timestamp = this.resolveArrowTimestamp(entry.timestamp);
         this.chart?.getDrawingModule()?.placeTradeArrow({
             ...entry,
             timestamp,
         });
     }
 
+    // ✅ Re-inject all arrows from store with new TF timestamps
+    // Called after chart-drawings-ready — chart data is guaranteed ready
     private reInjectTradeArrows(): void {
         if (this.tradeArrowStore.length === 0) return;
 
@@ -152,6 +155,7 @@ export class ModuleManager {
         console.log(`🎯 Re-injected ${this.tradeArrowStore.length} trade arrows`);
     }
 
+    // ✅ Clear store and remove all arrows from chart
     private clearAllTradeArrows(): void {
         this.tradeArrowStore = [];
         this.chart?.getDrawingModule()?.removeTradeArrows();
@@ -186,6 +190,7 @@ export class ModuleManager {
             this.tradingInstance?.updatePositions(positions);
         });
 
+        // ✅ Trade executed → store raw MT5 timestamp + place arrow
         this.connectionManager.onTradeExecuted((data: WebSocketMessage) => {
             if (data.success) {
                 this.notifications.success(
@@ -195,6 +200,7 @@ export class ModuleManager {
 
                 if (data.direction && data.price) {
                     const type  = data.direction === 'BUY' ? 'buy' : 'sell';
+                    // ✅ Store raw MT5 timestamp for re-injection on TF switch
                     const rawTs = Number(data.timestamp) || Math.floor(Date.now() / 1000);
                     const id    = `trade-arrow-${type}-${rawTs}`;
 
@@ -238,6 +244,7 @@ export class ModuleManager {
                     document.dispatchEvent(new CustomEvent(data.type, { detail: data }));
                     break;
 
+                // ✅ Strategy signal → store raw timestamp + place arrow
                 case 'strategy_signal':
                     document.dispatchEvent(new CustomEvent(data.type, { detail: data }));
 
@@ -274,21 +281,14 @@ export class ModuleManager {
 
     private setupDOMEventBridge(): void {
 
-        // ── Watchlist → C++ backend ──
         document.addEventListener('watchlist-add', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
-            if (symbol) {
-                this.connectionManager.sendCommand(`WATCHLIST_ADD_${symbol}`);
-                console.log(`📡 Watchlist add → backend: ${symbol}`);
-            }
+            if (symbol) this.connectionManager.sendCommand(`WATCHLIST_ADD_${symbol}`);
         });
 
         document.addEventListener('watchlist-remove', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
-            if (symbol) {
-                this.connectionManager.sendCommand(`WATCHLIST_REMOVE_${symbol}`);
-                console.log(`📡 Watchlist remove → backend: ${symbol}`);
-            }
+            if (symbol) this.connectionManager.sendCommand(`WATCHLIST_REMOVE_${symbol}`);
         });
 
         document.addEventListener('symbol-changed', (e: Event) => {
@@ -296,6 +296,7 @@ export class ModuleManager {
             if (!symbol) return;
             this.connectionManager.setSymbol(symbol);
             this.chart?.handleSymbolChange(symbol);
+            // ✅ Symbol change — clear store and arrows
             this.clearAllTradeArrows();
         });
 
@@ -304,12 +305,16 @@ export class ModuleManager {
             if (!timeframe) return;
             this.connectionManager.setTimeframe(timeframe);
             this.chart?.handleTimeframeChange(timeframe);
+            // ✅ No re-inject here — wait for chart-drawings-ready
         });
 
+        // ✅ Chart drawings restored — re-inject trade arrows
+        // Fires from chart-drawing-module.ts onDataReady() after loadDrawings()
         document.addEventListener('chart-drawings-ready', () => {
             this.reInjectTradeArrows();
         });
 
+        // ✅ Arrow toggle ON — re-inject matching type from store
         document.addEventListener('chart-arrows-toggle-on', (e: Event) => {
             const { type } = (e as CustomEvent).detail as { type: 'buy' | 'sell' };
             this.tradeArrowStore

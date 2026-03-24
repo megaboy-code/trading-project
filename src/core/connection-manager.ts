@@ -244,7 +244,7 @@ export class ConnectionManager {
     // ==================== WEBSOCKET SETUP ====================
 
     private setupWebSocket(): void {
-        this.ws = new WebSocket('ws://localhost:8765');
+        this.ws = new WebSocket('ws://127.0.0.1:8765');
 
         this.ws.onopen = () => {
             console.log('✅ WebSocket connected');
