@@ -32,6 +32,9 @@ export class WatchlistModule {
     private priceUpdateHandler:     ((e: Event) => void) | null = null;
     private watchlistUpdateHandler: ((e: Event) => void) | null = null;
 
+    // ✅ Cache last known price + change per symbol to skip redundant DOM writes
+    private priceCache: Map<string, { price: number; change?: number }> = new Map();
+
     // ── Full symbol database ──
     private readonly SYMBOLS: WatchlistSymbol[] = [
         { id: 'EURUSD',  name: 'EUR/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'eu', quote: 'us' },
@@ -330,6 +333,9 @@ export class WatchlistModule {
         this.saveToStorage();
         el.remove();
 
+        // ✅ Clear cache entry on remove
+        this.priceCache.delete(id);
+
         // ── Tell C++ to remove ──
         this.notifyBackendRemove(id);
 
@@ -385,22 +391,31 @@ export class WatchlistModule {
 
         if (!priceEl) return;
 
-        // ── Flash price up/down ──
-        const current = parseFloat(priceEl.textContent || '0');
-        const goUp    = price >= current;
+        const cached = this.priceCache.get(symbolId);
 
-        priceEl.textContent = price.toString();
-        priceEl.classList.remove('flash-up', 'flash-down');
-        priceEl.classList.add(goUp ? 'flash-up' : 'flash-down');
-        setTimeout(() => priceEl.classList.remove('flash-up', 'flash-down'), 400);
+        // ✅ Skip all DOM work if price unchanged
+        if (cached && cached.price === price && cached.change === change) return;
 
-        // ── Update change % ──
-        if (chgEl && change !== undefined) {
+        // ✅ Only flash if price actually changed
+        if (!cached || cached.price !== price) {
+            const goUp = !cached || price >= cached.price;
+
+            priceEl.textContent = price.toString();
+            priceEl.classList.remove('flash-up', 'flash-down');
+            priceEl.classList.add(goUp ? 'flash-up' : 'flash-down');
+            setTimeout(() => priceEl.classList.remove('flash-up', 'flash-down'), 400);
+        }
+
+        // ✅ Only update change % if value changed
+        if (chgEl && change !== undefined && (!cached || cached.change !== change)) {
             const chgClass = change >= 0 ? 'up' : 'down';
             const sign     = change >= 0 ? '+' : '';
             chgEl.textContent = `${sign}${change.toFixed(2)}%`;
             chgEl.className   = `watch-change ${chgClass}`;
         }
+
+        // ✅ Update cache
+        this.priceCache.set(symbolId, { price, change });
     }
 
     // ================================================================
@@ -445,6 +460,7 @@ export class WatchlistModule {
         if (this.watchlistUpdateHandler) {
             document.removeEventListener('watchlist-prices-update', this.watchlistUpdateHandler);
         }
+        this.priceCache.clear();
         console.log('🗑️ Watchlist Module destroyed');
     }
 }

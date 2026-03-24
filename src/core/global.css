@@ -56,6 +56,10 @@
     --raise:    0 2px 8px oklch(0% 0 0 / 0.4);
     --raise-sm: 0 1px 4px oklch(0% 0 0 / 0.3);
     --press:    inset 0 2px 6px oklch(0% 0 0 / 0.35);
+
+    /* ── TOAST GLASS — dark ── */
+    --toast-bg:     rgba(15, 20, 35, 0.45);
+    --toast-border: rgba(255, 255, 255, 0.14);
 }
 
 /* ==================== LIGHT THEME ==================== */
@@ -113,6 +117,10 @@
     --raise:    5px 5px 14px rgba(150,155,180,0.32), -3px -3px 8px rgba(255,255,255,0.88);
     --raise-sm: 3px 3px 8px rgba(150,155,180,0.25), -2px -2px 5px rgba(255,255,255,0.85);
     --press:    inset 2px 2px 6px rgba(140,145,165,0.22), inset -1px -1px 4px rgba(255,255,255,0.8);
+
+    /* ── TOAST GLASS — light ── */
+    --toast-bg:     rgba(255, 255, 255, 0.20);
+    --toast-border: rgba(255, 255, 255, 0.45);
 }
 
 /* ==================== SHARED — Never changes between themes ==================== */

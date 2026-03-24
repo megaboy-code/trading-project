@@ -28,6 +28,11 @@ export class TabManager {
     private lastDirectionChange: number = 0;
     private readonly DIRECTION_COOLDOWN = 300;
 
+    // ✅ Cache last rendered tab label values to skip redundant DOM writes
+    private lastRenderedTitle:     string = '';
+    private lastRenderedPrice:     string = '';
+    private lastRenderedDirection: string = '';
+
     private readonly defaultTabs: Tab[] = [
         {
             id: 'chart',
@@ -91,11 +96,15 @@ export class TabManager {
         document.addEventListener('symbol-changed', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
             if (symbol) {
-                this.currentSymbol = symbol;
-                this.currentPrice = '';
-                this.lastPrice = 0;
-                this.priceDirection = 'flat';
+                this.currentSymbol    = symbol;
+                this.currentPrice     = '';
+                this.lastPrice        = 0;
+                this.priceDirection   = 'flat';
                 this.lastDirectionChange = 0;
+                // ✅ Reset cache on symbol change so label fully re-renders
+                this.lastRenderedTitle     = '';
+                this.lastRenderedPrice     = '';
+                this.lastRenderedDirection = '';
                 this.updateChartTabLabel();
             }
         });
@@ -104,6 +113,8 @@ export class TabManager {
             const { timeframe } = (e as CustomEvent).detail;
             if (timeframe) {
                 this.currentTimeframe = timeframe;
+                // ✅ Reset title cache so timeframe change re-renders
+                this.lastRenderedTitle = '';
                 this.updateChartTabLabel();
             }
         });
@@ -122,19 +133,31 @@ export class TabManager {
         const priceEl = tabEl.querySelector('.tab-live-price') as HTMLElement;
         const arrowEl = tabEl.querySelector('.tab-live-arrow') as HTMLElement;
 
-        if (titleEl) {
-            titleEl.textContent = `${this.currentSymbol} · ${this.currentTimeframe}`;
+        const newTitle     = `${this.currentSymbol} · ${this.currentTimeframe}`;
+        const newPrice     = this.currentPrice;
+        const newDirection = this.priceDirection;
+
+        // ✅ Only update title if changed
+        if (titleEl && this.lastRenderedTitle !== newTitle) {
+            titleEl.textContent    = newTitle;
+            this.lastRenderedTitle = newTitle;
         }
 
-        if (priceEl) {
-            priceEl.textContent = this.currentPrice;
-            priceEl.className   = `tab-live-price ${this.priceDirection}`;
+        // ✅ Only update price if changed
+        if (priceEl && this.lastRenderedPrice !== newPrice) {
+            priceEl.textContent    = newPrice;
+            this.lastRenderedPrice = newPrice;
         }
 
-        if (arrowEl) {
-            arrowEl.className   = `tab-live-arrow ${this.priceDirection}`;
-            arrowEl.textContent = this.priceDirection === 'up'   ? '▲'
-                                : this.priceDirection === 'down' ? '▼' : '';
+        // ✅ Only update direction/arrow if changed
+        if (this.lastRenderedDirection !== newDirection) {
+            if (priceEl) priceEl.className = `tab-live-price ${newDirection}`;
+            if (arrowEl) {
+                arrowEl.className   = `tab-live-arrow ${newDirection}`;
+                arrowEl.textContent = newDirection === 'up'   ? '▲'
+                                    : newDirection === 'down' ? '▼' : '';
+            }
+            this.lastRenderedDirection = newDirection;
         }
     }
 

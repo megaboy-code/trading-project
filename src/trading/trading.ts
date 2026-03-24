@@ -264,7 +264,6 @@ export class TradingModule {
             const slPrice = isBuy
                 ? price - this.inlineEditor.slPips * pipSize
                 : price + this.inlineEditor.slPips * pipSize;
-            // ✅ Round to correct precision
             this.inlineEditor.slPrice = parseFloat(formatPrice(symbol, slPrice));
             if (slInput && document.activeElement !== slInput) {
                 slInput.value = formatPrice(symbol, slPrice);
@@ -276,7 +275,6 @@ export class TradingModule {
             const tpPrice = isBuy
                 ? price + this.inlineEditor.tpPips * pipSize
                 : price - this.inlineEditor.tpPips * pipSize;
-            // ✅ Round to correct precision
             this.inlineEditor.tpPrice = parseFloat(formatPrice(symbol, tpPrice));
             if (tpInput && document.activeElement !== tpInput) {
                 tpInput.value = formatPrice(symbol, tpPrice);
@@ -523,13 +521,14 @@ export class TradingModule {
         const contractSize = getContractSize(this.state.symbol);
         const margin       = lot * contractSize * this.state.ask / this.state.leverage;
 
-        this.setText('marginAmount', `$${margin.toLocaleString('en-US', { maximumFractionDigits: 2 })}`);
+        const marginStr = `$${margin.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+        this.setTextIfChanged('marginAmount', marginStr);
 
         if (this.state.slEnabled) {
             const risk = lot * getPipValue(this.state.symbol) * this.state.slPips;
-            this.setText('riskAmount', `$${risk.toFixed(2)}`);
+            this.setTextIfChanged('riskAmount', `$${risk.toFixed(2)}`);
         } else {
-            this.setText('riskAmount', '--');
+            this.setTextIfChanged('riskAmount', '--');
         }
 
         const overMargin = margin > this.state.freeMargin;
@@ -549,7 +548,7 @@ export class TradingModule {
 
         if (!this.state.safeMode && overMargin) {
             const shortfall = (margin - this.state.freeMargin).toFixed(2);
-            this.setText('marginWarningText',
+            this.setTextIfChanged('marginWarningText',
                 `Margin $${margin.toFixed(2)} — exceeds free margin by $${shortfall}`
             );
             this.showMarginWarning();
@@ -723,16 +722,20 @@ export class TradingModule {
         if (this.state.tpEnabled) {
             const el = document.getElementById('tpPips');
             if (el) {
-                el.textContent = `+${this.state.tpPips.toFixed(1)}p`;
-                el.className   = 'tpsl-pips positive';
+                const newText = `+${this.state.tpPips.toFixed(1)}p`;
+                // ✅ Only update if changed
+                if (el.textContent !== newText) el.textContent = newText;
+                el.className = 'tpsl-pips positive';
             }
         }
 
         if (this.state.slEnabled) {
             const el = document.getElementById('slPips');
             if (el) {
-                el.textContent = `-${this.state.slPips.toFixed(1)}p`;
-                el.className   = 'tpsl-pips negative';
+                const newText = `-${this.state.slPips.toFixed(1)}p`;
+                // ✅ Only update if changed
+                if (el.textContent !== newText) el.textContent = newText;
+                el.className = 'tpsl-pips negative';
             }
         }
     }
@@ -750,7 +753,7 @@ export class TradingModule {
         if (slPips === 0) return;
 
         const rr = (this.state.tpPips / slPips).toFixed(2);
-        this.setText('rrValue', `1 : ${rr}`);
+        this.setTextIfChanged('rrValue', `1 : ${rr}`);
     }
 
     private checkTpSlEmpty(): void {
@@ -1096,12 +1099,31 @@ export class TradingModule {
 
             if (existing) {
                 const cells = existing.querySelectorAll('td');
-                if (cells[4]) cells[4].textContent = String(pos.current_price ?? '—');
-                if (cells[5]) cells[5].textContent = String(pos.sl ?? '—');  // ✅ sl
-                if (cells[6]) cells[6].textContent = String(pos.tp ?? '—');  // ✅ tp
+
+                // ✅ Only write to DOM if value changed
+                const newPrice = String(pos.current_price ?? '—');
+                if (cells[4] && cells[4].textContent !== newPrice) {
+                    cells[4].textContent = newPrice;
+                }
+
+                const newSl = String(pos.sl ?? '—');
+                if (cells[5] && cells[5].textContent !== newSl) {
+                    cells[5].textContent = newSl;
+                }
+
+                const newTp = String(pos.tp ?? '—');
+                if (cells[6] && cells[6].textContent !== newTp) {
+                    cells[6].textContent = newTp;
+                }
+
                 if (cells[7]) {
-                    cells[7].textContent = pnlStr;
-                    cells[7].className   = pnlClass;
+                    // ✅ Only write to DOM if value changed
+                    if (cells[7].textContent !== pnlStr) {
+                        cells[7].textContent = pnlStr;
+                    }
+                    if (cells[7].className !== pnlClass) {
+                        cells[7].className = pnlClass;
+                    }
                 }
             } else {
                 this.renderPositionsTable();
@@ -1124,14 +1146,16 @@ export class TradingModule {
 
         const pnlEl = document.getElementById('summaryTotalPnl');
         if (pnlEl) {
-            pnlEl.textContent = `${totalPnl >= 0 ? '+$' : '-$'}${Math.abs(totalPnl).toFixed(2)}`;
+            const newPnl = `${totalPnl >= 0 ? '+$' : '-$'}${Math.abs(totalPnl).toFixed(2)}`;
+            // ✅ Only update if changed
+            if (pnlEl.textContent !== newPnl) pnlEl.textContent = newPnl;
             pnlEl.classList.toggle('positive', totalPnl >= 0);
             pnlEl.classList.toggle('negative', totalPnl <  0);
         }
 
-        this.setText('summaryTotalLots', totalLots.toFixed(2));
-        this.setText('summaryWinning',   String(winning));
-        this.setText('summaryLosing',    String(losing));
+        this.setTextIfChanged('summaryTotalLots', totalLots.toFixed(2));
+        this.setTextIfChanged('summaryWinning',   String(winning));
+        this.setTextIfChanged('summaryLosing',    String(losing));
     }
 
     // ════════════════════════════════════════
@@ -1170,13 +1194,10 @@ export class TradingModule {
         this.inlineEditor.symbol = symbol;
 
         if (pos.sl) {
-            // ✅ Has existing SL — fixed, pip display updates live
             this.inlineEditor.slFixed = true;
-            // ✅ Round to correct precision
             this.inlineEditor.slPrice = parseFloat(formatPrice(symbol, pos.sl));
             this.inlineEditor.slPips  = Math.abs(pos.sl - price) / pipSize;
         } else {
-            // ✅ No SL — live updating like panel
             this.inlineEditor.slFixed = false;
             this.inlineEditor.slPips  = TPSL_DEFAULT_PIPS;
             this.inlineEditor.slPrice = parseFloat(formatPrice(symbol,
@@ -1185,13 +1206,10 @@ export class TradingModule {
         }
 
         if (pos.tp) {
-            // ✅ Has existing TP — fixed, pip display updates live
             this.inlineEditor.tpFixed = true;
-            // ✅ Round to correct precision
             this.inlineEditor.tpPrice = parseFloat(formatPrice(symbol, pos.tp));
             this.inlineEditor.tpPips  = Math.abs(pos.tp - price) / pipSize;
         } else {
-            // ✅ No TP — live updating like panel
             this.inlineEditor.tpFixed = false;
             this.inlineEditor.tpPips  = TPSL_DEFAULT_PIPS;
             this.inlineEditor.tpPrice = parseFloat(formatPrice(symbol,
@@ -1226,7 +1244,6 @@ export class TradingModule {
         newClose?.addEventListener('click',  () => this.submitClosePosition(pos));
         newCancel?.addEventListener('click', () => this.collapseInlineEditor());
 
-        // ✅ Manual input — fix price and recalculate pip distance
         document.getElementById('inlineSlInput')?.addEventListener('input', () => {
             const val = parseFloat((document.getElementById('inlineSlInput') as HTMLInputElement).value);
             if (!isNaN(val)) {
@@ -1333,7 +1350,6 @@ export class TradingModule {
         const pipSize = getPipSize(this.inlineEditor.symbol);
         const isBuy   = this.inlineEditor.isBuy;
 
-        // ✅ Live pip distance from current price to fixed SL/TP prices
         const slPips = Math.abs(this.inlineEditor.slPrice - price) / pipSize;
         const tpPips = Math.abs(this.inlineEditor.tpPrice - price) / pipSize;
 
@@ -1341,13 +1357,19 @@ export class TradingModule {
         const tpEl = document.getElementById('inlineTpPips');
 
         if (slEl) {
-            slEl.textContent = `${isBuy ? '-' : '+'}${slPips.toFixed(1)}p`;
-            slEl.className   = `inline-field-pips ${isBuy ? 'negative' : 'positive'}`;
+            const newText  = `${isBuy ? '-' : '+'}${slPips.toFixed(1)}p`;
+            const newClass = `inline-field-pips ${isBuy ? 'negative' : 'positive'}`;
+            // ✅ Only update if changed
+            if (slEl.textContent !== newText) slEl.textContent = newText;
+            if (slEl.className   !== newClass) slEl.className  = newClass;
         }
 
         if (tpEl) {
-            tpEl.textContent = `${isBuy ? '+' : '-'}${tpPips.toFixed(1)}p`;
-            tpEl.className   = `inline-field-pips ${isBuy ? 'positive' : 'negative'}`;
+            const newText  = `${isBuy ? '+' : '-'}${tpPips.toFixed(1)}p`;
+            const newClass = `inline-field-pips ${isBuy ? 'positive' : 'negative'}`;
+            // ✅ Only update if changed
+            if (tpEl.textContent !== newText) tpEl.textContent = newText;
+            if (tpEl.className   !== newClass) tpEl.className  = newClass;
         }
     }
 
@@ -1416,13 +1438,17 @@ export class TradingModule {
         const pctEl = document.getElementById('heroPct');
 
         if (pnlEl) {
-            pnlEl.textContent = `${positive ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`;
+            const newPnl = `${positive ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`;
+            // ✅ Only update if changed
+            if (pnlEl.textContent !== newPnl) pnlEl.textContent = newPnl;
             pnlEl.classList.toggle('positive', positive);
             pnlEl.classList.toggle('negative', !positive);
         }
 
         if (pctEl) {
-            pctEl.textContent = `${positive ? '+' : '-'}${pct}%`;
+            const newPct = `${positive ? '+' : '-'}${pct}%`;
+            // ✅ Only update if changed
+            if (pctEl.textContent !== newPct) pctEl.textContent = newPct;
             pctEl.classList.toggle('positive', positive);
             pctEl.classList.toggle('negative', !positive);
         }
@@ -1433,10 +1459,10 @@ export class TradingModule {
     // ════════════════════════════════════════
 
     private renderMetrics(): void {
-        this.setText('accountBalance',    this.formatCurrency(this.state.balance));
-        this.setText('accountEquity',     this.formatCurrency(this.state.equity));
-        this.setText('accountMargin',     this.formatCurrency(this.state.margin));
-        this.setText('accountFreeMargin', this.formatCurrency(this.state.freeMargin));
+        this.setTextIfChanged('accountBalance',    this.formatCurrency(this.state.balance));
+        this.setTextIfChanged('accountEquity',     this.formatCurrency(this.state.equity));
+        this.setTextIfChanged('accountMargin',     this.formatCurrency(this.state.margin));
+        this.setTextIfChanged('accountFreeMargin', this.formatCurrency(this.state.freeMargin));
     }
 
     // ════════════════════════════════════════
@@ -1444,8 +1470,8 @@ export class TradingModule {
     // ════════════════════════════════════════
 
     private renderBuySellPrices(): void {
-        this.setText('buyBtnPrice',  formatPrice(this.state.symbol, this.state.ask));
-        this.setText('sellBtnPrice', formatPrice(this.state.symbol, this.state.bid));
+        this.setTextIfChanged('buyBtnPrice',  formatPrice(this.state.symbol, this.state.ask));
+        this.setTextIfChanged('sellBtnPrice', formatPrice(this.state.symbol, this.state.bid));
     }
 
     // ════════════════════════════════════════
@@ -1454,8 +1480,8 @@ export class TradingModule {
 
     private updatePositionsCount(): void {
         const count = this.state.positions.length;
-        this.setText('positionsCount',     String(count));
-        this.setText('modalPositionCount', String(count));
+        this.setTextIfChanged('positionsCount',     String(count));
+        this.setTextIfChanged('modalPositionCount', String(count));
     }
 
     // ════════════════════════════════════════
@@ -1490,13 +1516,17 @@ export class TradingModule {
         this.state.equity      = this.state.balance + this.state.floatingPnl;
 
         this.updatePositionsCount();
-        this.renderHero();
-        this.renderMetrics();
 
-        const modal = document.getElementById('positionsModal');
-        if (modal && !modal.classList.contains('hidden')) {
-            this.updatePositionRows();
-        }
+        // ✅ Batch all visual updates in next animation frame
+        requestAnimationFrame(() => {
+            this.renderHero();
+            this.renderMetrics();
+
+            const modal = document.getElementById('positionsModal');
+            if (modal && !modal.classList.contains('hidden')) {
+                this.updatePositionRows();
+            }
+        });
     }
 
     public handleTradeConfirmation(data: WebSocketMessage): void {
@@ -1510,6 +1540,12 @@ export class TradingModule {
     private setText(id: string, value: string): void {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
+    }
+
+    // ✅ Only touches DOM if value actually changed
+    private setTextIfChanged(id: string, value: string): void {
+        const el = document.getElementById(id);
+        if (el && el.textContent !== value) el.textContent = value;
     }
 
     private formatCurrency(value: number): string {
