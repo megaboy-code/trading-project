@@ -1,41 +1,44 @@
 // ================================================================
 // ⚡ CONNECTION MANAGER - WebSocket Pipe Only
+// FlatBuffers binary protocol — replaces all JSON
 // ================================================================
 
-import {
-    WebSocketMessage,
-    AccountInfo,
-    PositionData
-} from '../types';
+import { MegaFlowzDecoder, DecodedMessage } from '../generated/MegaFlowzDecoder';
+import { AccountInfo, PositionData }        from '../types';
 
 export interface ConnectionCallbacks {
-    onCandleData?:       (data: WebSocketMessage) => void;
-    onTickData?:         (data: WebSocketMessage) => void;
-    onAccountUpdate?:    (account: AccountInfo) => void;
+    onCandleData?:       (symbol: string, timeframe: string, candles: any[]) => void;
+    onBarUpdate?:        (symbol: string, timeframe: string, candle: any)    => void;
+    onTickData?:         (symbol: string, bid: number, ask: number, spread: number, time: number) => void;
+    onAccountUpdate?:    (account: AccountInfo)    => void;
     onPositionsUpdate?:  (positions: PositionData[]) => void;
-    onStrategyData?:     (data: WebSocketMessage) => void;
-    onTradeExecuted?:    (data: WebSocketMessage) => void;
+    onStrategyData?:     (type: string, data: any) => void;
+    onTradeExecuted?:    (success: boolean, direction: string, symbol: string, volume: number, price: number, ticket: number, timestamp: number, message: string) => void;
+    onPositionClosed?:   (success: boolean, ticket: number, message: string) => void;
+    onPositionModified?: (success: boolean, ticket: number, message: string) => void;
     onConnectionStatus?: (status: 'connected' | 'disconnected' | 'connecting' | 'error') => void;
     onMT5Status?:        (connected: boolean, statusText: string) => void;
-    // ✅ Fix #39 — direct callback for watchlist prices
-    onWatchlistUpdate?:  (data: WebSocketMessage) => void;
+    onWatchlistUpdate?:  (symbol: string, bid: number, ask: number, spread: number, time: number, change: number) => void;
+    onError?:            (message: string) => void;
+    onAutoTrading?:      (enabled: boolean, message: string) => void;
+    onCacheCleared?:     (message: string) => void;
 }
 
 export class ConnectionManager {
-    private ws: WebSocket | null = null;
-    private wsConnected: boolean = false;
+    private ws:                  WebSocket | null = null;
+    private wsConnected:         boolean = false;
 
-    private currentSymbol: string;
-    private currentTimeframe: string;
+    private currentSymbol:       string;
+    private currentTimeframe:    string;
     private currentSubscription: string | null = null;
 
-    private lastBidPrice: number | null = null;
-    private lastAskPrice: number | null = null;
+    private lastBidPrice:        number | null = null;
+    private lastAskPrice:        number | null = null;
 
-    private mt5Connected: boolean = false;
-    private mt5StatusText: string = 'Unknown';
+    private mt5Connected:        boolean = false;
+    private mt5StatusText:       string  = 'Unknown';
 
-    private callbacks: ConnectionCallbacks = {};
+    private callbacks:           ConnectionCallbacks = {};
 
     constructor() {
         this.currentSymbol    = localStorage.getItem('last_symbol')    || 'EURUSD';
@@ -82,15 +85,11 @@ export class ConnectionManager {
 
     // ==================== SEND ====================
 
-    public sendCommand(command: string | object): void {
-        if (this.wsConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
-            if (typeof command === 'object') {
-                this.ws.send(JSON.stringify(command));
-            } else {
-                this.ws.send(command);
-            }
-        } else {
-            console.warn('⚠️ Cannot send — WebSocket not connected');
+    public sendCommand(command: string): void {
+        if (this.wsConnected && this.ws &&
+            this.ws.readyState === WebSocket.OPEN)
+        {
+            this.ws.send(command);
         }
     }
 
@@ -100,7 +99,6 @@ export class ConnectionManager {
         const oldSymbol    = this.currentSymbol;
         this.currentSymbol = symbol;
 
-        // ✅ Clear stale prices immediately on symbol change
         this.lastBidPrice = null;
         this.lastAskPrice = null;
 
@@ -151,7 +149,9 @@ export class ConnectionManager {
     ): void {
         const slStr = sl !== null ? String(sl) : '0';
         const tpStr = tp !== null ? String(tp) : '0';
-        this.sendCommand(`TRADE_${direction}_${symbol}_${volume}_${price}_${slStr}_${tpStr}`);
+        this.sendCommand(
+            `TRADE_${direction}_${symbol}_${volume}_${price}_${slStr}_${tpStr}`
+        );
     }
 
     public closeAllPositions(): void           { this.sendCommand('CLOSE_ALL'); }
@@ -169,7 +169,9 @@ export class ConnectionManager {
         params:       object
     ): void {
         const tf = this.normalizeTimeframe(timeframe);
-        this.sendCommand(`DEPLOY_STRATEGY_${strategyType}_${symbol}_${tf}_${JSON.stringify(params)}`);
+        this.sendCommand(
+            `DEPLOY_STRATEGY_${strategyType}_${symbol}_${tf}_${JSON.stringify(params)}`
+        );
     }
 
     public removeStrategy(strategyId: string): void {
@@ -190,7 +192,9 @@ export class ConnectionManager {
         params:       object
     ): void {
         const tf = this.normalizeTimeframe(timeframe);
-        this.sendCommand(`BACKTEST_STRATEGY_${strategyType}_${symbol}_${tf}_${days}_${JSON.stringify(params)}`);
+        this.sendCommand(
+            `BACKTEST_STRATEGY_${strategyType}_${symbol}_${tf}_${days}_${JSON.stringify(params)}`
+        );
     }
 
     public setAutoTrading(enabled: boolean): void {
@@ -199,59 +203,41 @@ export class ConnectionManager {
 
     // ==================== CALLBACK REGISTRATION ====================
 
-    public onCandleData(callback: (data: WebSocketMessage) => void): void {
-        this.callbacks.onCandleData = callback;
-    }
-
-    public onTickData(callback: (data: WebSocketMessage) => void): void {
-        this.callbacks.onTickData = callback;
-    }
-
-    public onAccountUpdate(callback: (account: AccountInfo) => void): void {
-        this.callbacks.onAccountUpdate = callback;
-    }
-
-    public onPositionsUpdate(callback: (positions: PositionData[]) => void): void {
-        this.callbacks.onPositionsUpdate = callback;
-    }
-
-    public onStrategyData(callback: (data: WebSocketMessage) => void): void {
-        this.callbacks.onStrategyData = callback;
-    }
-
-    public onTradeExecuted(callback: (data: WebSocketMessage) => void): void {
-        this.callbacks.onTradeExecuted = callback;
-    }
-
-    public onConnectionStatus(callback: (status: 'connected' | 'disconnected' | 'connecting' | 'error') => void): void {
-        this.callbacks.onConnectionStatus = callback;
-    }
-
-    public onMT5Status(callback: (connected: boolean, statusText: string) => void): void {
-        this.callbacks.onMT5Status = callback;
-    }
-
-    // ✅ Fix #39 — direct callback registration for watchlist prices
-    public onWatchlistUpdate(callback: (data: WebSocketMessage) => void): void {
-        this.callbacks.onWatchlistUpdate = callback;
-    }
+    public onCandleData(cb: ConnectionCallbacks['onCandleData']): void         { this.callbacks.onCandleData        = cb; }
+    public onBarUpdate(cb: ConnectionCallbacks['onBarUpdate']): void           { this.callbacks.onBarUpdate         = cb; }
+    public onTickData(cb: ConnectionCallbacks['onTickData']): void             { this.callbacks.onTickData          = cb; }
+    public onAccountUpdate(cb: ConnectionCallbacks['onAccountUpdate']): void   { this.callbacks.onAccountUpdate     = cb; }
+    public onPositionsUpdate(cb: ConnectionCallbacks['onPositionsUpdate']): void { this.callbacks.onPositionsUpdate = cb; }
+    public onStrategyData(cb: ConnectionCallbacks['onStrategyData']): void     { this.callbacks.onStrategyData      = cb; }
+    public onTradeExecuted(cb: ConnectionCallbacks['onTradeExecuted']): void   { this.callbacks.onTradeExecuted     = cb; }
+    public onPositionClosed(cb: ConnectionCallbacks['onPositionClosed']): void { this.callbacks.onPositionClosed    = cb; }
+    public onPositionModified(cb: ConnectionCallbacks['onPositionModified']): void { this.callbacks.onPositionModified = cb; }
+    public onConnectionStatus(cb: ConnectionCallbacks['onConnectionStatus']): void { this.callbacks.onConnectionStatus = cb; }
+    public onMT5Status(cb: ConnectionCallbacks['onMT5Status']): void           { this.callbacks.onMT5Status         = cb; }
+    public onWatchlistUpdate(cb: ConnectionCallbacks['onWatchlistUpdate']): void { this.callbacks.onWatchlistUpdate = cb; }
+    public onError(cb: ConnectionCallbacks['onError']): void                   { this.callbacks.onError             = cb; }
+    public onAutoTrading(cb: ConnectionCallbacks['onAutoTrading']): void       { this.callbacks.onAutoTrading       = cb; }
+    public onCacheCleared(cb: ConnectionCallbacks['onCacheCleared']): void     { this.callbacks.onCacheCleared      = cb; }
 
     // ==================== WEBSOCKET SETUP ====================
 
     private setupWebSocket(): void {
         this.ws = new WebSocket('ws://127.0.0.1:8765');
 
+        // ── Binary frames — FlatBuffers ──
+        this.ws.binaryType = 'arraybuffer';
+
         this.ws.onopen = () => {
             this.wsConnected = true;
             this.notifyConnectionStatus('connected');
 
-            // ✅ GET_ACCOUNT_INFO kept — user may reload after deposit
             this.sendCommand('GET_ACCOUNT_INFO');
 
-            // ✅ Fix #38 — GET_POSITIONS removed, Thread 3 pushes automatically
-
-            this.currentSubscription = `${this.currentSymbol}_${this.currentTimeframe}`;
-            this.sendCommand(`SUBSCRIBE_${this.currentSymbol}_${this.currentTimeframe}`);
+            this.currentSubscription =
+                `${this.currentSymbol}_${this.currentTimeframe}`;
+            this.sendCommand(
+                `SUBSCRIBE_${this.currentSymbol}_${this.currentTimeframe}`
+            );
 
             try {
                 const saved = localStorage.getItem('watchlist_symbols');
@@ -263,18 +249,14 @@ export class ConnectionManager {
                         });
                     }
                 }
-            } catch (e) {
-                console.warn('⚠️ Failed to sync watchlist to backend');
-            }
+            } catch (e) {}
         };
 
         this.ws.onmessage = (event: MessageEvent) => {
-            try {
-                const data: WebSocketMessage = JSON.parse(event.data);
-                this.handleWebSocketData(data);
-            } catch (error) {
-                console.error('❌ WebSocket parse error:', error);
-            }
+            // ── All messages are binary FlatBuffers ──
+            if (!(event.data instanceof ArrayBuffer)) return;
+            const msg = MegaFlowzDecoder.decode(event.data);
+            this.routeMessage(msg);
         };
 
         this.ws.onclose = () => {
@@ -283,91 +265,160 @@ export class ConnectionManager {
             this.notifyConnectionStatus('disconnected');
 
             setTimeout(() => {
-                if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+                if (!this.ws ||
+                    this.ws.readyState === WebSocket.CLOSED)
+                {
                     this.setupWebSocket();
                 }
             }, 3000);
         };
 
         this.ws.onerror = () => {
-            console.error('❌ WebSocket error');
             this.notifyConnectionStatus('error');
         };
     }
 
     // ==================== MESSAGE ROUTING ====================
 
-    private handleWebSocketData(data: WebSocketMessage): void {
-        if (!data || !data.type) return;
-
-        switch (data.type) {
-
-            case 'connection_status':
-                this.handleConnectionStatus(data);
-                break;
+    private routeMessage(msg: DecodedMessage): void {
+        switch (msg.type) {
 
             case 'initial':
-            case 'update':
-            case 'append':
-                if (this.callbacks.onCandleData) this.callbacks.onCandleData(data);
+                if (this.callbacks.onCandleData) {
+                    this.callbacks.onCandleData(
+                        msg.data.symbol,
+                        msg.data.timeframe,
+                        msg.data.candles
+                    );
+                }
+                break;
+
+            case 'bar_update':
+                if (this.callbacks.onBarUpdate) {
+                    this.callbacks.onBarUpdate(
+                        msg.data.symbol,
+                        msg.data.timeframe,
+                        msg.data.candle
+                    );
+                }
                 break;
 
             case 'price_update':
-                if (data.bid !== undefined) this.lastBidPrice = data.bid;
-                if (data.ask !== undefined) this.lastAskPrice = data.ask;
-                if (this.callbacks.onTickData) this.callbacks.onTickData(data);
+                this.lastBidPrice = msg.data.bid;
+                this.lastAskPrice = msg.data.ask;
+                if (this.callbacks.onTickData) {
+                    this.callbacks.onTickData(
+                        msg.data.symbol,
+                        msg.data.bid,
+                        msg.data.ask,
+                        msg.data.spread,
+                        msg.data.time
+                    );
+                }
                 break;
 
-            case 'trade_executed':
-            case 'position_modified':
-            case 'position_closed':
-            case 'positions_closed':
-                if (this.callbacks.onTradeExecuted) this.callbacks.onTradeExecuted(data);
+            case 'watchlist_update':
+                if (this.callbacks.onWatchlistUpdate) {
+                    this.callbacks.onWatchlistUpdate(
+                        msg.data.symbol,
+                        msg.data.bid,
+                        msg.data.ask,
+                        msg.data.spread,
+                        msg.data.time,
+                        msg.data.change
+                    );
+                }
                 break;
 
             case 'positions_update':
-                if (data.positions && this.callbacks.onPositionsUpdate) {
-                    this.callbacks.onPositionsUpdate(data.positions);
+                if (msg.data.positions &&
+                    this.callbacks.onPositionsUpdate)
+                {
+                    this.callbacks.onPositionsUpdate(
+                        msg.data.positions as PositionData[]
+                    );
                 }
-                if (data.account && this.callbacks.onAccountUpdate) {
-                    this.callbacks.onAccountUpdate(data.account);
+                if (msg.data.account &&
+                    this.callbacks.onAccountUpdate)
+                {
+                    this.callbacks.onAccountUpdate(
+                        msg.data.account as AccountInfo
+                    );
                 }
                 break;
 
-            case 'account_info':
-                if (data.account && this.callbacks.onAccountUpdate) {
-                    this.callbacks.onAccountUpdate(data.account);
+            case 'connection_status':
+                this.mt5Connected  = msg.data.connected;
+                this.mt5StatusText = msg.data.status_text;
+                if (this.callbacks.onMT5Status) {
+                    this.callbacks.onMT5Status(
+                        msg.data.connected,
+                        msg.data.status_text
+                    );
                 }
                 break;
 
-            // ✅ Fix #11 — direct callback, no DOM event
-            case 'watchlist_update':
-                if (this.callbacks.onWatchlistUpdate) this.callbacks.onWatchlistUpdate(data);
+            case 'trade_executed':
+                if (this.callbacks.onTradeExecuted) {
+                    this.callbacks.onTradeExecuted(
+                        msg.data.success,
+                        msg.data.direction,
+                        msg.data.symbol,
+                        msg.data.volume,
+                        msg.data.price,
+                        msg.data.ticket,
+                        msg.data.timestamp,
+                        msg.data.message
+                    );
+                }
                 break;
 
-            case 'strategy_response':
-            case 'strategy_deployed':
-            case 'strategy_removed':
-            case 'strategy_updated':
-            case 'strategy_signal':
-            case 'strategy_initial':
-            case 'strategy_update':
-            case 'auto_trading_status':
-            case 'backtest_results':
-                if (this.callbacks.onStrategyData) this.callbacks.onStrategyData(data);
+            case 'position_closed':
+                if (this.callbacks.onPositionClosed) {
+                    this.callbacks.onPositionClosed(
+                        msg.data.success,
+                        msg.data.ticket,
+                        msg.data.message
+                    );
+                }
                 break;
 
-            default:
+            case 'position_modified':
+                if (this.callbacks.onPositionModified) {
+                    this.callbacks.onPositionModified(
+                        msg.data.success,
+                        msg.data.ticket,
+                        msg.data.message
+                    );
+                }
                 break;
-        }
-    }
 
-    private handleConnectionStatus(data: WebSocketMessage): void {
-        this.mt5Connected  = data.data?.mt5_connected || false;
-        this.mt5StatusText = data.data?.status_text   || 'Unknown';
+            case 'error':
+                if (this.callbacks.onError) {
+                    this.callbacks.onError(msg.data.message);
+                }
+                break;
 
-        if (this.callbacks.onMT5Status) {
-            this.callbacks.onMT5Status(this.mt5Connected, this.mt5StatusText);
+            case 'auto_trading':
+                if (this.callbacks.onAutoTrading) {
+                    this.callbacks.onAutoTrading(
+                        msg.data.enabled,
+                        msg.data.message
+                    );
+                }
+                break;
+
+            case 'cache_cleared':
+                if (this.callbacks.onCacheCleared) {
+                    this.callbacks.onCacheCleared(msg.data.message);
+                }
+                break;
+
+            case 'pong':
+                break;
+
+            case 'unknown':
+                break;
         }
     }
 

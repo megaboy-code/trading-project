@@ -209,10 +209,8 @@ export class MainChart {
         this.currentChartType = chartType;
         this.dataManager.setChartType(chartType as any);
 
-        // ✅ Fix #3 — createSeries hides current, shows or creates target
         this.seriesManager.createSeries(chartType);
 
-        // ✅ Always refresh data on series switch — cached series may be stale
         if (this.dataManager.hasData()) {
             const convertedData = this.dataManager.getDataForCurrentType();
             if (convertedData && convertedData.length > 0) {
@@ -294,6 +292,11 @@ export class MainChart {
 
     public resetChartDataState(): void {
         this.stateManager.setState('LOADING');
+    }
+
+    // ✅ Fix — expose setReady for ModuleManager to clear loading after data arrives
+    public setReady(): void {
+        this.stateManager.setState('READY');
     }
 
     // ==================== VOLUME ====================
@@ -461,6 +464,9 @@ export class MainChart {
     public getVolumeSeries()                           { return this.volumeManager?.getSeries() ?? null; }
     public isReady(): boolean                          { return this.stateManager.isReady(); }
     public getState()                                  { return this.stateManager.getState(); }
+
+    // ✅ Fix #P7 — expose SeriesManager for ModuleManager direct wiring
+    public getSeriesManager(): SeriesManager           { return this.seriesManager; }
 
     public toggleGrid():      void { this.chartInstance.toggleGrid(); }
     public toggleCrosshair(): void { this.chartInstance.toggleCrosshair(); }

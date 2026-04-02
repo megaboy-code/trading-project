@@ -1,0 +1,468 @@
+// ================================================================
+// MEGAFLOWZ_DECODER.TS - FlatBuffers Binary Decoder
+// Wraps auto-generated flatc output into clean typed interface
+// Zero copy — reads directly from buffer, no allocation
+// Import path assumes flatc output in same directory
+// ================================================================
+
+import { ByteBuffer }        from 'flatbuffers';
+import {
+    Message,
+    MessagePayload,
+    InitialData,
+    BarUpdate,
+    PriceUpdate,
+    WatchlistUpdate,
+    PositionsUpdate,
+    Position,
+    Account,
+    ConnectionStatus,
+    TradeExecuted,
+    PositionClosed,
+    PositionModified,
+    ErrorMsg,
+    AutoTradingStatus,
+    CacheCleared,
+    Timeframe,
+    PositionType
+} from './mega-flowz';
+
+// ================================================================
+// TYPED PAYLOADS — what ConnectionManager receives
+// ================================================================
+
+export interface CandleData {
+    time:   number;
+    open:   number;
+    high:   number;
+    low:    number;
+    close:  number;
+    volume: number;
+}
+
+export interface InitialPayload {
+    symbol:    string;
+    timeframe: string;
+    candles:   CandleData[];
+}
+
+export interface BarUpdatePayload {
+    symbol:    string;
+    timeframe: string;
+    candle:    CandleData;
+}
+
+export interface PriceUpdatePayload {
+    symbol: string;
+    bid:    number;
+    ask:    number;
+    spread: number;
+    time:   number;
+}
+
+export interface WatchlistUpdatePayload {
+    symbol: string;
+    bid:    number;
+    ask:    number;
+    spread: number;
+    time:   number;
+    change: number;
+}
+
+export interface PositionData {
+    ticket:        number;
+    symbol:        string;
+    type:          'BUY' | 'SELL';
+    volume:        number;
+    open_price:    number;
+    current_price: number;
+    sl:            number;
+    tp:            number;
+    profit:        number;
+    swap:          number;
+    commission:    number;
+    open_time:     number;
+}
+
+export interface AccountData {
+    balance:      number;
+    equity:       number;
+    margin:       number;
+    free_margin:  number;
+    margin_level: number;
+    leverage:     number;
+}
+
+export interface PositionsUpdatePayload {
+    positions: PositionData[];
+    account:   AccountData | null;
+}
+
+export interface ConnectionStatusPayload {
+    connected:   boolean;
+    status_text: string;
+}
+
+export interface TradeExecutedPayload {
+    success:   boolean;
+    direction: 'BUY' | 'SELL';
+    symbol:    string;
+    volume:    number;
+    price:     number;
+    ticket:    number;
+    timestamp: number;
+    message:   string;
+}
+
+export interface PositionClosedPayload {
+    success: boolean;
+    ticket:  number;
+    message: string;
+}
+
+export interface PositionModifiedPayload {
+    success: boolean;
+    ticket:  number;
+    message: string;
+}
+
+export interface ErrorPayload {
+    message: string;
+}
+
+export interface AutoTradingPayload {
+    enabled: boolean;
+    message: string;
+}
+
+export interface CacheClearedPayload {
+    message: string;
+}
+
+export interface PongPayload {
+    message: string;
+}
+
+// ================================================================
+// DISCRIMINATED UNION — single return type
+// ================================================================
+
+export type DecodedMessage =
+    | { type: 'initial';          data: InitialPayload          }
+    | { type: 'bar_update';       data: BarUpdatePayload        }
+    | { type: 'price_update';     data: PriceUpdatePayload      }
+    | { type: 'watchlist_update'; data: WatchlistUpdatePayload  }
+    | { type: 'positions_update'; data: PositionsUpdatePayload  }
+    | { type: 'connection_status';data: ConnectionStatusPayload }
+    | { type: 'trade_executed';   data: TradeExecutedPayload    }
+    | { type: 'position_closed';  data: PositionClosedPayload   }
+    | { type: 'position_modified';data: PositionModifiedPayload }
+    | { type: 'error';            data: ErrorPayload            }
+    | { type: 'auto_trading';     data: AutoTradingPayload      }
+    | { type: 'cache_cleared';    data: CacheClearedPayload     }
+    | { type: 'pong';             data: PongPayload             }
+    | { type: 'unknown' };
+
+// ================================================================
+// TIMEFRAME ENUM → STRING
+// ================================================================
+
+function tfToString(tf: Timeframe): string {
+    switch (tf) {
+        case Timeframe.M1:  return 'M1';
+        case Timeframe.M5:  return 'M5';
+        case Timeframe.M15: return 'M15';
+        case Timeframe.H1:  return 'H1';
+        case Timeframe.H4:  return 'H4';
+        case Timeframe.D1:  return 'D1';
+        default:            return 'M1';
+    }
+}
+
+// ================================================================
+// POSITION TYPE ENUM → STRING
+// ================================================================
+
+function posTypeToString(t: PositionType): 'BUY' | 'SELL' {
+    return t === PositionType.Buy ? 'BUY' : 'SELL';
+}
+
+// ================================================================
+// CANDLE EXTRACTOR
+// ================================================================
+
+function extractCandle(c: any): CandleData {
+    return {
+        time:   Number(c.time()),
+        open:   c.open(),
+        high:   c.high(),
+        low:    c.low(),
+        close:  c.close(),
+        volume: Number(c.volume())
+    };
+}
+
+// ================================================================
+// DECODER CLASS
+// ================================================================
+
+export class MegaFlowzDecoder {
+
+    // ── Decode ArrayBuffer from WebSocket binary frame ──
+    static decode(buffer: ArrayBuffer): DecodedMessage {
+        try {
+            const bytes = new Uint8Array(buffer);
+            const bb    = new ByteBuffer(bytes);
+            const msg   = Message.getRootAsMessage(bb);
+
+            const payloadType = msg.payloadType();
+
+            switch (payloadType) {
+
+                // ── Initial burst ──
+                case MessagePayload.InitialData: {
+                    const p = msg.payload(
+                        new InitialData()
+                    ) as InitialData;
+
+                    const candles: CandleData[] = [];
+                    for (let i = 0; i < p.candlesLength(); i++) {
+                        const c = p.candles(i);
+                        if (c) candles.push(extractCandle(c));
+                    }
+
+                    return {
+                        type: 'initial',
+                        data: {
+                            symbol:    p.symbol()    ?? '',
+                            timeframe: tfToString(p.timeframe()),
+                            candles
+                        }
+                    };
+                }
+
+                // ── Bar update ──
+                case MessagePayload.BarUpdate: {
+                    const p = msg.payload(
+                        new BarUpdate()
+                    ) as BarUpdate;
+
+                    const c = p.candle();
+                    if (!c) return { type: 'unknown' };
+
+                    return {
+                        type: 'bar_update',
+                        data: {
+                            symbol:    p.symbol()    ?? '',
+                            timeframe: tfToString(p.timeframe()),
+                            candle:    extractCandle(c)
+                        }
+                    };
+                }
+
+                // ── Price update ──
+                case MessagePayload.PriceUpdate: {
+                    const p = msg.payload(
+                        new PriceUpdate()
+                    ) as PriceUpdate;
+
+                    return {
+                        type: 'price_update',
+                        data: {
+                            symbol: p.symbol() ?? '',
+                            bid:    p.bid(),
+                            ask:    p.ask(),
+                            spread: p.spread(),
+                            time:   Number(p.time())
+                        }
+                    };
+                }
+
+                // ── Watchlist update ──
+                case MessagePayload.WatchlistUpdate: {
+                    const p = msg.payload(
+                        new WatchlistUpdate()
+                    ) as WatchlistUpdate;
+
+                    return {
+                        type: 'watchlist_update',
+                        data: {
+                            symbol: p.symbol() ?? '',
+                            bid:    p.bid(),
+                            ask:    p.ask(),
+                            spread: p.spread(),
+                            time:   Number(p.time()),
+                            change: p.change()
+                        }
+                    };
+                }
+
+                // ── Positions update ──
+                case MessagePayload.PositionsUpdate: {
+                    const p = msg.payload(
+                        new PositionsUpdate()
+                    ) as PositionsUpdate;
+
+                    const positions: PositionData[] = [];
+                    for (let i = 0; i < p.positionsLength(); i++) {
+                        const pos = p.positions(i);
+                        if (!pos) continue;
+                        positions.push({
+                            ticket:        Number(pos.ticket()),
+                            symbol:        pos.symbol()       ?? '',
+                            type:          posTypeToString(pos.type()),
+                            volume:        pos.volume(),
+                            open_price:    pos.openPrice(),
+                            current_price: pos.currentPrice(),
+                            sl:            pos.sl(),
+                            tp:            pos.tp(),
+                            profit:        pos.profit(),
+                            swap:          pos.swap(),
+                            commission:    pos.commission(),
+                            open_time:     Number(pos.openTime())
+                        });
+                    }
+
+                    const acc = p.account();
+                    const account: AccountData | null = acc
+                        ? {
+                            balance:      acc.balance(),
+                            equity:       acc.equity(),
+                            margin:       acc.margin(),
+                            free_margin:  acc.freeMargin(),
+                            margin_level: acc.marginLevel(),
+                            leverage:     acc.leverage()
+                          }
+                        : null;
+
+                    return {
+                        type: 'positions_update',
+                        data: { positions, account }
+                    };
+                }
+
+                // ── Connection status ──
+                case MessagePayload.ConnectionStatus: {
+                    const p = msg.payload(
+                        new ConnectionStatus()
+                    ) as ConnectionStatus;
+
+                    return {
+                        type: 'connection_status',
+                        data: {
+                            connected:   p.connected(),
+                            status_text: p.statusText() ?? ''
+                        }
+                    };
+                }
+
+                // ── Trade executed ──
+                case MessagePayload.TradeExecuted: {
+                    const p = msg.payload(
+                        new TradeExecuted()
+                    ) as TradeExecuted;
+
+                    return {
+                        type: 'trade_executed',
+                        data: {
+                            success:   p.success(),
+                            direction: posTypeToString(p.direction()),
+                            symbol:    p.symbol()    ?? '',
+                            volume:    p.volume(),
+                            price:     p.price(),
+                            ticket:    Number(p.ticket()),
+                            timestamp: Number(p.timestamp()),
+                            message:   p.message()   ?? ''
+                        }
+                    };
+                }
+
+                // ── Position closed ──
+                case MessagePayload.PositionClosed: {
+                    const p = msg.payload(
+                        new PositionClosed()
+                    ) as PositionClosed;
+
+                    return {
+                        type: 'position_closed',
+                        data: {
+                            success: p.success(),
+                            ticket:  Number(p.ticket()),
+                            message: p.message() ?? ''
+                        }
+                    };
+                }
+
+                // ── Position modified ──
+                case MessagePayload.PositionModified: {
+                    const p = msg.payload(
+                        new PositionModified()
+                    ) as PositionModified;
+
+                    return {
+                        type: 'position_modified',
+                        data: {
+                            success: p.success(),
+                            ticket:  Number(p.ticket()),
+                            message: p.message() ?? ''
+                        }
+                    };
+                }
+
+                // ── Error ──
+                case MessagePayload.ErrorMsg: {
+                    const p = msg.payload(
+                        new ErrorMsg()
+                    ) as ErrorMsg;
+
+                    return {
+                        type: 'error',
+                        data: { message: p.message() ?? '' }
+                    };
+                }
+
+                // ── Auto trading ──
+                case MessagePayload.AutoTradingStatus: {
+                    const p = msg.payload(
+                        new AutoTradingStatus()
+                    ) as AutoTradingStatus;
+
+                    return {
+                        type: 'auto_trading',
+                        data: {
+                            enabled: p.enabled(),
+                            message: p.message() ?? ''
+                        }
+                    };
+                }
+
+                // ── Cache cleared / pong ──
+                case MessagePayload.CacheCleared: {
+                    const p = msg.payload(
+                        new CacheCleared()
+                    ) as CacheCleared;
+
+                    const message = p.message() ?? '';
+
+                    if (message === 'pong') {
+                        return {
+                            type: 'pong',
+                            data: { message }
+                        };
+                    }
+
+                    return {
+                        type: 'cache_cleared',
+                        data: { message }
+                    };
+                }
+
+                default:
+                    return { type: 'unknown' };
+            }
+
+        } catch (e) {
+            return { type: 'unknown' };
+        }
+    }
+}

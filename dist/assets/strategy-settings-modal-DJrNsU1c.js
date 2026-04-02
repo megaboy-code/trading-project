@@ -1,4 +1,4 @@
-import{_ as m}from"./index-DvszlgOM.js";class u{constructor(e){var t,r;this.modal=null,this.isDragging=!1,this.dragOffsetX=0,this.dragOffsetY=0,this.item=e,this.fastColor=((t=e.values[0])==null?void 0:t.color)||"#00d394",this.slowColor=((r=e.values[1])==null?void 0:r.color)||"#ff4d6b"}open(){if(document.getElementById("strategy-settings-modal"))return;this.modal=document.createElement("div"),this.modal.id="strategy-settings-modal",this.modal.style.cssText=`
+import{_ as m}from"./index-DwMo9ngp.js";class u{constructor(e){var t,r;this.modal=null,this.isDragging=!1,this.dragOffsetX=0,this.dragOffsetY=0,this.item=e,this.fastColor=((t=e.values[0])==null?void 0:t.color)||"#00d394",this.slowColor=((r=e.values[1])==null?void 0:r.color)||"#ff4d6b"}open(){if(document.getElementById("strategy-settings-modal"))return;this.modal=document.createElement("div"),this.modal.id="strategy-settings-modal",this.modal.style.cssText=`
             position: fixed;
             top: 50%;
             left: 50%;

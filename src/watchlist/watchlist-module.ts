@@ -6,7 +6,6 @@
 // ================================================================
 
 import { ConnectionManager } from '../core/connection-manager';
-import { WebSocketMessage } from '../types';
 
 interface WatchlistSymbol {
     id:     string;
@@ -19,7 +18,7 @@ interface WatchlistSymbol {
 }
 
 interface ElementRefs {
-    price: HTMLElement;
+    price:  HTMLElement;
     change: HTMLElement;
 }
 
@@ -34,7 +33,7 @@ export class WatchlistModule {
     private searchInput:   HTMLInputElement | null = null;
     private searchResults: HTMLElement | null = null;
 
-    private added: Set<string> = new Set();
+    private added:       Set<string> = new Set();
     private currentSort: 'az' | 'chg' = 'az';
 
     // ✅ Fix #12 — element reference map for direct DOM access
@@ -81,29 +80,17 @@ export class WatchlistModule {
         this.searchInput   = document.getElementById('watchlistSearchInput') as HTMLInputElement;
         this.searchResults = document.getElementById('watchlistSearchResults');
 
-        if (!this.container || !this.itemsEl) {
-            console.warn('⚠️ Watchlist: container not found');
-            return;
-        }
+        if (!this.container || !this.itemsEl) return;
 
         this.loadFromStorage();
         this.renderSymbols();
         this.bindEvents();
 
-        // ✅ Fix #39 — wire direct callback for watchlist prices
-        this.connectionManager.onWatchlistUpdate((data: WebSocketMessage) => {
-            const prices = data.prices;
-            if (!prices) return;
-            Object.entries(prices).forEach(([symbol, d]: [string, any]) => {
-                if (d.bid !== undefined) {
-                    this.updatePrice(symbol, d.bid, d.change);
-                }
-            });
-        });
-
-        // ── Tell C++ about all watchlist symbols ──
-        this.added.forEach(symbol => {
-            this.connectionManager.sendCommand(`WATCHLIST_ADD_${symbol}`);
+        // ✅ FlatBuffers — primitives direct, no WebSocketMessage
+        this.connectionManager.onWatchlistUpdate((
+            symbol, bid, ask, spread, time, change) =>
+        {
+            this.updatePrice(symbol, bid, change);
         });
     }
 
@@ -153,42 +140,37 @@ export class WatchlistModule {
         });
     }
 
-    // ✅ Fix #13 — createElement instead of innerHTML for interactive elements
+    // ✅ Fix #13 — createElement instead of innerHTML
     private buildWatchItem(sym: WatchlistSymbol): HTMLElement {
         const item = document.createElement('div');
         item.className = 'watch-item';
         item.setAttribute('data-symbol', sym.id);
 
-        // Icon
         item.appendChild(this.buildIconElement(sym));
 
-        // Symbol wrap
         const wrap = document.createElement('div');
         wrap.className = 'watch-symbol-wrap';
 
         const nameEl = document.createElement('div');
-        nameEl.className = 'watch-symbol';
+        nameEl.className   = 'watch-symbol';
         nameEl.textContent = sym.name;
 
         const catEl = document.createElement('div');
-        catEl.className = 'watch-category';
+        catEl.className   = 'watch-category';
         catEl.textContent = sym.cat;
 
         wrap.appendChild(nameEl);
         wrap.appendChild(catEl);
         item.appendChild(wrap);
 
-        // Price
         const priceEl = document.createElement('div');
-        priceEl.className = 'watch-price';
+        priceEl.className   = 'watch-price';
         priceEl.textContent = '--';
 
-        // Change
         const chgEl = document.createElement('div');
-        chgEl.className = 'watch-change';
+        chgEl.className   = 'watch-change';
         chgEl.textContent = '--';
 
-        // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'watch-delete';
         const icon = document.createElement('i');
@@ -212,11 +194,11 @@ export class WatchlistModule {
             container.className = 'wl-flag-container';
 
             const base = document.createElement('div');
-            base.className = 'wl-flag-circle wl-flag-base';
+            base.className            = 'wl-flag-circle wl-flag-base';
             base.style.backgroundImage = `url('https://flagcdn.com/w320/${sym.base}.png')`;
 
             const quote = document.createElement('div');
-            quote.className = 'wl-flag-circle wl-flag-quote';
+            quote.className            = 'wl-flag-circle wl-flag-quote';
             quote.style.backgroundImage = `url('https://flagcdn.com/w320/${sym.quote}.png')`;
 
             container.appendChild(base);
@@ -235,11 +217,11 @@ export class WatchlistModule {
         img.alt = sym.name;
 
         const fallback = document.createElement('i');
-        fallback.className = 'fas fa-circle-dot';
+        fallback.className    = 'fas fa-circle-dot';
         fallback.style.display = 'none';
 
         img.addEventListener('error', () => {
-            img.style.display = 'none';
+            img.style.display      = 'none';
             fallback.style.display = 'flex';
         });
 
@@ -254,14 +236,11 @@ export class WatchlistModule {
     // ================================================================
 
     private bindEvents(): void {
-        // ── Add button ──
         document.getElementById('watchlistAddBtn')
             ?.addEventListener('click', () => this.toggleSearch());
 
-        // ── Search input ──
         this.searchInput?.addEventListener('input', () => this.handleSearch());
 
-        // ── Sort buttons ──
         document.querySelectorAll('.wl-sort-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const sort = btn.getAttribute('data-sort') as 'az' | 'chg';
@@ -272,7 +251,6 @@ export class WatchlistModule {
             });
         });
 
-        // ── Close search on outside click ──
         document.addEventListener('click', (e) => {
             if (!this.searchEl?.contains(e.target as Node) &&
                 !(e.target as HTMLElement).closest('#watchlistAddBtn')) {
@@ -282,9 +260,9 @@ export class WatchlistModule {
 
         // ✅ Fix #14 — event delegation on itemsEl
         this.itemsEl?.addEventListener('click', (e) => {
-            const target  = e.target as HTMLElement;
-            const delBtn  = target.closest('.watch-delete');
-            const item    = target.closest('.watch-item') as HTMLElement | null;
+            const target = e.target as HTMLElement;
+            const delBtn = target.closest('.watch-delete');
+            const item   = target.closest('.watch-item') as HTMLElement | null;
             if (!item) return;
 
             const symbol = item.getAttribute('data-symbol');
@@ -329,13 +307,14 @@ export class WatchlistModule {
 
         const matches = this.SYMBOLS.filter(s =>
             !this.added.has(s.id) &&
-            (s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q))
+            (s.name.toLowerCase().includes(q) ||
+             s.id.toLowerCase().includes(q))
         ).slice(0, 5);
 
         if (!matches.length) {
             const empty = document.createElement('div');
             empty.style.cssText = 'font-size:0.65rem;color:var(--text-muted);padding:4px 8px;';
-            empty.textContent = 'No results found';
+            empty.textContent   = 'No results found';
             this.searchResults.appendChild(empty);
             return;
         }
@@ -347,11 +326,11 @@ export class WatchlistModule {
             item.appendChild(this.buildIconElement(sym));
 
             const nameSpan = document.createElement('span');
-            nameSpan.className = 'search-result-name';
+            nameSpan.className   = 'search-result-name';
             nameSpan.textContent = sym.name;
 
             const catSpan = document.createElement('span');
-            catSpan.className = 'search-result-cat';
+            catSpan.className   = 'search-result-cat';
             catSpan.textContent = sym.cat;
 
             item.appendChild(nameSpan);
@@ -374,7 +353,7 @@ export class WatchlistModule {
         this.itemsEl?.appendChild(item);
         this.closeSearch();
 
-        // ✅ Fix #15 — direct command, no DOM event
+        // ✅ Fix #15 — direct command
         this.connectionManager.sendCommand(`WATCHLIST_ADD_${sym.id}`);
     }
 
@@ -387,7 +366,7 @@ export class WatchlistModule {
         this.elementRefs.delete(id);
         this.priceCache.delete(id);
 
-        // ✅ Fix #15 — direct command, no DOM event
+        // ✅ Fix #15 — direct command
         this.connectionManager.sendCommand(`WATCHLIST_REMOVE_${id}`);
 
         const first = this.itemsEl?.querySelector('.watch-item');
@@ -422,7 +401,7 @@ export class WatchlistModule {
     // ================================================================
     // PRICE UPDATE
     // ✅ Fix #9/#12 — direct refs, no querySelector on every tick
-    // Called directly from ModuleManager.onTick + onWatchlistUpdate
+    // Called directly from onWatchlistUpdate callback
     // ================================================================
 
     public updatePrice(
@@ -435,17 +414,23 @@ export class WatchlistModule {
 
         const cached = this.priceCache.get(symbolId);
 
-        if (cached && cached.price === price && cached.change === change) return;
+        if (cached &&
+            cached.price  === price &&
+            cached.change === change) return;
 
         if (!cached || cached.price !== price) {
             const goUp = !cached || price >= cached.price;
             refs.price.textContent = price.toString();
             refs.price.classList.remove('flash-up', 'flash-down');
             refs.price.classList.add(goUp ? 'flash-up' : 'flash-down');
-            setTimeout(() => refs.price.classList.remove('flash-up', 'flash-down'), 400);
+            setTimeout(() => refs.price.classList.remove(
+                'flash-up', 'flash-down'
+            ), 400);
         }
 
-        if (change !== undefined && (!cached || cached.change !== change)) {
+        if (change !== undefined &&
+            (!cached || cached.change !== change))
+        {
             const chgClass = change >= 0 ? 'up' : 'down';
             const sign     = change >= 0 ? '+' : '';
             refs.change.textContent = `${sign}${change.toFixed(2)}%`;
@@ -463,7 +448,9 @@ export class WatchlistModule {
         this.currentSort = sort;
         if (!this.itemsEl) return;
 
-        const items = Array.from(this.itemsEl.querySelectorAll('.watch-item'));
+        const items = Array.from(
+            this.itemsEl.querySelectorAll('.watch-item')
+        );
 
         items.sort((a, b) => {
             if (sort === 'az') {
@@ -471,8 +458,12 @@ export class WatchlistModule {
                 const nameB = b.querySelector('.watch-symbol')?.textContent || '';
                 return nameA.localeCompare(nameB);
             } else {
-                const chgA = parseFloat(a.querySelector('.watch-change')?.textContent || '0');
-                const chgB = parseFloat(b.querySelector('.watch-change')?.textContent || '0');
+                const chgA = parseFloat(
+                    a.querySelector('.watch-change')?.textContent || '0'
+                );
+                const chgB = parseFloat(
+                    b.querySelector('.watch-change')?.textContent || '0'
+                );
                 return chgB - chgA;
             }
         });

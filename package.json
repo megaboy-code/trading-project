@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "fancy-canvas": "^2.1.0",
+    "flatbuffers": "^25.9.23",
     "lightweight-charts": "^5.0.0",
     "lightweight-charts-line-tools-circle": "file:lightweight-charts-line-tools-circle",
     "lightweight-charts-line-tools-core": "github:difurious/lightweight-charts-line-tools-core",

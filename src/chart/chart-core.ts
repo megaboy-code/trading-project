@@ -2,17 +2,18 @@
 // ⚡ CHART CORE - Orchestrator
 // ================================================================
 
-import { MainChart, InitialDataParams, UpdateDataParams } from './chart-engine/index';
-import { ChartLegend } from './legend/index';
-import { ChartDataManager } from './chart-data-manager';
+import { MainChart }          from './chart-engine/index';
+import { ChartLegend }        from './legend/index';
+import { ChartDataManager }   from './chart-data-manager';
 import { ChartDrawingModule } from './drawingtools/index';
-import { UserPriceAlerts } from './price-alerts';
-import { getDecimalPrecision, getPriceFormatter } from './chart-utils';
-import { ChartUI } from './ui/chart-ui';
-import { ChartContextMenu } from './ui/context-menu';
+import { UserPriceAlerts }    from './price-alerts';
+import { getDecimalPrecision,
+         getPriceFormatter }  from './chart-utils';
+import { ChartUI }            from './ui/chart-ui';
+import { ChartContextMenu }   from './ui/context-menu';
 import { ChartSettingsModal } from './ui/chart-settings-modal';
-import { DrawingToolsConfig, LegendItem } from './chart-types';
-import { WebSocketMessage } from '../types';
+import { DrawingToolsConfig,
+         LegendItem }         from './chart-types';
 
 export class ChartModule {
     private mainChart:        MainChart;
@@ -41,6 +42,9 @@ export class ChartModule {
 
     private visibilityMap: Map<string, boolean> = new Map();
 
+    // ── Chart ready callback — registered by ModuleManager ──
+    private _onChartReadyCb: (() => void) | null = null;
+
     constructor() {
         this._currentSymbol    = localStorage.getItem('last_symbol')    || 'EURUSD';
         this._currentTimeframe = localStorage.getItem('last_timeframe') || 'H1';
@@ -52,11 +56,16 @@ export class ChartModule {
             this.chartDataManager
         );
 
-        this.mainChart.onChartReady = () => this.onChartReady();
+        this.mainChart.onChartReady = () => {
+            this.onChartReady();
+            if (this._onChartReadyCb) this._onChartReadyCb();
+        };
 
-        this.mainChart.onInitialDataLoaded = (detail) => this.onInitialDataLoaded(detail);
+        this.mainChart.onInitialDataLoaded = (detail) => {
+            this.handleInitialDataLoaded(detail);
+        };
 
-        this.mainChart.onPriceUpdate = (price) => {
+        this.mainChart.onPriceUpdate = () => {
             const latestOHLC = this.chartDataManager.getLatestOHLC();
             if (latestOHLC) this.indicatorManager?.updateLatestValues(latestOHLC);
         };
@@ -93,20 +102,68 @@ export class ChartModule {
             }
         };
 
-        // ✅ Series has data — safe to restore drawings
         this.mainChart.onSeriesDataReady = () => {
             this.drawingModule?.onDataReady();
         };
 
-        // ✅ Series about to be destroyed — clear tools first
         this.mainChart.onBeforeSeriesRemoved = () => {
             this.drawingModule?.clearToolsOnly();
         };
 
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.initialize());
+            document.addEventListener('DOMContentLoaded',
+                () => this.initialize()
+            );
         } else {
             this.initialize();
+        }
+    }
+
+    // ================================================================
+    // CHART READY CALLBACK — registered by ModuleManager
+    // ================================================================
+
+    public onChartReadyCallback(cb: () => void): void {
+        this._onChartReadyCb = cb;
+    }
+
+    // ================================================================
+    // DIRECT ACCESS — ModuleManager wires hot path directly
+    // ================================================================
+
+    public getSeriesManager(): any {
+        return this.mainChart.getSeriesManager();
+    }
+
+    public getDataManager(): ChartDataManager {
+        return this.chartDataManager;
+    }
+
+    // ✅ Fix — clear loading state after data arrives
+    public setReady(): void {
+        this.mainChart.setReady();
+    }
+
+    // ================================================================
+    // INITIAL DATA LOADED
+    // ================================================================
+
+    public handleInitialDataLoaded(detail: any): void {
+        if (detail.symbol &&
+            detail.symbol !== this._currentSymbol)
+        {
+            this._currentSymbol = detail.symbol;
+        }
+
+        if (this.chartLegend) {
+            this.chartLegend.update({
+                symbol:    this._currentSymbol,
+                timeframe: this._currentTimeframe
+            });
+        }
+
+        if (this.chartUI) {
+            this.chartUI.updateSymbol(this._currentSymbol);
         }
     }
 
@@ -115,16 +172,11 @@ export class ChartModule {
     private initialize(): void {
         try {
             this.chartContainer = document.getElementById('tvChart');
-            if (!this.chartContainer) {
-                console.error('❌ Chart container #tvChart not found');
-                return;
-            }
+            if (!this.chartContainer) return;
             this.setupEventListeners();
             this.setupResizeObserver();
             this.loadChart();
-        } catch (error) {
-            console.error('❌ Chart Module initialization failed:', error);
-        }
+        } catch (error) {}
     }
 
     private async loadChart(): Promise<void> {
@@ -137,14 +189,20 @@ export class ChartModule {
     private setupResizeObserver(): void {
         if (!this.chartContainer) return;
 
+        let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
         this.resizeObserver = new ResizeObserver(() => {
-            const chart = this.mainChart.getChart();
-            if (chart && this.chartContainer) {
-                const container = this.chartContainer;
-                requestAnimationFrame(() => {
-                    chart.resize(container.clientWidth, container.clientHeight, true);
-                });
-            }
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                const chart = this.mainChart.getChart();
+                if (chart && this.chartContainer) {
+                    chart.resize(
+                        this.chartContainer.clientWidth,
+                        this.chartContainer.clientHeight,
+                        true
+                    );
+                }
+            }, 50);
         });
 
         this.resizeObserver.observe(this.chartContainer);
@@ -169,13 +227,6 @@ export class ChartModule {
                 volumeVisible: this.mainChart.isVolumeVisible()
             }
         }));
-    }
-
-    private onInitialDataLoaded(detail: any): void {
-        if (detail.symbol && detail.symbol !== this._currentSymbol) {
-            this._currentSymbol = detail.symbol;
-        }
-        document.dispatchEvent(new CustomEvent('chart-initial-data-loaded', { detail }));
     }
 
     // ==================== MODULE INITIALIZATION ====================
@@ -204,9 +255,7 @@ export class ChartModule {
         };
 
         this.drawingModule = new ChartDrawingModule(
-            chart,
-            series,
-            config,
+            chart, series, config,
             undefined,
             this._currentSymbol,
             this._currentTimeframe
@@ -224,9 +273,7 @@ export class ChartModule {
             this.priceAlerts = new UserPriceAlerts();
             this.priceAlerts.setSymbolName(this._currentSymbol);
             series.attachPrimitive(this.priceAlerts);
-        } catch (error) {
-            console.error('❌ Failed to initialize price alerts:', error);
-        }
+        } catch (error) {}
     }
 
     private initializeChartUI(): void {
@@ -270,9 +317,8 @@ export class ChartModule {
                     await this.chartLegend.createPaneLegend(pane);
                 }
             };
-        } catch (error) {
-            console.error('❌ Failed to lazy load indicator manager:', error);
-        } finally {
+        } catch (error) {}
+        finally {
             this.indicatorLoading = false;
         }
     }
@@ -285,15 +331,15 @@ export class ChartModule {
             const chart = this.mainChart.getChart();
             if (!chart) return;
 
-            const { FrontendStrategyManager } = await import('./strategy-manager');
+            const { FrontendStrategyManager } =
+                await import('./strategy-manager');
 
             this.strategyManager = new FrontendStrategyManager();
             this.strategyManager.setChart(chart);
             this.strategyManager.setSymbol(this._currentSymbol);
             this.strategyManager.initialize();
-        } catch (error) {
-            console.error('❌ Failed to lazy load strategy manager:', error);
-        } finally {
+        } catch (error) {}
+        finally {
             this.strategyLoading = false;
         }
     }
@@ -320,9 +366,13 @@ export class ChartModule {
             if (now - lastUpdateTime < THROTTLE_MS) return;
             lastUpdateTime = now;
 
-            const ohlc = this.chartDataManager.getOHLCAtTime(param.time as number);
+            const ohlc = this.chartDataManager.getOHLCAtTime(
+                param.time as number
+            );
             if (ohlc && this.chartLegend) {
-                this.chartLegend.updateOHLC(ohlc.open, ohlc.high, ohlc.low, ohlc.close);
+                this.chartLegend.updateOHLC(
+                    ohlc.open, ohlc.high, ohlc.low, ohlc.close
+                );
             }
 
             if (this.drawingModule) {
@@ -331,37 +381,7 @@ export class ChartModule {
         });
     }
 
-    // ==================== TICK UPDATE — direct call from ModuleManager ====================
-
-    // ✅ Fix #9 — replaces price-update DOM event
-    public onTick(data: any): void {
-        if (data.symbol !== this._currentSymbol) return;
-        this.mainChart.updateBidAsk(data.bid, data.ask);
-        const latestOHLC = this.chartDataManager.getLatestOHLC();
-        if (latestOHLC) this.indicatorManager?.updateLatestValues(latestOHLC);
-    }
-
     // ==================== CALLED BY MODULE MANAGER ====================
-
-    public updateWithWebSocketData(data: WebSocketMessage): void {
-        if (!data || !data.type) return;
-
-        if (data.type === 'initial') {
-            const params: InitialDataParams = {
-                data:      data.data,
-                symbol:    data.symbol,
-                timeframe: data.timeframe
-            };
-            this.mainChart.handleInitialData(params);
-        } else if (data.type === 'update') {
-            const params: UpdateDataParams = {
-                data:      data.data,
-                symbol:    data.symbol,
-                timeframe: data.timeframe
-            };
-            this.mainChart.handleUpdate(params);
-        }
-    }
 
     public handleSymbolChange(symbol: string): void {
         if (this._currentSymbol === symbol) return;
@@ -448,13 +468,20 @@ export class ChartModule {
         this.abortController = new AbortController();
         const { signal } = this.abortController;
 
-        document.addEventListener('chart-reset-request',          () => this.mainChart.resetView(), { signal });
-        document.addEventListener('chart-download-request',       () => this.triggerChartDownload(), { signal });
-        document.addEventListener('chart-toggle-grid',            () => this.mainChart.toggleGrid(), { signal });
-        document.addEventListener('chart-toggle-crosshair',       () => this.mainChart.toggleCrosshair(), { signal });
-        document.addEventListener('chart-toggle-timescale',       () => this.mainChart.toggleTimeScale(), { signal });
-        document.addEventListener('chart-toggle-grid-vertical',   () => this.mainChart.toggleGridVertical(), { signal });
-        document.addEventListener('chart-toggle-grid-horizontal', () => this.mainChart.toggleGridHorizontal(), { signal });
+        document.addEventListener('chart-reset-request',
+            () => this.mainChart.resetView(), { signal });
+        document.addEventListener('chart-download-request',
+            () => this.triggerChartDownload(), { signal });
+        document.addEventListener('chart-toggle-grid',
+            () => this.mainChart.toggleGrid(), { signal });
+        document.addEventListener('chart-toggle-crosshair',
+            () => this.mainChart.toggleCrosshair(), { signal });
+        document.addEventListener('chart-toggle-timescale',
+            () => this.mainChart.toggleTimeScale(), { signal });
+        document.addEventListener('chart-toggle-grid-vertical',
+            () => this.mainChart.toggleGridVertical(), { signal });
+        document.addEventListener('chart-toggle-grid-horizontal',
+            () => this.mainChart.toggleGridHorizontal(), { signal });
 
         document.addEventListener('chart-toggle-volume', async () => {
             await this.mainChart.toggleVolume();
@@ -479,9 +506,13 @@ export class ChartModule {
                     break;
                 case 'open-settings-modal':
                     if (document.getElementById('settingsOverlay')) {
-                        document.dispatchEvent(new CustomEvent('close-settings-modal'));
+                        document.dispatchEvent(
+                            new CustomEvent('close-settings-modal')
+                        );
                     } else {
-                        document.dispatchEvent(new CustomEvent('chart-settings-modal-request'));
+                        document.dispatchEvent(
+                            new CustomEvent('chart-settings-modal-request')
+                        );
                     }
                     break;
             }
@@ -562,7 +593,8 @@ export class ChartModule {
 
         document.addEventListener('chart-watermark', (e: Event) => {
             const { visible, color } = (e as CustomEvent).detail;
-            if (visible !== undefined) this.mainChart.applyWatermark(visible, color);
+            if (visible !== undefined)
+                this.mainChart.applyWatermark(visible, color);
         }, { signal });
 
         document.addEventListener('chart-setting-toggle', (e: Event) => {
@@ -592,7 +624,8 @@ export class ChartModule {
             const { id, name, settings } = (e as CustomEvent).detail;
             if (this.chartLegend) {
                 this.chartLegend.updateItemName(id, name);
-                if (settings) this.chartLegend.updateItemSettings(id, settings);
+                if (settings)
+                    this.chartLegend.updateItemSettings(id, settings);
             }
         }, { signal });
 
@@ -601,13 +634,17 @@ export class ChartModule {
             if (!item) return;
 
             if (item.icon === 'fa-robot') {
-                import('./ui/strategy-settings-modal').then(({ StrategySettingsModal }) => {
-                    new StrategySettingsModal(item).open();
-                });
+                import('./ui/strategy-settings-modal').then(
+                    ({ StrategySettingsModal }) => {
+                        new StrategySettingsModal(item).open();
+                    }
+                );
             } else {
-                import('./ui/indicator-settings-modal').then(({ IndicatorSettingsModal }) => {
-                    new IndicatorSettingsModal(item).open();
-                });
+                import('./ui/indicator-settings-modal').then(
+                    ({ IndicatorSettingsModal }) => {
+                        new IndicatorSettingsModal(item).open();
+                    }
+                );
             }
         }, { signal });
 
@@ -652,7 +689,9 @@ export class ChartModule {
 
             await this.loadIndicatorManager();
             if (type === 'RSI') {
-                await this.indicatorManager?.addPaneIndicator(type, config?.settings);
+                await this.indicatorManager?.addPaneIndicator(
+                    type, config?.settings
+                );
             } else {
                 this.indicatorManager?.addIndicator(type, config?.settings);
             }
@@ -660,12 +699,16 @@ export class ChartModule {
 
         document.addEventListener('strategy_initial', async (e: Event) => {
             await this.loadStrategyManager();
-            this.strategyManager?.addStrategyIndicators((e as CustomEvent).detail);
+            this.strategyManager?.addStrategyIndicators(
+                (e as CustomEvent).detail
+            );
         }, { signal });
 
         document.addEventListener('strategy_update', async (e: Event) => {
             await this.loadStrategyManager();
-            this.strategyManager?.updateStrategyIndicators((e as CustomEvent).detail);
+            this.strategyManager?.updateStrategyIndicators(
+                (e as CustomEvent).detail
+            );
         }, { signal });
 
         document.addEventListener('tab-switched', (e: Event) => {
@@ -723,7 +766,8 @@ export class ChartModule {
     }
 
     public exportDrawings(): string {
-        return this.drawingModule ? this.drawingModule.exportDrawings() : '[]';
+        return this.drawingModule
+            ? this.drawingModule.exportDrawings() : '[]';
     }
 
     public importDrawings(json: string): void {
@@ -735,13 +779,13 @@ export class ChartModule {
     public getLineTools(): any                           { return this.drawingModule ? this.drawingModule.getLineTools() : null; }
     public isReady(): boolean                            { return this.mainChart.isReady(); }
     public isVolumeVisible(): boolean                    { return this.mainChart.isVolumeVisible(); }
-    public getDataManager(): ChartDataManager            { return this.chartDataManager; }
 
     // ==================== DESTROY ====================
 
     public async destroy(): Promise<void> {
         this.abortController?.abort();
         this.abortController = null;
+        this._onChartReadyCb = null;
 
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
@@ -763,17 +807,15 @@ export class ChartModule {
             this.chartLegend.destroy();
             this.chartLegend = null;
         }
-
         if (this.indicatorManager) {
             await this.indicatorManager.destroy();
             this.indicatorManager = null;
             this.indicatorLoading = false;
         }
-
         if (this.strategyManager) {
             await this.strategyManager.destroy();
-            this.strategyManager  = null;
-            this.strategyLoading  = false;
+            this.strategyManager = null;
+            this.strategyLoading = false;
         }
 
         if (this.chartDataManager) this.chartDataManager.clear();

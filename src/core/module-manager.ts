@@ -1,52 +1,59 @@
 // ================================================================
 // ⚡ MODULE MANAGER - Orchestrator
+// Direct wiring — no middlemen on hot path
+// Chart ready before WebSocket connects — no race conditions
 // ================================================================
 
-import { ChartModule as ChartModuleImpl } from '../chart/chart-core';
-import { ConnectionManager } from './connection-manager';
+import { ChartModule as ChartModuleImpl }      from '../chart/chart-core';
+import { ConnectionManager }                   from './connection-manager';
 import { TradingModule as TradingModuleClass } from '../trading/trading';
-import { Notification } from '../notification';
-import { Panels } from '../panel';
-import { WatchlistModule } from '../watchlist/watchlist-module';
-import { EconomicCalendarModule } from '../calendar/calendar-module';
-import { AlertsModule } from '../alerts/alerts-module';
-import { WebSocketMessage, AccountInfo, PositionData } from '../types';
+import { Notification }                        from '../notification';
+import { Panels }                              from '../panel';
+import { WatchlistModule }                     from '../watchlist/watchlist-module';
+import { EconomicCalendarModule }              from '../calendar/calendar-module';
+import { AlertsModule }                        from '../alerts/alerts-module';
+import { OHLCData }                            from '../chart/chart-types';
 
 declare global {
     interface Window {}
 }
 
 export class ModuleManager {
-    private chart: ChartModuleImpl | null = null;
-    private tradingInstance: InstanceType<typeof TradingModuleClass> | null = null;
-    private journalInstance: any | null = null;
+    private chart:            ChartModuleImpl | null = null;
+    private tradingInstance:  InstanceType<typeof TradingModuleClass> | null = null;
+    private journalInstance:  any | null = null;
     private strategyInstance: any | null = null;
 
     private watchlistInstance: WatchlistModule | null = null;
-    private calendarInstance: EconomicCalendarModule | null = null;
-    private alertsInstance: AlertsModule | null = null;
+    private calendarInstance:  EconomicCalendarModule | null = null;
+    private alertsInstance:    AlertsModule | null = null;
 
-    private journalLoading: boolean = false;
+    private journalLoading:  boolean = false;
     private strategyLoading: boolean = false;
 
     private notifications = Notification;
-    private panels = Panels;
+    private panels        = Panels;
 
     constructor(private connectionManager: ConnectionManager) {}
 
     // ==================== INITIALIZATION ====================
 
     public initialize(): void {
-        this.setupConnectionCallbacks();
-
         this.initializeNotificationModule();
         this.initializeChartModule();
         this.initializeTradingModule();
         this.initializeWatchlistModule();
         this.initializeCalendarModule();
         this.initializeAlertsModule();
-
         this.setupDOMEventBridge();
+
+        // ── Connect only after chart is ready — no race condition ──
+        if (this.chart) {
+            this.chart.onChartReadyCallback(() => {
+                this.wireDirectCallbacks();
+                this.connectionManager.connect();
+            });
+        }
     }
 
     public destroy(): void {
@@ -60,59 +67,193 @@ export class ModuleManager {
         this.notifications.destroy();
     }
 
-    // ==================== CONNECTION CALLBACKS ====================    
+    // ================================================================
+    // DIRECT CALLBACKS — wired once after chart ready
+    // ================================================================
 
-    private setupConnectionCallbacks(): void {
+    private wireDirectCallbacks(): void {
+        if (!this.chart) return;
 
-        this.connectionManager.onCandleData((data: WebSocketMessage) => {
-            this.chart?.updateWithWebSocketData(data);
+        const seriesManager = this.chart.getSeriesManager();
+        const dataManager   = this.chart.getDataManager();
+
+        // ── Tick — direct to SeriesManager ──
+        this.connectionManager.onTickData((
+            symbol, bid, ask, spread, time) =>
+        {
+            if (symbol !== this.connectionManager.getCurrentSymbol()) return;
+            seriesManager?.updateBidAsk(bid, ask);
         });
 
-        this.connectionManager.onTickData((data: WebSocketMessage) => {
-            this.chart?.onTick(data);
-            this.tradingInstance?.onTick(data);
-            if (data.symbol && data.bid !== undefined) {
-                this.watchlistInstance?.updatePrice(data.symbol, data.bid, data.change);
+        // ── Bar update — direct to DataManager + SeriesManager ──
+        this.connectionManager.onBarUpdate((
+            symbol, timeframe, candle) =>
+        {
+            if (symbol    !== this.connectionManager.getCurrentSymbol())    return;
+            if (timeframe !== this.connectionManager.getCurrentTimeframe()) return;
+
+            const ohlc: OHLCData = {
+                time:   candle.time,
+                open:   candle.open,
+                high:   candle.high,
+                low:    candle.low,
+                close:  candle.close,
+                volume: candle.volume
+            };
+
+            dataManager.updateOHLCData(ohlc);
+            const latest = dataManager.getLatestUpdateForCurrentType();
+            if (latest) seriesManager?.updateData(latest);
+        });
+
+        // ── Initial burst — direct to DataManager + SeriesManager ──
+        this.connectionManager.onCandleData((
+            symbol, timeframe, candles) =>
+        {
+            const ohlcData: OHLCData[] = candles.map(c => ({
+                time:   c.time,
+                open:   c.open,
+                high:   c.high,
+                low:    c.low,
+                close:  c.close,
+                volume: c.volume
+            }));
+
+            dataManager.addOHLCData(ohlcData);
+            const converted = dataManager.getDataForCurrentType();
+            if (converted.length > 0) {
+                seriesManager?.setData(converted);
             }
+
+            // ✅ Fix — clear loading overlay after data arrives
+            this.chart?.setReady();
+
+            this.chart?.handleInitialDataLoaded({
+                count:     ohlcData.length,
+                symbol,
+                timeframe
+            });
+
+            document.dispatchEvent(new CustomEvent(
+                'chart-initial-data-loaded', {
+                    detail: { symbol, timeframe, count: ohlcData.length }
+                }
+            ));
+
+            this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
         });
 
-        this.connectionManager.onAccountUpdate((account: AccountInfo) => {
-            this.tradingInstance?.updateAccountInfo(account);
+        // ── Watchlist — direct callback ──
+        this.connectionManager.onWatchlistUpdate((
+            symbol, bid, ask, spread, time, change) =>
+        {
+            this.watchlistInstance?.updatePrice(
+                symbol, bid, change
+            );
         });
 
-        this.connectionManager.onPositionsUpdate((positions: PositionData[]) => {
+        // ── Positions — direct to TradingModule ──
+        this.connectionManager.onPositionsUpdate((positions) => {
             this.tradingInstance?.updatePositions(positions);
         });
 
-        this.connectionManager.onTradeExecuted((data: WebSocketMessage) => {
-            if (data.success) {
+        // ── Account — direct to TradingModule ──
+        this.connectionManager.onAccountUpdate((account) => {
+            this.tradingInstance?.updateAccountInfo(account);
+        });
+
+        // ── Trade executed ──
+        this.connectionManager.onTradeExecuted((
+            success, direction, symbol,
+            volume, price, ticket, timestamp, message) =>
+        {
+            if (success) {
                 this.notifications.success(
-                    `Trade ${data.direction || 'executed'} successfully`,
+                    `Trade ${direction} executed successfully`,
                     { title: 'Trade Executed' }
                 );
             } else {
                 this.notifications.error(
-                    data.message || 'Trade execution failed',
+                    message || 'Trade execution failed',
                     { title: 'Trade Failed' }
                 );
             }
-            this.tradingInstance?.handleTradeConfirmation(data);
+            this.tradingInstance?.handleTradeConfirmation({
+                type:      'trade_executed',
+                success, direction, symbol,
+                volume, price, ticket,
+                timestamp: String(timestamp),
+                message
+            });
         });
 
-        this.connectionManager.onMT5Status((connected: boolean, statusText: string) => {
-            document.dispatchEvent(new CustomEvent('mt5-status-changed', {
-                detail: { connected, statusText }
-            }));
+        // ── Position closed ──
+        this.connectionManager.onPositionClosed((
+            success, ticket, message) =>
+        {
+            if (success) {
+                this.notifications.success(
+                    message, { title: 'Position Closed' }
+                );
+            } else {
+                this.notifications.error(
+                    message, { title: 'Close Failed' }
+                );
+            }
         });
 
+        // ── Position modified ──
+        this.connectionManager.onPositionModified((
+            success, ticket, message) =>
+        {
+            if (success) {
+                this.notifications.success(
+                    message, { title: 'Position Modified' }
+                );
+            } else {
+                this.notifications.error(
+                    message, { title: 'Modify Failed' }
+                );
+            }
+        });
+
+        // ── MT5 status ──
+        this.connectionManager.onMT5Status((
+            connected, statusText) =>
+        {
+            document.dispatchEvent(new CustomEvent(
+                'mt5-status-changed', {
+                    detail: { connected, statusText }
+                }
+            ));
+        });
+
+        // ── WS connection status ──
         this.connectionManager.onConnectionStatus((status) => {
-            document.dispatchEvent(new CustomEvent('chart-connection-status', {
-                detail: { status }
-            }));
+            document.dispatchEvent(new CustomEvent(
+                'chart-connection-status', {
+                    detail: { status }
+                }
+            ));
         });
 
-        this.connectionManager.onStrategyData((data: WebSocketMessage) => {
-            switch (data.type) {
+        // ── Error ──
+        this.connectionManager.onError((message) => {
+            this.notifications.error(message, { title: 'Error' });
+        });
+
+        // ── Auto trading ──
+        this.connectionManager.onAutoTrading((enabled, message) => {
+            document.dispatchEvent(new CustomEvent(
+                'auto_trading_status', {
+                    detail: { enabled, message }
+                }
+            ));
+        });
+
+        // ── Strategy data ──
+        this.connectionManager.onStrategyData((type, data) => {
+            switch (type) {
                 case 'strategy_initial':
                 case 'strategy_update':
                 case 'strategy_deployed':
@@ -120,9 +261,10 @@ export class ModuleManager {
                 case 'strategy_updated':
                 case 'strategy_signal':
                 case 'auto_trading_status':
-                    document.dispatchEvent(new CustomEvent(data.type, { detail: data }));
+                    document.dispatchEvent(
+                        new CustomEvent(type, { detail: data })
+                    );
                     break;
-
                 case 'backtest_results':
                     this.strategyInstance?.handleBacktestResults(data);
                     break;
@@ -136,12 +278,16 @@ export class ModuleManager {
 
         document.addEventListener('watchlist-add', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
-            if (symbol) this.connectionManager.sendCommand(`WATCHLIST_ADD_${symbol}`);
+            if (symbol) this.connectionManager.sendCommand(
+                `WATCHLIST_ADD_${symbol}`
+            );
         });
 
         document.addEventListener('watchlist-remove', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
-            if (symbol) this.connectionManager.sendCommand(`WATCHLIST_REMOVE_${symbol}`);
+            if (symbol) this.connectionManager.sendCommand(
+                `WATCHLIST_REMOVE_${symbol}`
+            );
         });
 
         document.addEventListener('symbol-changed', (e: Event) => {
@@ -158,31 +304,35 @@ export class ModuleManager {
             this.chart?.handleTimeframeChange(timeframe);
         });
 
-        document.addEventListener('chart-initial-data-loaded', () => {
-            this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
-        });
-
         document.addEventListener('auto-trade-toggled', (e: Event) => {
             const { enabled } = (e as CustomEvent).detail;
             this.connectionManager.setAutoTrading(enabled);
             if (enabled) {
-                this.notifications.success('Auto trading is now active', { title: 'Auto Trading Enabled' });
+                this.notifications.success(
+                    'Auto trading is now active',
+                    { title: 'Auto Trading Enabled' }
+                );
             } else {
-                this.notifications.warning('Auto trading has been disabled', { title: 'Auto Trading Disabled' });
+                this.notifications.warning(
+                    'Auto trading has been disabled',
+                    { title: 'Auto Trading Disabled' }
+                );
             }
         });
 
         document.addEventListener('execute-trade', (e: Event) => {
             const { command, tp, sl } = (e as CustomEvent).detail;
             if (!command) return;
-
             const parts = command.split('_');
             if (parts.length >= 5) {
                 const direction = parts[1] as 'BUY' | 'SELL';
                 const symbol    = parts[2];
                 const volume    = parseFloat(parts[3]);
                 const price     = parseFloat(parts[4]);
-                this.connectionManager.executeTrade(direction, symbol, volume, price, tp ?? null, sl ?? null);
+                this.connectionManager.executeTrade(
+                    direction, symbol, volume, price,
+                    tp ?? null, sl ?? null
+                );
             } else {
                 this.connectionManager.sendCommand(command);
             }
@@ -205,9 +355,12 @@ export class ModuleManager {
         });
 
         document.addEventListener('deploy-strategy', (e: Event) => {
-            const { strategyType, symbol, timeframe, params } = (e as CustomEvent).detail;
+            const { strategyType, symbol, timeframe, params } =
+                (e as CustomEvent).detail;
             if (strategyType && symbol && timeframe) {
-                this.connectionManager.deployStrategy(strategyType, symbol, timeframe, params || {});
+                this.connectionManager.deployStrategy(
+                    strategyType, symbol, timeframe, params || {}
+                );
             }
             this.loadStrategyModule();
         });
@@ -219,7 +372,8 @@ export class ModuleManager {
 
         document.addEventListener('update-strategy', (e: Event) => {
             const { strategyId, updates } = (e as CustomEvent).detail;
-            if (strategyId && updates) this.connectionManager.updateStrategy(strategyId, updates);
+            if (strategyId && updates)
+                this.connectionManager.updateStrategy(strategyId, updates);
         });
 
         document.addEventListener('get-active-strategies', () => {
@@ -228,9 +382,12 @@ export class ModuleManager {
         });
 
         document.addEventListener('backtest-strategy', (e: Event) => {
-            const { strategyType, symbol, timeframe, days, params } = (e as CustomEvent).detail;
+            const { strategyType, symbol, timeframe, days, params } =
+                (e as CustomEvent).detail;
             if (strategyType && symbol && timeframe && days) {
-                this.connectionManager.backtestStrategy(strategyType, symbol, timeframe, days, params || {});
+                this.connectionManager.backtestStrategy(
+                    strategyType, symbol, timeframe, days, params || {}
+                );
             }
             this.loadStrategyModule();
         });
@@ -264,7 +421,10 @@ export class ModuleManager {
 
         document.addEventListener('trade-error', (e: Event) => {
             const { message } = (e as CustomEvent).detail;
-            this.notifications.error(message || 'Trade execution failed', { title: 'Trade Error' });
+            this.notifications.error(
+                message || 'Trade execution failed',
+                { title: 'Trade Error' }
+            );
         });
 
         document.addEventListener('hide-panel', () => {
@@ -277,14 +437,15 @@ export class ModuleManager {
     private async loadJournalModule(): Promise<void> {
         if (this.journalInstance || this.journalLoading) return;
         this.journalLoading = true;
-
         try {
             const { JournalModule } = await import('../journal/journal');
             this.journalInstance = new JournalModule();
             this.journalInstance.initialize();
         } catch (error) {
-            console.error('❌ Failed to lazy load journal:', error);
-            this.notifications.error('Failed to load journal module', { title: 'Module Error' });
+            this.notifications.error(
+                'Failed to load journal module',
+                { title: 'Module Error' }
+            );
         } finally {
             this.journalLoading = false;
         }
@@ -293,7 +454,6 @@ export class ModuleManager {
     private async loadStrategyModule(): Promise<void> {
         if (this.strategyInstance || this.strategyLoading) return;
         this.strategyLoading = true;
-
         try {
             const { StrategyModule } = await import('../strategy/strategy');
             this.strategyInstance = new StrategyModule(
@@ -301,8 +461,10 @@ export class ModuleManager {
                 () => this.connectionManager.getCurrentTimeframe()
             );
         } catch (error) {
-            console.error('❌ Failed to lazy load strategy:', error);
-            this.notifications.error('Failed to load strategy module', { title: 'Module Error' });
+            this.notifications.error(
+                'Failed to load strategy module',
+                { title: 'Module Error' }
+            );
         } finally {
             this.strategyLoading = false;
         }
@@ -314,35 +476,42 @@ export class ModuleManager {
         try {
             this.chart = new ChartModuleImpl();
         } catch (error) {
-            console.error('❌ Failed to initialize chart:', error);
-            this.notifications.error('Failed to initialize chart module', { title: 'Module Error' });
+            this.notifications.error(
+                'Failed to initialize chart module',
+                { title: 'Module Error' }
+            );
         }
     }
 
     private initializeTradingModule(): void {
         try {
+            // ✅ Fix — TradingModule takes no constructor arguments
             this.tradingInstance = new TradingModuleClass();
         } catch (error) {
-            console.error('❌ Failed to initialize trading:', error);
-            this.notifications.error('Failed to initialize trading module', { title: 'Module Error' });
+            this.notifications.error(
+                'Failed to initialize trading module',
+                { title: 'Module Error' }
+            );
         }
     }
 
     private initializeNotificationModule(): void {
         try {
             Notification.initialize();
-        } catch (error) {
-            console.error('❌ Failed to initialize notifications:', error);
-        }
+        } catch (error) {}
     }
 
     private initializeWatchlistModule(): void {
         try {
-            // ✅ Fix #15 — connectionManager passed directly
-            this.watchlistInstance = new WatchlistModule(this.connectionManager);
+            this.watchlistInstance = new WatchlistModule(
+                this.connectionManager
+            );
             this.watchlistInstance.initialize();
         } catch (error) {
-            console.error('❌ Failed to initialize watchlist:', error);
+            this.notifications.error(
+                'Failed to initialize watchlist',
+                { title: 'Module Error' }
+            );
         }
     }
 
@@ -350,18 +519,14 @@ export class ModuleManager {
         try {
             this.calendarInstance = new EconomicCalendarModule();
             this.calendarInstance.initialize();
-        } catch (error) {
-            console.error('❌ Failed to initialize calendar:', error);
-        }
+        } catch (error) {}
     }
 
     private initializeAlertsModule(): void {
         try {
             this.alertsInstance = new AlertsModule();
             this.alertsInstance.initialize();
-        } catch (error) {
-            console.error('❌ Failed to initialize alerts:', error);
-        }
+        } catch (error) {}
     }
 
     // ==================== NOTIFICATION HELPER ====================
@@ -381,14 +546,14 @@ export class ModuleManager {
 
     // ==================== GETTERS ====================
 
-    public getChart(): ChartModuleImpl | null                 { return this.chart; }
-    public getTradingModule()                                  { return this.tradingInstance; }
-    public getJournalModule()                                  { return this.journalInstance; }
-    public getStrategyModule()                                 { return this.strategyInstance; }
-    public getWatchlistModule(): WatchlistModule | null        { return this.watchlistInstance; }
-    public getCalendarModule(): EconomicCalendarModule | null  { return this.calendarInstance; }
-    public getAlertsModule(): AlertsModule | null              { return this.alertsInstance; }
-    public getConnectionManager(): ConnectionManager           { return this.connectionManager; }
-    public getPanelsModule(): typeof Panels                    { return this.panels; }
-    public getNotificationModule(): typeof Notification        { return this.notifications; }
+    public getChart(): ChartModuleImpl | null                { return this.chart; }
+    public getTradingModule()                                 { return this.tradingInstance; }
+    public getJournalModule()                                 { return this.journalInstance; }
+    public getStrategyModule()                                { return this.strategyInstance; }
+    public getWatchlistModule(): WatchlistModule | null       { return this.watchlistInstance; }
+    public getCalendarModule(): EconomicCalendarModule | null { return this.calendarInstance; }
+    public getAlertsModule(): AlertsModule | null             { return this.alertsInstance; }
+    public getConnectionManager(): ConnectionManager          { return this.connectionManager; }
+    public getPanelsModule(): typeof Panels                   { return this.panels; }
+    public getNotificationModule(): typeof Notification       { return this.notifications; }
 }
