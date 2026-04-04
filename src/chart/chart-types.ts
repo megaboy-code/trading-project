@@ -55,7 +55,7 @@ export type ChartState = 'IDLE' | 'LOADING' | 'READY';
 // ==================== OHLC ====================
 
 export interface OHLCData {
-    time:    Time;
+    time:    number;
     open:    number;
     high:    number;
     low:     number;

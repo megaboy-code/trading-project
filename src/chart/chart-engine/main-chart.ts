@@ -208,14 +208,20 @@ export class MainChart {
 
         this.currentChartType = chartType;
         this.dataManager.setChartType(chartType as any);
-
         this.seriesManager.createSeries(chartType);
 
         if (this.dataManager.hasData()) {
             const convertedData = this.dataManager.getDataForCurrentType();
+
+            console.log('hasData:', this.dataManager.hasData());
+            console.log('convertedData length:', convertedData?.length);
+            console.log('convertedData sample:', convertedData?.[0]);
+
             if (convertedData && convertedData.length > 0) {
                 this.seriesManager.setData(convertedData);
             }
+        } else {
+            console.log('hasData: FALSE — no data in manager');
         }
     }
 

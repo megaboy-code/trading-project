@@ -2,12 +2,11 @@
 // ⚡ CHART DATA MANAGER - OPTIMIZED with Running Total
 // ================================================================
 
-import { Time } from 'lightweight-charts';
 import { OHLCData, ChartType } from './chart-types';
 
 // Lightweight Charts compatible data types
 export interface CandlestickChartData {
-    time: Time;
+    time: number;
     open: number;
     high: number;
     low: number;
@@ -15,17 +14,17 @@ export interface CandlestickChartData {
 }
 
 export interface LineChartData {
-    time: Time;
+    time: number;
     value: number;
 }
 
 export interface AreaChartData {
-    time: Time;
+    time: number;
     value: number;
 }
 
 export interface BaselineChartData {
-    time: Time;
+    time: number;
     value: number;
 }
 

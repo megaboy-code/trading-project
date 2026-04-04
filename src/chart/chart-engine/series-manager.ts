@@ -90,10 +90,12 @@ export class SeriesManager {
             this.currentSeries.applyOptions({ visible: false });
         }
 
-        // ✅ Series already exists — show it, refresh data will be handled by caller
+        // ✅ Series already exists — clear stale data, show it
+        // caller will immediately fill with fresh data
         if (this.seriesMap.has(chartType)) {
             this.currentSeries    = this.seriesMap.get(chartType)!;
             this.currentChartType = chartType;
+            this.currentSeries.setData([]);                    // ✅ clear stale data
             this.currentSeries.applyOptions({ visible: true });
             return this.currentSeries;
         }

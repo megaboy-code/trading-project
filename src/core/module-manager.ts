@@ -77,12 +77,13 @@ export class ModuleManager {
         const seriesManager = this.chart.getSeriesManager();
         const dataManager   = this.chart.getDataManager();
 
-        // ── Tick — direct to SeriesManager ──
+        // ── Tick — direct to SeriesManager + TradingModule ──
         this.connectionManager.onTickData((
             symbol, bid, ask, spread, time) =>
         {
             if (symbol !== this.connectionManager.getCurrentSymbol()) return;
             seriesManager?.updateBidAsk(bid, ask);
+            this.tradingInstance?.onTick(symbol, bid, ask);  // ✅ fixed
         });
 
         // ── Bar update — direct to DataManager + SeriesManager ──
@@ -93,7 +94,7 @@ export class ModuleManager {
             if (timeframe !== this.connectionManager.getCurrentTimeframe()) return;
 
             const ohlc: OHLCData = {
-                time:   candle.time,
+                time:   Number(candle.time),
                 open:   candle.open,
                 high:   candle.high,
                 low:    candle.low,
@@ -110,8 +111,24 @@ export class ModuleManager {
         this.connectionManager.onCandleData((
             symbol, timeframe, candles) =>
         {
+            const currentSymbol    = this.connectionManager.getCurrentSymbol();
+            const currentTimeframe = this.connectionManager.getCurrentTimeframe();
+
+            // ── Debug — check if backend data matches current selection ──
+            console.log(
+                `[CandleData] arrived: ${symbol} ${timeframe} | current: ${currentSymbol} ${currentTimeframe} | candles: ${candles.length}`
+            );
+
+            // ── Discard stale data from previous symbol/tf switch ──
+            if (symbol !== currentSymbol || timeframe !== currentTimeframe) {
+                console.warn(
+                    `[CandleData] DISCARDED — stale data for ${symbol} ${timeframe}`
+                );
+                return;
+            }
+
             const ohlcData: OHLCData[] = candles.map(c => ({
-                time:   c.time,
+                time:   Number(c.time),
                 open:   c.open,
                 high:   c.high,
                 low:    c.low,
@@ -485,7 +502,6 @@ export class ModuleManager {
 
     private initializeTradingModule(): void {
         try {
-            // ✅ Fix — TradingModule takes no constructor arguments
             this.tradingInstance = new TradingModuleClass();
         } catch (error) {
             this.notifications.error(

@@ -193,12 +193,12 @@ function posTypeToString(t: PositionType): 'BUY' | 'SELL' {
 
 function extractCandle(c: any): CandleData {
     return {
-        time:   Number(c.time()),
+        time:   parseInt(c.time().toString(), 10),    // ✅ BigInt → string → int
         open:   c.open(),
         high:   c.high(),
         low:    c.low(),
         close:  c.close(),
-        volume: Number(c.volume())
+        volume: parseInt(c.volume().toString(), 10)   // ✅ BigInt → string → int
     };
 }
 
@@ -273,7 +273,7 @@ export class MegaFlowzDecoder {
                             bid:    p.bid(),
                             ask:    p.ask(),
                             spread: p.spread(),
-                            time:   Number(p.time())
+                            time:   parseInt(p.time().toString(), 10)
                         }
                     };
                 }
@@ -291,7 +291,7 @@ export class MegaFlowzDecoder {
                             bid:    p.bid(),
                             ask:    p.ask(),
                             spread: p.spread(),
-                            time:   Number(p.time()),
+                            time:   parseInt(p.time().toString(), 10),
                             change: p.change()
                         }
                     };
@@ -308,7 +308,7 @@ export class MegaFlowzDecoder {
                         const pos = p.positions(i);
                         if (!pos) continue;
                         positions.push({
-                            ticket:        Number(pos.ticket()),
+                            ticket:        parseInt(pos.ticket().toString(), 10),
                             symbol:        pos.symbol()       ?? '',
                             type:          posTypeToString(pos.type()),
                             volume:        pos.volume(),
@@ -319,7 +319,7 @@ export class MegaFlowzDecoder {
                             profit:        pos.profit(),
                             swap:          pos.swap(),
                             commission:    pos.commission(),
-                            open_time:     Number(pos.openTime())
+                            open_time:     parseInt(pos.openTime().toString(), 10)
                         });
                     }
 
@@ -370,8 +370,8 @@ export class MegaFlowzDecoder {
                             symbol:    p.symbol()    ?? '',
                             volume:    p.volume(),
                             price:     p.price(),
-                            ticket:    Number(p.ticket()),
-                            timestamp: Number(p.timestamp()),
+                            ticket:    parseInt(p.ticket().toString(), 10),
+                            timestamp: parseInt(p.timestamp().toString(), 10),
                             message:   p.message()   ?? ''
                         }
                     };
@@ -387,7 +387,7 @@ export class MegaFlowzDecoder {
                         type: 'position_closed',
                         data: {
                             success: p.success(),
-                            ticket:  Number(p.ticket()),
+                            ticket:  parseInt(p.ticket().toString(), 10),
                             message: p.message() ?? ''
                         }
                     };
@@ -403,7 +403,7 @@ export class MegaFlowzDecoder {
                         type: 'position_modified',
                         data: {
                             success: p.success(),
-                            ticket:  Number(p.ticket()),
+                            ticket:  parseInt(p.ticket().toString(), 10),
                             message: p.message() ?? ''
                         }
                     };
