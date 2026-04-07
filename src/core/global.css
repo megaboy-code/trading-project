@@ -56,13 +56,17 @@
     --raise:    0 2px 8px oklch(0% 0 0 / 0.4);
     --raise-sm: 0 1px 4px oklch(0% 0 0 / 0.3);
     --press:    inset 0 2px 6px oklch(0% 0 0 / 0.35);
+
+    /* ── TOAST — dark theme ── */
+    --toast-bg:     #1e1e2e;
+    --toast-border: #2a2a3e;
 }
 
 /* ==================== TOAST GLASS — dark ==================== */
 [data-theme="dark"],
 [data-theme="system"] {
-    --toast-bg:     rgba(15, 20, 35, 0.45);
-    --toast-border: rgba(255, 255, 255, 0.14);
+    --toast-bg:     #1e1e2e;
+    --toast-border: #2a2a3e;
 }
 
 /* ==================== LIGHT THEME ==================== */
@@ -84,7 +88,6 @@
     /* ── TEXT ── */
     --text-primary:   #0a0c12;
     --text-secondary: #06070c;
-    /* ✅ Darkened for better readability */
     --text-muted:     #333650;
     --text-dim:       #030306;
 
@@ -121,9 +124,9 @@
     --raise-sm: 3px 3px 8px rgba(150,155,180,0.25), -2px -2px 5px rgba(255,255,255,0.85);
     --press:    inset 2px 2px 6px rgba(140,145,165,0.22), inset -1px -1px 4px rgba(255,255,255,0.8);
 
-    /* ── TOAST GLASS — light ── */
-    --toast-bg:     rgba(255, 255, 255, 0.20);
-    --toast-border: rgba(255, 255, 255, 0.45);
+    /* ── TOAST — light theme ── */
+    --toast-bg:     #ffffff;
+    --toast-border: #e0e0e0;
 }
 
 /* ==================== SHARED — Never changes between themes ==================== */
@@ -307,7 +310,6 @@ body {
     min-width: 0;
 }
 
-/* lg — user name */
 .user-name {
     font-size: var(--text-lg);
     font-weight: 700;
@@ -317,14 +319,12 @@ body {
     text-overflow: ellipsis;
 }
 
-/* base — user role */
 .user-role {
     font-size: var(--text-base);
     color: var(--accent-info);
     font-weight: 500;
 }
 
-/* base — menu items */
 .user-menu-item {
     display: flex;
     align-items: center;
@@ -403,7 +403,6 @@ body {
     display: flex;
 }
 
-/* base — theme options */
 .user-theme-option {
     display: flex;
     align-items: center;
@@ -485,11 +484,9 @@ body {
 
 .tab.closable { padding-right: 8px; }
 
-/* md — tab icon */
 .tab-icon { font-size: var(--text-md); opacity: 0.8; }
 .tab.active .tab-icon { opacity: 1; color: var(--accent-info); }
 
-/* base — tab title */
 .tab-title {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -501,7 +498,6 @@ body {
 }
 
 /* ==================== LIVE TAB PRICE ==================== */
-/* base — live price */
 .tab-live-price {
     font-size: var(--text-base);
     font-weight: 500;
@@ -618,7 +614,6 @@ body {
 
 .notification-bell-tab:hover { color: var(--text-primary); }
 
-/* base — alert count badge */
 .notification-bell-tab .alert-count {
     position: absolute;
     top: -2px;

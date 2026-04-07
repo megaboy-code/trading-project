@@ -271,7 +271,7 @@ export class NotificationModule {
     }
 
     public error(message: string, options: NotificationOptions = {}): string {
-        return this.show(message, 'error', 6000, { title: 'Error', persistent: true, ...options });
+        return this.show(message, 'error', 6000, { title: 'Error', persistent: false, ...options });
     }
 
     public warning(message: string, options: NotificationOptions = {}): string {

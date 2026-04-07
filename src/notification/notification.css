@@ -27,7 +27,6 @@
 
 .notification-bell.has-unread { color: var(--accent-info); }
 
-/* sm — bell count badge */
 .bell-count {
     position: absolute;
     top: -4px;
@@ -88,7 +87,6 @@
     flex-shrink: 0;
 }
 
-/* lg — header title */
 .notification-header h3 {
     font-size: var(--text-lg);
     font-weight: 600;
@@ -107,7 +105,6 @@
     gap: 4px;
 }
 
-/* base — sound toggle */
 .notification-sound-toggle {
     width: 28px;
     height: 28px;
@@ -133,7 +130,6 @@
     background: rgba(var(--accent-info-rgb), 0.1);
 }
 
-/* base — close button */
 .close-notifications {
     width: 28px;
     height: 28px;
@@ -196,7 +192,6 @@
 .notification-item.empty:hover { background: transparent; }
 
 /* ==================== NOTIFICATION ICON ==================== */
-/* lg — notification icon */
 .notification-icon {
     width: 32px;
     height: 32px;
@@ -235,7 +230,6 @@
 /* ==================== NOTIFICATION CONTENT ==================== */
 .notification-content { flex: 1; min-width: 0; }
 
-/* lg — notification title */
 .notification-title {
     font-weight: 600;
     font-size: var(--text-lg);
@@ -243,7 +237,6 @@
     margin-bottom: 4px;
 }
 
-/* base — notification text */
 .notification-text {
     font-size: var(--text-base);
     color: var(--text-muted);
@@ -251,7 +244,6 @@
     margin-bottom: 4px;
 }
 
-/* base — notification time */
 .notification-time {
     font-size: var(--text-base);
     color: var(--text-muted);
@@ -270,7 +262,6 @@
 
 .notification-item:hover .notification-actions { opacity: 1; }
 
-/* base — action buttons */
 .notification-mark-read,
 .notification-dismiss {
     width: 22px;
@@ -308,7 +299,6 @@
     flex-shrink: 0;
 }
 
-/* base — clear all button */
 .clear-all {
     background: rgba(var(--accent-sell-rgb), 0.1);
     border: 1px solid rgba(var(--accent-sell-rgb), 0.2);
@@ -326,7 +316,6 @@
     border-color: var(--accent-sell);
 }
 
-/* base — notification count */
 .notification-count {
     font-size: var(--text-base);
     color: var(--text-muted);
@@ -346,7 +335,7 @@
     max-width: 320px;
 }
 
-/* ==================== TOAST ==================== */
+/* ==================== TOAST - CLASSIC SOLID ==================== */
 .notification-toast {
     width: 320px;
     border-radius: 10px;
@@ -358,27 +347,9 @@
     opacity: 0;
     transform: translateX(100%);
     transition: opacity 0.3s ease, transform 0.3s ease;
-
-    /* ✅ Glass effect — theme-aware via CSS variables */
     background: var(--toast-bg);
-    backdrop-filter: blur(32px) saturate(220%);
-    -webkit-backdrop-filter: blur(32px) saturate(220%);
     border: 1px solid var(--toast-border);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.12);
-}
-
-/* ✅ Light theme toast glass */
-[data-theme="light"] .notification-toast {
-    --toast-bg: rgba(255,255,255,0.20);
-    --toast-border: rgba(255,255,255,0.45);
-}
-
-/* ✅ Dark theme toast glass */
-:root .notification-toast,
-[data-theme="dark"] .notification-toast,
-[data-theme="system"] .notification-toast {
-    --toast-bg: rgba(15, 20, 35, 0.45);
-    --toast-border: rgba(255,255,255,0.14);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .notification-toast.show {
@@ -386,29 +357,11 @@
     transform: translateX(0);
 }
 
-.notification-toast.success {
-    border-color: rgba(var(--accent-buy-rgb), 0.35);
-    box-shadow: 0 8px 32px rgba(var(--accent-buy-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
-                inset 0 0 0 1px rgba(var(--accent-buy-rgb), 0.12);
-}
-
-.notification-toast.error {
-    border-color: rgba(var(--accent-sell-rgb), 0.35);
-    box-shadow: 0 8px 32px rgba(var(--accent-sell-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
-                inset 0 0 0 1px rgba(var(--accent-sell-rgb), 0.12);
-}
-
-.notification-toast.warning {
-    border-color: rgba(var(--accent-warn-rgb), 0.35);
-    box-shadow: 0 8px 32px rgba(var(--accent-warn-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
-                inset 0 0 0 1px rgba(var(--accent-warn-rgb), 0.12);
-}
-
-.notification-toast.info {
-    border-color: rgba(var(--accent-info-rgb), 0.35);
-    box-shadow: 0 8px 32px rgba(var(--accent-info-rgb), 0.15), 0 2px 8px rgba(0,0,0,0.1),
-                inset 0 0 0 1px rgba(var(--accent-info-rgb), 0.12);
-}
+/* Accent border left */
+.notification-toast.success { border-left: 4px solid var(--accent-buy); }
+.notification-toast.error   { border-left: 4px solid var(--accent-sell); }
+.notification-toast.warning { border-left: 4px solid var(--accent-warning); }
+.notification-toast.info    { border-left: 4px solid var(--accent-info); }
 
 /* ==================== TOAST CONTENT ==================== */
 .notification-toast-content {
@@ -419,10 +372,11 @@
     min-width: 0;
 }
 
-/* lg — toast icon */
 .notification-toast-content > i {
     font-size: var(--text-lg);
     flex-shrink: 0;
+    font-style: normal;
+    font-weight: bold;
 }
 
 .notification-toast.success .notification-toast-content > i { color: var(--accent-buy); }
@@ -432,7 +386,6 @@
 
 .notification-toast-text { flex: 1; min-width: 0; }
 
-/* lg — toast title */
 .notification-toast-title {
     font-weight: 600;
     font-size: var(--text-lg);
@@ -443,7 +396,6 @@
     text-overflow: ellipsis;
 }
 
-/* base — toast message */
 .notification-toast-message {
     font-size: var(--text-base);
     color: var(--text-muted);
@@ -452,7 +404,6 @@
     text-overflow: ellipsis;
 }
 
-/* base — action and close buttons */
 .notification-action-btn,
 .notification-close-btn {
     width: 24px;
