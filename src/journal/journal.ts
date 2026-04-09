@@ -84,64 +84,75 @@ export class JournalModule {
         this.elements.viewAllBtn = document.querySelector('.journal-view-all');
     }
 
+    private safePnl(pnl: any): number {
+        const val = parseFloat(String(pnl));
+        return isNaN(val) ? 0 : val;
+    }
+
+    private getRelativeDate(daysAgo: number): string {
+        const date = new Date();
+        date.setDate(date.getDate() - daysAgo);
+        return this.formatDateYMD(date);
+    }
+
     private generateSampleTrades(): Trade[] {
         return [
             { 
-                id: 1, date: '2025-04-08', time: '14:32', pair: 'EURUSD', direction: 'LONG', size: '0.5', pnl: 125,
+                id: 1, date: this.getRelativeDate(0), time: '14:32', pair: 'EURUSD', direction: 'LONG', size: '0.5', pnl: 125,
                 entry: '1.08500', exit: '1.08750', pips: '+25', duration: '45 min',
                 notes: '✅ Strategy: Breakout above resistance. RSI confirmation. Volume spike.',
                 imageUrl: 'https://via.placeholder.com/800x400?text=EURUSD+Chart'
             },
             { 
-                id: 2, date: '2025-04-08', time: '13:15', pair: 'GBPUSD', direction: 'SHORT', size: '0.3', pnl: -45,
+                id: 2, date: this.getRelativeDate(0), time: '13:15', pair: 'GBPUSD', direction: 'SHORT', size: '0.3', pnl: -45,
                 entry: '1.27500', exit: '1.27350', pips: '-15', duration: '25 min',
                 notes: '⚠️ Strategy: Short entry. Stop hit early. News spike caused reversal.',
                 imageUrl: null
             },
             { 
-                id: 3, date: '2025-04-07', time: '11:45', pair: 'XAUUSD', direction: 'LONG', size: '0.1', pnl: 87,
+                id: 3, date: this.getRelativeDate(1), time: '11:45', pair: 'XAUUSD', direction: 'LONG', size: '0.1', pnl: 87,
                 entry: '2650.00', exit: '2658.50', pips: '+85', duration: '2 hours',
                 notes: '',
                 imageUrl: null
             },
             { 
-                id: 4, date: '2025-04-07', time: '09:30', pair: 'USDJPY', direction: 'LONG', size: '0.4', pnl: 220,
+                id: 4, date: this.getRelativeDate(1), time: '09:30', pair: 'USDJPY', direction: 'LONG', size: '0.4', pnl: 220,
                 entry: '145.20', exit: '145.80', pips: '+60', duration: '1.5 hours',
                 notes: 'Strong breakout with volume confirmation',
                 imageUrl: 'https://via.placeholder.com/800x400?text=USDJPY+Chart'
             },
             { 
-                id: 5, date: '2025-04-06', time: '16:20', pair: 'BTCUSD', direction: 'SHORT', size: '0.05', pnl: -32,
+                id: 5, date: this.getRelativeDate(2), time: '16:20', pair: 'BTCUSD', direction: 'SHORT', size: '0.05', pnl: -32,
                 entry: '68500', exit: '68700', pips: '-200', duration: '30 min',
                 notes: '',
                 imageUrl: null
             },
             { 
-                id: 6, date: '2025-04-05', time: '10:00', pair: 'EURUSD', direction: 'LONG', size: '0.2', pnl: 55,
+                id: 6, date: this.getRelativeDate(3), time: '10:00', pair: 'EURUSD', direction: 'LONG', size: '0.2', pnl: 55,
                 entry: '1.08200', exit: '1.08350', pips: '+15', duration: '20 min',
                 notes: 'Quick scalp on support bounce',
                 imageUrl: null
             },
             { 
-                id: 7, date: '2025-04-04', time: '15:45', pair: 'GBPUSD', direction: 'SHORT', size: '0.4', pnl: -78,
+                id: 7, date: this.getRelativeDate(4), time: '15:45', pair: 'GBPUSD', direction: 'SHORT', size: '0.4', pnl: -78,
                 entry: '1.27800', exit: '1.28000', pips: '-20', duration: '40 min',
                 notes: 'Premature entry before news',
                 imageUrl: null
             },
             { 
-                id: 8, date: '2025-04-03', time: '12:30', pair: 'XAUUSD', direction: 'LONG', size: '0.15', pnl: 150,
+                id: 8, date: this.getRelativeDate(5), time: '12:30', pair: 'XAUUSD', direction: 'LONG', size: '0.15', pnl: 150,
                 entry: '2640.00', exit: '2655.00', pips: '+150', duration: '3 hours',
                 notes: 'Perfect trend following setup',
                 imageUrl: 'https://via.placeholder.com/800x400?text=XAUUSD+Chart'
             },
             { 
-                id: 9, date: '2025-03-31', time: '14:15', pair: 'EURUSD', direction: 'SHORT', size: '0.3', pnl: -25,
+                id: 9, date: this.getRelativeDate(7), time: '14:15', pair: 'EURUSD', direction: 'SHORT', size: '0.3', pnl: -25,
                 entry: '1.09000', exit: '1.09100', pips: '-10', duration: '15 min',
                 notes: '',
                 imageUrl: null
             },
             { 
-                id: 10, date: '2025-03-30', time: '11:00', pair: 'GBPUSD', direction: 'LONG', size: '0.5', pnl: 95,
+                id: 10, date: this.getRelativeDate(8), time: '11:00', pair: 'GBPUSD', direction: 'LONG', size: '0.5', pnl: 95,
                 entry: '1.27000', exit: '1.27250', pips: '+25', duration: '1 hour',
                 notes: 'Support bounce with divergence',
                 imageUrl: null
@@ -154,7 +165,11 @@ export class JournalModule {
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                this.trades = data.trades || this.generateSampleTrades();
+                const parsed = data.trades || [];
+                this.trades = parsed.map((t: Trade) => ({ ...t, pnl: this.safePnl(t.pnl) }));
+                if (this.trades.length === 0) {
+                    this.trades = this.generateSampleTrades();
+                }
             } catch (e) {
                 this.trades = this.generateSampleTrades();
             }
@@ -217,10 +232,9 @@ export class JournalModule {
             if (isSelected) extraClass += ' selected';
             
             if (dayData) {
-                if (dayData.wins > 0 && dayData.losses === 0) statusClass = ' win-day';
-                else if (dayData.losses > 0 && dayData.wins === 0) statusClass = ' loss-day';
-                else if (dayData.wins > 0 && dayData.losses > 0) statusClass = ' mixed-day';
-                
+                // Simple: green if net positive, red if net negative
+                statusClass = dayData.pnl >= 0 ? ' win-day' : ' loss-day';
+
                 const pnlClass = dayData.pnl >= 0 ? 'positive' : 'negative';
                 const pnlSymbol = dayData.pnl >= 0 ? '+' : '-';
                 pnlHTML = `<div class="journal-day-pnl ${pnlClass}">${pnlSymbol}$${Math.abs(dayData.pnl)}</div>`;
@@ -252,14 +266,14 @@ export class JournalModule {
         const dayTrades = this.trades.filter(t => t.date === dateStr);
         if (dayTrades.length === 0) return null;
         
-        const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
-        const wins = dayTrades.filter(t => t.pnl > 0).length;
-        const losses = dayTrades.filter(t => t.pnl < 0).length;
+        const totalPnl = dayTrades.reduce((sum, t) => sum + this.safePnl(t.pnl), 0);
+        const wins = dayTrades.filter(t => this.safePnl(t.pnl) > 0).length;
+        const losses = dayTrades.filter(t => this.safePnl(t.pnl) < 0).length;
         
         return {
             total: dayTrades.length,
-            wins: wins,
-            losses: losses,
+            wins,
+            losses,
             pnl: totalPnl
         };
     }
@@ -280,8 +294,8 @@ export class JournalModule {
             return;
         }
         
-        const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
-        const wins = dayTrades.filter(t => t.pnl > 0).length;
+        const totalPnl = dayTrades.reduce((sum, t) => sum + this.safePnl(t.pnl), 0);
+        const wins = dayTrades.filter(t => this.safePnl(t.pnl) > 0).length;
         const winRate = Math.round((wins / dayTrades.length) * 100);
         
         let summaryHTML = `
@@ -289,7 +303,7 @@ export class JournalModule {
                 <div class="journal-summary-item">
                     <div class="journal-summary-label">Total P&L</div>
                     <div class="journal-summary-value" style="color: ${totalPnl >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)'}">
-                        ${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl)}
+                        ${totalPnl >= 0 ? '+' : '-'}$${Math.abs(totalPnl)}
                     </div>
                 </div>
                 <div class="journal-summary-item">
@@ -305,9 +319,10 @@ export class JournalModule {
         
         let tradesHTML = '';
         dayTrades.forEach(trade => {
+            const pnl = this.safePnl(trade.pnl);
             const directionClass = trade.direction === 'LONG' ? 'long' : 'short';
-            const pnlClass = trade.pnl >= 0 ? 'win' : 'loss';
-            const pnlSymbol = trade.pnl >= 0 ? '+' : '-';
+            const pnlClass = pnl >= 0 ? 'win' : 'loss';
+            const pnlSymbol = pnl >= 0 ? '+' : '-';
             
             tradesHTML += `
                 <div class="journal-daily-trade ${pnlClass}" data-trade-id="${trade.id}">
@@ -317,7 +332,7 @@ export class JournalModule {
                         <span class="journal-daily-trade-size">${trade.size}L</span>
                     </div>
                     <div class="journal-daily-trade-pnl ${pnlClass}">
-                        ${pnlSymbol}$${Math.abs(trade.pnl)}
+                        ${pnlSymbol}$${Math.abs(pnl)}
                     </div>
                 </div>
             `;
@@ -343,40 +358,34 @@ export class JournalModule {
     }
     
     private getFilteredTrades(): Trade[] {
-        let filtered = [...this.trades];
         const today = new Date();
-        
+
         switch (this.currentFilter) {
             case 'win':
-                filtered = this.trades.filter(t => t.pnl > 0);
-                break;
+                return this.trades.filter(t => this.safePnl(t.pnl) > 0);
             case 'loss':
-                filtered = this.trades.filter(t => t.pnl < 0);
-                break;
+                return this.trades.filter(t => this.safePnl(t.pnl) < 0);
             case 'week':
                 const weekAgo = new Date();
                 weekAgo.setDate(weekAgo.getDate() - 7);
-                filtered = this.trades.filter(t => new Date(t.date) >= weekAgo);
-                break;
+                return this.trades.filter(t => new Date(t.date) >= weekAgo);
             case 'month':
                 const currentMonth = today.getMonth();
                 const currentYear = today.getFullYear();
-                filtered = this.trades.filter(t => {
+                return this.trades.filter(t => {
                     const date = new Date(t.date);
                     return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
                 });
-                break;
             default:
-                filtered = [...this.trades];
+                return [...this.trades];
         }
-        return filtered;
     }
     
     private calculateStats(trades: Trade[]): { total: number; winRate: number; netPnl: number } {
         const total = trades.length;
-        const wins = trades.filter(t => t.pnl > 0).length;
+        const wins = trades.filter(t => this.safePnl(t.pnl) > 0).length;
         const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-        const netPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
+        const netPnl = trades.reduce((sum, t) => sum + this.safePnl(t.pnl), 0);
         return { total, winRate, netPnl };
     }
     
@@ -393,7 +402,7 @@ export class JournalModule {
             this.elements.winRateStat.className = `stat-number ${stats.winRate >= 50 ? 'positive' : 'negative'}`;
         }
         if (this.elements.netPnlStat) {
-            this.elements.netPnlStat.textContent = `${stats.netPnl >= 0 ? '+' : ''}$${Math.abs(stats.netPnl)}`;
+            this.elements.netPnlStat.textContent = `${stats.netPnl >= 0 ? '+' : '-'}$${Math.abs(stats.netPnl)}`;
             this.elements.netPnlStat.className = `stat-number ${stats.netPnl >= 0 ? 'positive' : 'negative'}`;
         }
         
@@ -418,9 +427,10 @@ export class JournalModule {
         
         let html = '';
         filtered.forEach(trade => {
+            const pnl = this.safePnl(trade.pnl);
             const directionClass = trade.direction === 'LONG' ? 'long' : 'short';
-            const pnlClass = trade.pnl >= 0 ? 'pnl-profit' : 'pnl-loss';
-            const pnlSymbol = trade.pnl >= 0 ? '+' : '-';
+            const pnlClass = pnl >= 0 ? 'pnl-profit' : 'pnl-loss';
+            const pnlSymbol = pnl >= 0 ? '+' : '-';
             const dateTime = this.formatDateTime(trade.date, trade.time);
             
             html += `
@@ -429,7 +439,7 @@ export class JournalModule {
                     <td>${trade.pair}</td>
                     <td><span class="direction-badge ${directionClass}">${trade.direction}</span></td>
                     <td>${trade.size}</td>
-                    <td class="${pnlClass}">${pnlSymbol}$${Math.abs(trade.pnl)}</td>
+                    <td class="${pnlClass}">${pnlSymbol}$${Math.abs(pnl)}</td>
                 </tr>
             `;
         });
@@ -453,7 +463,6 @@ export class JournalModule {
         
         this.currentTradeId = trade.id;
         
-        // Set header color
         if (this.elements.modalHeader) {
             this.elements.modalHeader.classList.remove('long', 'short');
             this.elements.modalHeader.classList.add(trade.direction.toLowerCase());
@@ -487,7 +496,6 @@ export class JournalModule {
             (this.elements.tradeNotes as HTMLTextAreaElement).value = trade.notes || '';
         }
         
-        // Show/hide image section
         if (this.elements.imageSection) {
             if (trade.imageUrl) {
                 this.elements.imageSection.style.display = 'block';
@@ -518,7 +526,6 @@ export class JournalModule {
         if (trade) {
             trade.notes = notes;
             this.saveData();
-            // Show temporary success indicator
             const saveBtn = this.elements.saveNotesBtn;
             const originalText = saveBtn.textContent;
             saveBtn.textContent = '✓ Saved!';
@@ -541,6 +548,18 @@ export class JournalModule {
     // ==================== EVENT HANDLERS ====================
     
     private setupEventHandlers(): void {
+        // Tab switching
+        document.querySelectorAll('.journal-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = (tab as HTMLElement).dataset.tab;
+                document.querySelectorAll('.journal-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.journal-tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                const tabContent = document.getElementById(`journal-${tabName}-tab`);
+                if (tabContent) tabContent.classList.add('active');
+            });
+        });
+
         // Calendar day clicks
         if (this.elements.calendarDays) {
             this.elements.calendarDays.addEventListener('click', (e: Event) => {
@@ -585,13 +604,8 @@ export class JournalModule {
         // View all button
         if (this.elements.viewAllBtn) {
             this.elements.viewAllBtn.addEventListener('click', () => {
-                // Switch to trades tab
-                document.querySelectorAll('.journal-tab').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                document.querySelectorAll('.journal-tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
+                document.querySelectorAll('.journal-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.journal-tab-content').forEach(c => c.classList.remove('active'));
                 const tradesTab = document.querySelector('.journal-tab[data-tab="trades"]');
                 if (tradesTab) tradesTab.classList.add('active');
                 const tradesContent = document.getElementById('journal-trades-tab');
@@ -646,10 +660,11 @@ export class JournalModule {
     }
     
     private formatDateTime(dateStr: string, timeStr: string): string {
-        const date = new Date(dateStr);
-        const month = date.toLocaleDateString('en-US', { month: 'short' });
-        const day = date.getDate();
-        return `${month} ${day}, ${timeStr}`;
+        // Parse date parts directly to avoid UTC timezone shift
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+        return `${monthName} ${day}, ${timeStr}`;
     }
     
     // ==================== PUBLIC METHODS ====================

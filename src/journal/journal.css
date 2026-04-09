@@ -303,11 +303,6 @@ body.tab-journal-active .journal-studio {
   border-color: rgba(var(--accent-sell-rgb), 0.3);
 }
 
-.journal-calendar-day.mixed-day {
-  background: linear-gradient(135deg, rgba(var(--accent-info-rgb), 0.15), rgba(var(--accent-info-rgb), 0.05));
-  border-color: rgba(var(--accent-info-rgb), 0.3);
-}
-
 /* ==================== CALENDAR FOOTER ==================== */
 .journal-calendar-footer {
   text-align: center;

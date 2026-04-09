@@ -257,21 +257,29 @@
     word-break: break-word;
 }
 
+/* ==================== MODAL - BUY/SELL COLORS ==================== */
+.dir-buy {
+    color: var(--accent-buy, #00e08a);
+    font-weight: 700;
+}
+
+.dir-sell {
+    color: var(--accent-sell, #ff3d57);
+    font-weight: 700;
+}
+
+/* ==================== MODAL - PNL COLORS ==================== */
+.profit {
+    color: var(--accent-buy, #00e08a);
+    font-weight: 700;
+}
+
+.loss {
+    color: var(--accent-sell, #ff3d57);
+    font-weight: 700;
+}
+
 .notif-pnl-line { margin-bottom: 3px; }
-
-.notif-pnl-line .profit,
-.toast-pnl.profit {
-    color: var(--accent-buy);
-    font-weight: 700;
-    font-size: var(--text-base);
-}
-
-.notif-pnl-line .loss,
-.toast-pnl.loss {
-    color: var(--accent-sell);
-    font-weight: 700;
-    font-size: var(--text-base);
-}
 
 .notification-time {
     font-size: var(--text-sm);
@@ -515,20 +523,21 @@
     font-weight: 700;
 }
 
-.toast-pnl-arrow {
-    font-size: 11px;
-}
-
+/* ==================== TOAST - PNL COLORS ==================== */
 .toast-pnl {
     font-size: var(--text-md);
     font-weight: 700;
 }
 
-.toast-pnl.profit,
-.toast-pnl-arrow.profit { color: var(--accent-buy); }
+.toast-pnl.profit {
+    color: var(--accent-buy, #00e08a);
+    font-weight: 700;
+}
 
-.toast-pnl.loss,
-.toast-pnl-arrow.loss   { color: var(--accent-sell); }
+.toast-pnl.loss {
+    color: var(--accent-sell, #ff3d57);
+    font-weight: 700;
+}
 
 .toast-time {
     font-size: var(--text-sm);

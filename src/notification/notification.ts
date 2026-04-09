@@ -126,8 +126,6 @@ export class NotificationModule {
         };
 
         const type = severityMap[data.severity as number] ?? 'info';
-
-        // ✅ FIX: direction is already 'BUY' | 'SELL' string from decoder
         const directionStr = data.direction;
 
         let detailLine = '';
@@ -141,10 +139,9 @@ export class NotificationModule {
         let pnlLine = '';
         if (data.profit !== undefined && data.profit !== 0) {
             const isProfit = data.profit > 0;
-            const sign     = isProfit ? '+' : '';
-            const arrow    = isProfit ? '▲' : '▼';
-            const cls      = isProfit ? 'profit' : 'loss';
-            pnlLine = `<span class="toast-pnl ${cls}">${arrow} ${sign}$${Math.abs(data.profit).toFixed(2)} USD</span>`;
+            const sign = isProfit ? '+' : '-';
+            const cls = isProfit ? 'profit' : 'loss';
+            pnlLine = `<span class="toast-pnl ${cls}">${sign}$${Math.abs(data.profit).toFixed(2)} USD</span>`;
         }
 
         const message = [detailLine, pnlLine].filter(Boolean).join('<br>');
@@ -227,56 +224,34 @@ export class NotificationModule {
 
         const icon = this.getIcon(notification.type);
 
-        // ── Parse structured message parts ──
-        const parts     = notification.message.split('<br>');
+        const parts = notification.message.split('<br>');
         const tradeLine = parts[0] || '';
-        const pnlRaw    = parts[1] || '';
+        const pnlRaw = parts[1] || '';
 
-        // ── Detect direction for rich badge ──
-        const isBuy      = tradeLine.startsWith('BUY');
-        const isSell     = tradeLine.startsWith('SELL');
+        const isBuy = tradeLine.startsWith('BUY');
+        const isSell = tradeLine.startsWith('SELL');
         const isTradeMsg = isBuy || isSell;
 
         let directionHTML = '';
         let tradeBodyHTML = '';
-        let pnlHTML       = '';
+        let pnlHTML = '';
 
         if (isTradeMsg) {
-            const dirClass   = isBuy ? 'buy' : 'sell';
-            const dirLabel   = isBuy ? 'BUY' : 'SELL';
-            const dirArrow   = isBuy ? '▲' : '▼';
-
-            // Strip direction prefix from trade line for detail
+            const dirClass = isBuy ? 'buy' : 'sell';
+            const dirLabel = isBuy ? 'BUY' : 'SELL';
             const detail = tradeLine.replace(/^(BUY|SELL)\s*/, '');
 
             directionHTML = `
                 <div class="toast-direction-row">
-                    <span class="toast-dir-badge ${dirClass}">${dirArrow} ${dirLabel}</span>
+                    <span class="toast-dir-badge ${dirClass}">${dirLabel}</span>
                     <span class="toast-trade-line">${detail}</span>
                 </div>
             `;
 
             if (pnlRaw) {
-                // Extract value from span if present
-                const match = pnlRaw.match(/class="toast-pnl (\w+)">(.*?)<\/span>/);
-                if (match) {
-                    const cls   = match[1]; // profit | loss
-                    const value = match[2]; // e.g. ▲ +$125.00 USD
-                    const arrow = cls === 'profit' ? '▲' : '▼';
-                    // Remove arrow from value if already inside
-                    const cleanVal = value.replace(/^[▲▼]\s*/, '');
-                    pnlHTML = `
-                        <div class="toast-pnl-row">
-                            <span class="toast-pnl-arrow ${cls}">${arrow}</span>
-                            <span class="toast-pnl ${cls}">${cleanVal}</span>
-                        </div>
-                    `;
-                } else {
-                    pnlHTML = `<div class="toast-pnl-row">${pnlRaw}</div>`;
-                }
+                pnlHTML = `<div class="toast-pnl-row">${pnlRaw}</div>`;
             }
         } else {
-            // Plain message toast
             tradeBodyHTML = `<div class="toast-message">${notification.message}</div>`;
         }
 
@@ -381,15 +356,14 @@ export class NotificationModule {
 
     public tradeExecuted(tradeData: TradeData): string {
         const direction = tradeData.direction === 'LONG' ? 'BUY' : 'SELL';
-        const dirClass  = tradeData.direction === 'LONG' ? 'dir-buy' : 'dir-sell';
+        const dirClass = tradeData.direction === 'LONG' ? 'dir-buy' : 'dir-sell';
 
         let pnlPart = '';
         if (tradeData.pnl) {
             const isProfit = tradeData.pnl >= 0;
-            const sign     = isProfit ? '+' : '';
-            const arrow    = isProfit ? '▲' : '▼';
-            const cls      = isProfit ? 'profit' : 'loss';
-            pnlPart = `<br><span class="toast-pnl ${cls}">${arrow} ${sign}$${Math.abs(tradeData.pnl).toFixed(2)} USD</span>`;
+            const sign = isProfit ? '+' : '-';
+            const cls = isProfit ? 'profit' : 'loss';
+            pnlPart = `<br><span class="toast-pnl ${cls}">${sign}$${Math.abs(tradeData.pnl).toFixed(2)} USD</span>`;
         }
 
         return this.show(
@@ -506,14 +480,12 @@ export class NotificationModule {
         const notificationList = document.getElementById('notificationList');
         if (!notificationList) return;
 
-        // ── Update badge in header ──
         const badge = document.getElementById('notificationBadge');
         if (badge) {
             badge.textContent = String(this.unreadCount);
             badge.style.display = this.unreadCount > 0 ? 'inline-flex' : 'none';
         }
 
-        // ── Update footer count ──
         const countEl = document.querySelector('.notification-count');
         if (countEl) {
             countEl.textContent = `${this.notifications.length} total · ${this.unreadCount} unread`;
@@ -522,8 +494,8 @@ export class NotificationModule {
         if (this.notifications.length === 0) {
             notificationList.innerHTML = `
                 <div class="notification-item empty">
-                    <div class="notification-icon info">
-                        <i class="fas fa-info-circle"></i>
+                    <div class="notif-icon info">
+                        <i class="fas fa-bell-slash"></i>
                     </div>
                     <div class="notification-content">
                         <div class="notification-title">No notifications</div>
@@ -536,14 +508,26 @@ export class NotificationModule {
 
         let html = '';
         this.notifications.forEach(notification => {
-            const timeAgo   = this.formatTimeAgo(notification.timestamp);
+            const timeAgo = this.formatTimeAgo(notification.timestamp);
             const readClass = notification.read ? 'read' : 'unread';
-            const icon      = this.getIcon(notification.type);
+            const icon = this.getIcon(notification.type);
 
-            // ── Split trade line and pnl ──
-            const parts     = notification.message.split('<br>');
-            const tradeLine = parts[0] || '';
-            const pnlPart   = parts[1] || '';
+            let messageHtml = notification.message;
+            
+            // Replace BUY/SELL with styled spans
+            messageHtml = messageHtml.replace(/\b(BUY)\b/g, '<span class="dir-buy">BUY</span>');
+            messageHtml = messageHtml.replace(/\b(SELL)\b/g, '<span class="dir-sell">SELL</span>');
+            
+            // Extract PnL and wrap with profit/loss span
+            const pnlMatch = messageHtml.match(/\+\$[\d.]+ USD|-\$[\d.]+ USD/);
+            if (pnlMatch) {
+                const pnlValue = pnlMatch[0];
+                const isProfit = pnlValue.startsWith('+');
+                messageHtml = messageHtml.replace(pnlValue, `<span class="${isProfit ? 'profit' : 'loss'}">${pnlValue}</span>`);
+            }
+            
+            // Handle line breaks
+            const displayHtml = messageHtml.replace(/<br>/g, '<br>');
 
             html += `
                 <div class="notification-item ${notification.type} ${readClass}" data-id="${notification.id}">
@@ -551,9 +535,8 @@ export class NotificationModule {
                         <i class="fas fa-${icon}"></i>
                     </div>
                     <div class="notification-content">
-                        <div class="notification-title">${notification.title}</div>
-                        ${tradeLine ? `<div class="notification-text">${tradeLine}</div>` : ''}
-                        ${pnlPart   ? `<div class="notif-pnl-line">${pnlPart}</div>` : ''}
+                        <div class="notification-title">${this.escapeHtml(notification.title)}</div>
+                        <div class="notification-text">${displayHtml}</div>
                         <div class="notification-time">${timeAgo}</div>
                     </div>
                     <div class="notification-actions">
@@ -596,6 +579,15 @@ export class NotificationModule {
         });
     }
 
+    private escapeHtml(str: string): string {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     public updateBadge(): void {
         this.ui?.updateBadgeCount(this.unreadCount);
     }
@@ -623,11 +615,11 @@ export class NotificationModule {
     }
 
     private formatTimeAgo(timestamp: number): string {
-        const now  = Date.now();
+        const now = Date.now();
         const diff = now - timestamp;
 
-        if (diff < 60000)    return 'Just now';
-        if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
         if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
         if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
 
@@ -638,8 +630,8 @@ export class NotificationModule {
         return () => {
             try {
                 const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-                const oscillator   = audioContext.createOscillator();
-                const gainNode     = audioContext.createGain();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
 
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
@@ -757,7 +749,7 @@ export class NotificationModule {
 
     // ==================== PUBLIC API ====================
 
-    public enableSound(): void  { this.toggleSound(true); }
+    public enableSound(): void { this.toggleSound(true); }
     public disableSound(): void { this.toggleSound(false); }
     public setMaxNotifications(max: number): void { this.maxNotifications = max; }
 
@@ -773,18 +765,18 @@ export class NotificationModule {
             read: this.notifications.length - this.unreadCount,
             types: {
                 success: this.notifications.filter(n => n.type === 'success').length,
-                error:   this.notifications.filter(n => n.type === 'error').length,
+                error: this.notifications.filter(n => n.type === 'error').length,
                 warning: this.notifications.filter(n => n.type === 'warning').length,
-                info:    this.notifications.filter(n => n.type === 'info').length
+                info: this.notifications.filter(n => n.type === 'info').length
             }
         };
     }
 
     // ==================== UI DELEGATION ====================
 
-    public toggleModal(): void  { this.ui?.toggleModal(); }
-    public showModal(): void    { this.ui?.showModal(); this.updateNotificationList(); }
-    public hideModal(): void    { this.ui?.hideModal(); }
+    public toggleModal(): void { this.ui?.toggleModal(); }
+    public showModal(): void { this.ui?.showModal(); this.updateNotificationList(); }
+    public hideModal(): void { this.ui?.hideModal(); }
     public closeAllModals(): void { this.ui?.closeAllModals(); }
 
     // ==================== CLEANUP ====================
@@ -805,8 +797,8 @@ export class NotificationModule {
         }
 
         this.notifications = [];
-        this.unreadCount   = 0;
-        this.ui            = null;
+        this.unreadCount = 0;
+        this.ui = null;
 
         console.log('✅ Notification Module cleanup complete');
     }
