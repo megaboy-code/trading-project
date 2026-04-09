@@ -559,6 +559,7 @@ export class TabManager {
         }
     }
 
+    // ✅ FIX 1: dispatch tab-switched event so module-manager can lazy load
     public switchToTab(tabId: string): void {
         this.tabs.forEach(tab => {
             tab.active = tab.id === tabId;
@@ -568,6 +569,10 @@ export class TabManager {
         this.renderTabs();
         this.updateBodyTabClass();
         this.updateSidebars(tabId);
+
+        document.dispatchEvent(new CustomEvent('tab-switched', {
+            detail: { tabId }
+        }));
 
         console.log(`🔀 Switched to tab: ${tabId}`);
     }

@@ -26,7 +26,6 @@
     margin-bottom: 8px;
 }
 
-/* sm — label */
 .pnl-label {
     font-size: var(--text-sm);
     color: var(--text-muted);
@@ -42,7 +41,6 @@
     margin-bottom: 6px;
 }
 
-/* display — hero P&L number */
 .pnl-value {
     font-family: var(--text-mono);
     font-size: var(--text-display);
@@ -55,7 +53,6 @@
 .pnl-value.positive { color: var(--accent-buy) !important; }
 .pnl-value.negative { color: var(--accent-sell) !important; }
 
-/* sm — percentage badge */
 .pnl-percent {
     font-family: var(--text-mono);
     font-size: var(--text-sm);
@@ -77,7 +74,6 @@
     border: 1px solid rgba(var(--accent-sell-rgb), 0.25);
 }
 
-/* sm — today change */
 .pnl-change {
     display: flex;
     align-items: center;
@@ -106,7 +102,6 @@
     border-radius: var(--radius-sm);
 }
 
-/* sm — metric label */
 .metric-label {
     font-size: var(--text-sm);
     color: var(--text-muted);
@@ -118,7 +113,6 @@
     text-overflow: ellipsis;
 }
 
-/* md — metric value */
 .metric-value {
     font-family: var(--text-mono);
     font-size: var(--text-md);
@@ -199,10 +193,8 @@
     gap: 4px;
     font-family: var(--text-sans);
     border: none;
-    /* ✅ Removed transition: all - only transform on hover */
 }
 
-/* sm — price under button */
 .trade-btn span {
     font-family: var(--text-mono);
     font-size: var(--text-sm);
@@ -238,7 +230,6 @@
     margin-bottom: 8px;
 }
 
-/* sm — lot label */
 .lot-header-label {
     display: flex;
     align-items: center;
@@ -250,7 +241,6 @@
 
 .lot-header-label i { color: var(--accent-info); font-size: var(--text-sm); }
 
-/* 2xl — lot display number */
 .lot-display-big {
     font-family: var(--text-mono);
     font-size: var(--text-2xl);
@@ -265,7 +255,6 @@
     margin-bottom: 6px;
 }
 
-/* sm — max badge */
 .lot-max {
     font-size: var(--text-sm);
     color: var(--text-muted);
@@ -310,7 +299,6 @@
     margin-bottom: 6px;
 }
 
-/* sm — slider min/max labels */
 .slider-labels span {
     font-size: var(--text-sm);
     color: var(--text-muted);
@@ -338,7 +326,6 @@
     margin-bottom: 0;
 }
 
-/* base — preset buttons */
 .preset-btn {
     flex: 1;
     padding: 5px 0;
@@ -359,6 +346,204 @@
     color: var(--accent-info);
 }
 
+/* ==================== TP / SL ==================== */
+.tpsl-block {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    margin: 10px 0;
+}
+
+.tpsl-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.tpsl-block-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.tpsl-block-title i { color: var(--accent-warning); font-size: var(--text-sm); }
+
+/* ── TP / SL TOGGLE BUTTONS ── */
+.tpsl-toggles {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tpsl-toggle {
+    flex: 1;
+    padding: 10px 8px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    background: var(--bg-base);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    transition: background-color 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.15s ease;
+    font-family: var(--text-sans);
+}
+
+.tpsl-toggle:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.tpsl-toggle-label {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.tpsl-toggle-sub {
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--text-muted);
+    opacity: 0.6;
+    white-space: nowrap;
+}
+
+.tpsl-toggle.tp.active {
+    border-color: rgba(var(--accent-buy-rgb), 0.5);
+    background: rgba(var(--accent-buy-rgb), 0.08);
+    box-shadow: 0 0 10px rgba(var(--accent-buy-rgb), 0.15);
+}
+
+.tpsl-toggle.tp.active .tpsl-toggle-label,
+.tpsl-toggle.tp.active .tpsl-toggle-sub {
+    color: var(--accent-buy);
+    opacity: 1;
+}
+
+.tpsl-toggle.sl.active {
+    border-color: rgba(var(--accent-sell-rgb), 0.5);
+    background: rgba(var(--accent-sell-rgb), 0.08);
+    box-shadow: 0 0 10px rgba(var(--accent-sell-rgb), 0.15);
+}
+
+.tpsl-toggle.sl.active .tpsl-toggle-label,
+.tpsl-toggle.sl.active .tpsl-toggle-sub {
+    color: var(--accent-sell);
+    opacity: 1;
+}
+
+/* ── EMPTY STATE ── */
+.tpsl-empty {
+    padding: 6px 10px;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+}
+
+.tpsl-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    background: var(--bg-base);
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-light);
+    margin-bottom: 4px;
+}
+
+.tpsl-row.tp { border-left: 2px solid var(--accent-buy); }
+.tpsl-row.sl { border-left: 2px solid var(--accent-sell); }
+
+.tpsl-row-label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    min-width: 26px;
+    flex-shrink: 0;
+}
+
+.tpsl-row-label.tp { color: var(--accent-buy); }
+.tpsl-row-label.sl { color: var(--accent-sell); }
+
+.tpsl-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--text-mono);
+    font-size: var(--text-base);
+    text-align: right;
+    outline: none;
+    min-width: 0;
+}
+
+.tpsl-pips {
+    font-family: var(--text-mono);
+    font-size: var(--text-base);
+    font-weight: 700;
+    min-width: 40px;
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.tpsl-pips.positive { color: var(--accent-buy); }
+.tpsl-pips.negative { color: var(--accent-sell); }
+
+.rr-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+
+.rr-label { font-size: var(--text-sm); color: var(--text-muted); }
+
+.rr-value {
+    font-family: var(--text-mono);
+    font-size: var(--text-base);
+    font-weight: 700;
+    color: var(--accent-info);
+}
+
+.pip-presets {
+    display: flex;
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.pip-preset-btn {
+    flex: 1;
+    padding: 4px 0;
+    background: var(--bg-base);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xs);
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    font-family: var(--text-sans);
+}
+
+.pip-preset-btn:hover {
+    background: rgba(var(--accent-info-rgb), 0.1);
+    border-color: var(--accent-info);
+    color: var(--accent-info);
+}
+
 /* ==================== RISK % ==================== */
 .risk-pct-block {
     border-top: 1px solid var(--border);
@@ -373,7 +558,6 @@
     margin-bottom: 6px;
 }
 
-/* sm — risk title */
 .risk-pct-title {
     display: flex;
     align-items: center;
@@ -387,7 +571,6 @@
 
 .risk-pct-title i { color: var(--accent-warning); font-size: var(--text-sm); }
 
-/* sm — risk badge */
 .risk-pct-badge {
     font-family: var(--text-mono);
     font-size: var(--text-sm);
@@ -405,7 +588,6 @@
     margin-bottom: 6px;
 }
 
-/* base — risk preset buttons */
 .risk-pct-btn {
     flex: 1;
     padding: 5px 0;
@@ -433,14 +615,12 @@
     margin-bottom: 6px;
 }
 
-/* sm — risk label */
 .risk-pct-label {
     font-size: var(--text-sm);
     color: var(--text-muted);
     white-space: nowrap;
 }
 
-/* base — risk input */
 .risk-pct-input {
     flex: 1;
     background: var(--bg-base);
@@ -457,7 +637,6 @@
 
 .risk-pct-input:focus { border-color: var(--accent-warning); }
 
-/* sm — risk note */
 .risk-pct-note {
     font-size: var(--text-sm);
     color: var(--text-muted);
@@ -471,175 +650,6 @@
     font-style: normal;
     font-weight: 600;
     font-family: var(--text-mono);
-}
-
-/* ==================== TP / SL ==================== */
-.tpsl-block {
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 0;
-    margin: 10px 0;
-}
-
-.tpsl-block-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-/* sm — TP/SL title */
-.tpsl-block-title {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-}
-
-.tpsl-block-title i { color: var(--accent-warning); font-size: var(--text-sm); }
-
-.tpsl-toggles { display: flex; gap: 4px; }
-
-/* base — TP/SL toggle buttons */
-.tpsl-toggle {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
-    border-radius: var(--radius-xs);
-    border: 1px solid var(--border);
-    background: var(--bg-base);
-    font-size: var(--text-base);
-    font-weight: 600;
-    cursor: pointer;
-    color: var(--text-muted);
-    font-family: var(--text-sans);
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.tpsl-toggle.tp.active {
-    border-color: rgba(var(--accent-buy-rgb), 0.4);
-    background: rgba(var(--accent-buy-rgb), 0.08);
-    color: var(--accent-buy);
-}
-
-.tpsl-toggle.sl.active {
-    border-color: rgba(var(--accent-sell-rgb), 0.4);
-    background: rgba(var(--accent-sell-rgb), 0.08);
-    color: var(--accent-sell);
-}
-
-/* sm — empty state */
-.tpsl-empty {
-    padding: 6px 10px;
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    font-style: italic;
-    text-align: center;
-}
-
-.tpsl-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 8px;
-    background: var(--bg-base);
-    border-radius: var(--radius-xs);
-    border: 1px solid var(--border-light);
-    margin-bottom: 4px;
-}
-
-.tpsl-row.tp { border-left: 2px solid var(--accent-buy); }
-.tpsl-row.sl { border-left: 2px solid var(--accent-sell); }
-
-/* sm — TP/SL row label */
-.tpsl-row-label {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: var(--text-sm);
-    font-weight: 700;
-    min-width: 26px;
-    flex-shrink: 0;
-}
-
-.tpsl-row-label.tp { color: var(--accent-buy); }
-.tpsl-row-label.sl { color: var(--accent-sell); }
-
-/* base — TP/SL input */
-.tpsl-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: var(--text-primary);
-    font-family: var(--text-mono);
-    font-size: var(--text-base);
-    text-align: right;
-    outline: none;
-    min-width: 0;
-}
-
-/* base — pip display */
-.tpsl-pips {
-    font-family: var(--text-mono);
-    font-size: var(--text-base);
-    font-weight: 700;
-    min-width: 40px;
-    text-align: right;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.tpsl-pips.positive { color: var(--accent-buy); }
-.tpsl-pips.negative { color: var(--accent-sell); }
-
-.rr-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 0;
-}
-
-/* sm — R/R label */
-.rr-label { font-size: var(--text-sm); color: var(--text-muted); }
-
-/* base — R/R value */
-.rr-value {
-    font-family: var(--text-mono);
-    font-size: var(--text-base);
-    font-weight: 700;
-    color: var(--accent-info);
-}
-
-.pip-presets {
-    display: flex;
-    gap: 4px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-}
-
-/* base — pip preset buttons */
-.pip-preset-btn {
-    flex: 1;
-    padding: 4px 0;
-    background: var(--bg-base);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-xs);
-    font-size: var(--text-base);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-    font-family: var(--text-sans);
-}
-
-.pip-preset-btn:hover {
-    background: rgba(var(--accent-info-rgb), 0.1);
-    border-color: var(--accent-info);
-    color: var(--accent-info);
 }
 
 /* ==================== LOT STATS ==================== */
@@ -659,7 +669,6 @@
     text-align: center;
 }
 
-/* sm — stat label */
 .stat-label {
     font-size: var(--text-sm);
     color: var(--text-muted);
@@ -668,7 +677,6 @@
     letter-spacing: 0.3px;
 }
 
-/* base — stat value */
 .stat-value {
     font-family: var(--text-mono);
     font-size: var(--text-base);
@@ -685,7 +693,6 @@
     gap: 6px;
 }
 
-/* sm — action buttons */
 .action-btn {
     display: flex;
     align-items: center;
@@ -740,7 +747,6 @@
     color: var(--text-primary);
 }
 
-/* base — positions label */
 .positions-btn-left {
     display: flex;
     align-items: center;
@@ -757,7 +763,6 @@
     gap: 6px;
 }
 
-/* sm — positions count badge */
 .positions-count {
     background: var(--accent-info);
     color: #ffffff;
@@ -778,4 +783,5 @@
 /* ==================== REDUCED MOTION ==================== */
 @media (prefers-reduced-motion: reduce) {
     .trade-btn:hover { transform: none; }
+    .tpsl-toggle:hover { transform: none; }
 }

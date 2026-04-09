@@ -6,7 +6,7 @@ import { CacheCleared } from '../mega-flowz/cache-cleared.js';
 import { ConnectionStatus } from '../mega-flowz/connection-status.js';
 import { ErrorMsg } from '../mega-flowz/error-msg.js';
 import { InitialData } from '../mega-flowz/initial-data.js';
-import { PositionClosed } from '../mega-flowz/position-closed.js';
+import { Notification } from '../mega-flowz/notification.js';
 import { PositionModified } from '../mega-flowz/position-modified.js';
 import { PositionsUpdate } from '../mega-flowz/positions-update.js';
 import { PriceUpdate } from '../mega-flowz/price-update.js';
@@ -23,17 +23,17 @@ export enum MessagePayload {
   PositionsUpdate = 5,
   ConnectionStatus = 6,
   TradeExecuted = 7,
-  PositionClosed = 8,
-  PositionModified = 9,
-  ErrorMsg = 10,
-  AutoTradingStatus = 11,
-  CacheCleared = 12
+  PositionModified = 8,
+  ErrorMsg = 9,
+  AutoTradingStatus = 10,
+  CacheCleared = 11,
+  Notification = 12
 }
 
 export function unionToMessagePayload(
   type: MessagePayload,
-  accessor: (obj:AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|PositionClosed|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate) => AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|PositionClosed|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null
-): AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|PositionClosed|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null {
+  accessor: (obj:AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|Notification|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate) => AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|Notification|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null
+): AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|Notification|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null {
   switch(MessagePayload[type]) {
     case 'NONE': return null; 
     case 'InitialData': return accessor(new InitialData())! as InitialData;
@@ -43,20 +43,20 @@ export function unionToMessagePayload(
     case 'PositionsUpdate': return accessor(new PositionsUpdate())! as PositionsUpdate;
     case 'ConnectionStatus': return accessor(new ConnectionStatus())! as ConnectionStatus;
     case 'TradeExecuted': return accessor(new TradeExecuted())! as TradeExecuted;
-    case 'PositionClosed': return accessor(new PositionClosed())! as PositionClosed;
     case 'PositionModified': return accessor(new PositionModified())! as PositionModified;
     case 'ErrorMsg': return accessor(new ErrorMsg())! as ErrorMsg;
     case 'AutoTradingStatus': return accessor(new AutoTradingStatus())! as AutoTradingStatus;
     case 'CacheCleared': return accessor(new CacheCleared())! as CacheCleared;
+    case 'Notification': return accessor(new Notification())! as Notification;
     default: return null;
   }
 }
 
 export function unionListToMessagePayload(
   type: MessagePayload, 
-  accessor: (index: number, obj:AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|PositionClosed|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate) => AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|PositionClosed|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null, 
+  accessor: (index: number, obj:AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|Notification|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate) => AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|Notification|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null, 
   index: number
-): AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|PositionClosed|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null {
+): AutoTradingStatus|BarUpdate|CacheCleared|ConnectionStatus|ErrorMsg|InitialData|Notification|PositionModified|PositionsUpdate|PriceUpdate|TradeExecuted|WatchlistUpdate|null {
   switch(MessagePayload[type]) {
     case 'NONE': return null; 
     case 'InitialData': return accessor(index, new InitialData())! as InitialData;
@@ -66,11 +66,11 @@ export function unionListToMessagePayload(
     case 'PositionsUpdate': return accessor(index, new PositionsUpdate())! as PositionsUpdate;
     case 'ConnectionStatus': return accessor(index, new ConnectionStatus())! as ConnectionStatus;
     case 'TradeExecuted': return accessor(index, new TradeExecuted())! as TradeExecuted;
-    case 'PositionClosed': return accessor(index, new PositionClosed())! as PositionClosed;
     case 'PositionModified': return accessor(index, new PositionModified())! as PositionModified;
     case 'ErrorMsg': return accessor(index, new ErrorMsg())! as ErrorMsg;
     case 'AutoTradingStatus': return accessor(index, new AutoTradingStatus())! as AutoTradingStatus;
     case 'CacheCleared': return accessor(index, new CacheCleared())! as CacheCleared;
+    case 'Notification': return accessor(index, new Notification())! as Notification;
     default: return null;
   }
 }

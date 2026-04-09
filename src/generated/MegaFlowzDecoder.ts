@@ -18,11 +18,13 @@ import {
     Account,
     ConnectionStatus,
     TradeExecuted,
-    PositionClosed,
     PositionModified,
     ErrorMsg,
     AutoTradingStatus,
     CacheCleared,
+    Notification,
+    NotificationType,
+    Severity,
     Timeframe,
     PositionType
 } from './mega-flowz';
@@ -114,16 +116,25 @@ export interface TradeExecutedPayload {
     message:   string;
 }
 
-export interface PositionClosedPayload {
+export interface PositionModifiedPayload {
     success: boolean;
     ticket:  number;
     message: string;
 }
 
-export interface PositionModifiedPayload {
-    success: boolean;
-    ticket:  number;
-    message: string;
+export interface NotificationPayload {
+    nType:      NotificationType;
+    severity:   Severity;
+    title:      string;
+    message:    string;
+    symbol:     string;
+    direction:  'BUY' | 'SELL';
+    volume:     number;
+    price:      number;
+    open_price: number;
+    profit:     number;
+    ticket:     number;
+    timestamp:  number;
 }
 
 export interface ErrorPayload {
@@ -155,8 +166,8 @@ export type DecodedMessage =
     | { type: 'positions_update'; data: PositionsUpdatePayload  }
     | { type: 'connection_status';data: ConnectionStatusPayload }
     | { type: 'trade_executed';   data: TradeExecutedPayload    }
-    | { type: 'position_closed';  data: PositionClosedPayload   }
     | { type: 'position_modified';data: PositionModifiedPayload }
+    | { type: 'notification';     data: NotificationPayload     }
     | { type: 'error';            data: ErrorPayload            }
     | { type: 'auto_trading';     data: AutoTradingPayload      }
     | { type: 'cache_cleared';    data: CacheClearedPayload     }
@@ -193,12 +204,12 @@ function posTypeToString(t: PositionType): 'BUY' | 'SELL' {
 
 function extractCandle(c: any): CandleData {
     return {
-        time:   parseInt(c.time().toString(), 10),    // ✅ BigInt → string → int
+        time:   parseInt(c.time().toString(), 10),
         open:   c.open(),
         high:   c.high(),
         low:    c.low(),
         close:  c.close(),
-        volume: parseInt(c.volume().toString(), 10)   // ✅ BigInt → string → int
+        volume: parseInt(c.volume().toString(), 10)
     };
 }
 
@@ -377,22 +388,6 @@ export class MegaFlowzDecoder {
                     };
                 }
 
-                // ── Position closed ──
-                case MessagePayload.PositionClosed: {
-                    const p = msg.payload(
-                        new PositionClosed()
-                    ) as PositionClosed;
-
-                    return {
-                        type: 'position_closed',
-                        data: {
-                            success: p.success(),
-                            ticket:  parseInt(p.ticket().toString(), 10),
-                            message: p.message() ?? ''
-                        }
-                    };
-                }
-
                 // ── Position modified ──
                 case MessagePayload.PositionModified: {
                     const p = msg.payload(
@@ -405,6 +400,31 @@ export class MegaFlowzDecoder {
                             success: p.success(),
                             ticket:  parseInt(p.ticket().toString(), 10),
                             message: p.message() ?? ''
+                        }
+                    };
+                }
+
+                // ── Notification — universal rich toast ──
+                case MessagePayload.Notification: {
+                    const p = msg.payload(
+                        new Notification()
+                    ) as Notification;
+
+                    return {
+                        type: 'notification',
+                        data: {
+                            nType:      p.type(),
+                            severity:   p.severity(),
+                            title:      p.title()   ?? '',
+                            message:    p.message() ?? '',
+                            symbol:     p.symbol()  ?? '',
+                            direction:  posTypeToString(p.direction()),
+                            volume:     p.volume(),
+                            price:      p.price(),
+                            open_price: p.openPrice(),
+                            profit:     p.profit(),
+                            ticket:     parseInt(p.ticket().toString(), 10),
+                            timestamp:  parseInt(p.timestamp().toString(), 10)
                         }
                     };
                 }

@@ -1,0 +1,55 @@
+<!-- ================================================================
+     JOURNAL MINI PANEL
+     ================================================================ -->
+<div class="panel-content journal-panel">
+
+    <!-- Header -->
+    <div class="panel-header">
+        <div class="panel-header-left">
+            <i class="fas fa-book"></i>
+            <span>Today's Trades</span>
+        </div>
+        <div class="panel-header-right">
+            <button class="panel-icon-btn" id="openFullJournalBtn" title="Full Journal">
+                <i class="fas fa-arrow-up-right-from-square"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="journal-mini-stats">
+        <div class="journal-mini-stat">
+            <div class="journal-mini-stat-label">Today P&L</div>
+            <div class="journal-mini-stat-value" id="journalTodayPnl">$0</div>
+        </div>
+        <div class="journal-mini-stat">
+            <div class="journal-mini-stat-label">Win Rate</div>
+            <div class="journal-mini-stat-value" id="journalWinRate">0%</div>
+        </div>
+        <div class="journal-mini-stat">
+            <div class="journal-mini-stat-label">Trades</div>
+            <div class="journal-mini-stat-value" id="journalTradeCount">0</div>
+        </div>
+    </div>
+
+    <!-- Column Headers -->
+    <div class="journal-mini-cols">
+        <span class="jm-col-pair">Pair</span>
+        <span class="jm-col-dir">Dir</span>
+        <span class="jm-col-pnl">P&L</span>
+    </div>
+
+    <!-- Trades List -->
+    <div class="journal-mini-list" id="journalMiniList"></div>
+
+    <!-- Footer -->
+    <div class="panel-footer">
+        <div class="journal-footer-info">
+            <i class="fas fa-circle"></i> Mock Data
+        </div>
+        <button class="journal-open-full-btn" id="journalOpenFullBtn">
+            Full Journal <i class="fas fa-arrow-right"></i>
+        </button>
+    </div>
+
+</div>

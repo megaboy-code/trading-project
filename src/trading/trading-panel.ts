@@ -3,6 +3,7 @@
 // ================================================================
 
 import { formatPrice, getPipSize, getPipValue, getContractSize } from '../core/price-utils';
+import { TradingSettings } from './trading-settings';
 
 const MAX_BROKER_LOTS   = 50;
 const TPSL_DEFAULT_PIPS = 20;
@@ -56,6 +57,8 @@ export class TradingPanel {
         slPips:      TPSL_DEFAULT_PIPS,
     };
 
+    private settings: TradingSettings = new TradingSettings();
+
     // ── Throttle timers ──
     private lastRiskPctApply: number = 0;
 
@@ -83,6 +86,7 @@ export class TradingPanel {
     // ================================================================
 
     public initialize(): void {
+        this.settings.initialize();
         this.setupSafeMode();
         this.setupLotControls();
         this.setupRiskPct();
@@ -90,6 +94,7 @@ export class TradingPanel {
         this.setupTradeButtons();
         this.setupQuickActions();
         this.startTpSlBackgroundUpdate();
+        this.updateVisibility();
         this.renderAll();
     }
 
@@ -113,7 +118,6 @@ export class TradingPanel {
             this.renderTpSlInputsFromPips();
         }
 
-        // ✅ Fix #P3 — throttle risk% recalc only
         if (this.state.riskPct > 0 && this.state.slEnabled) {
             const now = Date.now();
             if (now - this.lastRiskPctApply >= THROTTLE_MS) {
@@ -142,7 +146,6 @@ export class TradingPanel {
         this.state.margin     = margin;
         this.state.leverage   = leverage;
 
-        // ✅ Fix #P3 — maxSafeLots and applySafeMode on account update only
         this.state.maxSafeLots = this.calcMaxSafeLots();
         this.applySafeMode();
 
@@ -409,7 +412,6 @@ export class TradingPanel {
             this.boundTpToggle = () => {
                 this.state.tpEnabled = !this.state.tpEnabled;
                 tpToggle.classList.toggle('active', this.state.tpEnabled);
-                document.getElementById('tpRow')?.classList.toggle('hidden', !this.state.tpEnabled);
 
                 if (this.state.tpEnabled && this.state.ask > 0) {
                     this.state.tpPips = TPSL_DEFAULT_PIPS;
@@ -420,7 +422,8 @@ export class TradingPanel {
                     );
                 }
 
-                this.checkTpSlEmpty();
+                this.updateToggleSub();
+                this.updateVisibility();
                 this.renderTpSlPips();
                 this.renderRR();
             };
@@ -431,7 +434,6 @@ export class TradingPanel {
             this.boundSlToggle = () => {
                 this.state.slEnabled = !this.state.slEnabled;
                 slToggle.classList.toggle('active', this.state.slEnabled);
-                document.getElementById('slRow')?.classList.toggle('hidden', !this.state.slEnabled);
 
                 if (this.state.slEnabled && this.state.ask > 0) {
                     this.state.slPips = TPSL_DEFAULT_PIPS;
@@ -442,7 +444,8 @@ export class TradingPanel {
                     );
                 }
 
-                this.checkTpSlEmpty();
+                this.updateToggleSub();
+                this.updateVisibility();
                 this.renderLotStats();
                 this.renderTpSlPips();
                 this.renderRR();
@@ -600,9 +603,28 @@ export class TradingPanel {
         this.setTextIfChanged('rrValue', `1 : ${rr}`);
     }
 
-    private checkTpSlEmpty(): void {
-        const bothOff = !this.state.tpEnabled && !this.state.slEnabled;
-        document.getElementById('tpslEmpty')?.classList.toggle('hidden', !bothOff);
+    // ================================================================
+    // VISIBILITY
+    // ================================================================
+
+    private updateVisibility(): void {
+        const either = this.state.tpEnabled || this.state.slEnabled;
+        const both   = !this.state.tpEnabled && !this.state.slEnabled;
+
+        document.getElementById('tpslEmpty')?.classList.toggle('hidden', !both);
+        document.getElementById('tpRow')?.classList.toggle('hidden', !this.state.tpEnabled);
+        document.getElementById('slRow')?.classList.toggle('hidden', !this.state.slEnabled);
+        document.getElementById('pipPresets')?.classList.toggle('hidden', !either);
+        document.getElementById('riskPctBlock')?.classList.toggle('hidden', !this.state.slEnabled);
+
+        if (!this.state.slEnabled) this.clearRiskPct();
+    }
+
+    private updateToggleSub(): void {
+        const tpSub = document.querySelector('#tpToggle .tpsl-toggle-sub');
+        const slSub = document.querySelector('#slToggle .tpsl-toggle-sub');
+        if (tpSub) tpSub.textContent = this.state.tpEnabled ? 'Active ✓' : 'Tap to enable';
+        if (slSub) slSub.textContent = this.state.slEnabled ? 'Active ✓' : 'Tap to enable';
     }
 
     // ================================================================
@@ -714,7 +736,6 @@ export class TradingPanel {
         }, 300);
     }
 
-    // ── Injected by TradingModule so panel can access positions ──
     private getPositions: () => import('../types').PositionData[] = () => [];
 
     public setGetPositions(fn: () => import('../types').PositionData[]): void {
@@ -816,6 +837,7 @@ export class TradingPanel {
 
     public destroy(): void {
         this.stopTpSlBackgroundUpdate();
+        this.settings.destroy();
 
         if (this.boundSafeModeToggle) document.getElementById('safeModeToggle')?.removeEventListener('click',   this.boundSafeModeToggle);
         if (this.boundSlider)         document.getElementById('lotSlider')?.removeEventListener('input',        this.boundSlider);

@@ -1,0 +1,211 @@
+<!-- ================================================================ -->
+<!-- ⚙️ TRADING PREFERENCES MODAL                                    -->
+<!-- ================================================================ -->
+
+<div class="trading-prefs-backdrop hidden" id="tradingPrefsBackdrop"></div>
+
+<div class="trading-prefs-modal hidden" id="tradingPrefsModal">
+
+    <!-- HEADER -->
+    <div class="trading-prefs-header">
+        <div class="trading-prefs-header-left">
+            <i class="fas fa-sliders-h"></i>
+            <span>Trading Preferences</span>
+        </div>
+        <button class="trading-prefs-close" id="tradingPrefsClose">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- BODY -->
+    <div class="trading-prefs-body">
+
+        <!-- RISK MANAGEMENT -->
+        <div class="trading-prefs-group">
+            <div class="trading-prefs-group-title">
+                <i class="fas fa-shield-halved"></i> Risk Management
+            </div>
+
+            <div class="trading-prefs-item">
+                <div class="trading-prefs-label">
+                    <span>Daily Loss Limit</span>
+                    <span id="tpDailyLossValue">$0</span>
+                </div>
+                <input type="range" class="trading-prefs-slider" id="tpDailyLossSlider" min="0" max="5000" step="100" value="0">
+                <div class="trading-prefs-hint">0 = disabled — stops trading after reaching this loss</div>
+            </div>
+
+            <div class="trading-prefs-item">
+                <div class="trading-prefs-label">
+                    <span>Max Open Positions</span>
+                    <span id="tpMaxPositionsValue">0</span>
+                </div>
+                <input type="range" class="trading-prefs-slider" id="tpMaxPositionsSlider" min="0" max="20" step="1" value="0">
+                <div class="trading-prefs-hint">0 = unlimited</div>
+            </div>
+
+            <div class="trading-prefs-checkbox">
+                <input type="checkbox" id="tpPositionWarning">
+                <label for="tpPositionWarning">Show warning when lot exceeds free margin</label>
+            </div>
+        </div>
+
+        <!-- DEFAULT POSITION SIZE -->
+        <div class="trading-prefs-group">
+            <div class="trading-prefs-group-title">
+                <i class="fas fa-layer-group"></i> Default Position Size
+            </div>
+
+            <div class="trading-prefs-item">
+                <div class="trading-prefs-label">
+                    <span>Default Lot Size</span>
+                    <span id="tpDefaultLotValue">0.01</span>
+                </div>
+                <input type="range" class="trading-prefs-slider" id="tpDefaultLotSlider" min="0.01" max="10" step="0.01" value="0.01">
+            </div>
+        </div>
+
+        <!-- DEFAULT TP / SL -->
+        <div class="trading-prefs-group">
+            <div class="trading-prefs-group-title">
+                <i class="fas fa-bullseye"></i> Default TP / SL
+            </div>
+
+            <div class="trading-prefs-item">
+                <div class="trading-prefs-label">
+                    <span>Default Take Profit (pips)</span>
+                    <span id="tpDefaultTpValue">0</span>
+                </div>
+                <input type="range" class="trading-prefs-slider" id="tpDefaultTpSlider" min="0" max="200" step="5" value="0">
+                <div class="trading-prefs-limit-row">
+                    <span class="trading-prefs-limit-label">Max TP limit:</span>
+                    <input type="number" class="trading-prefs-limit-input" id="tpTpMaxLimit" value="200" step="10">
+                    <span class="trading-prefs-limit-unit">pips</span>
+                </div>
+                <div class="trading-prefs-hint">0 = No TP — slider max = your limit</div>
+            </div>
+
+            <div class="trading-prefs-item">
+                <div class="trading-prefs-label">
+                    <span>Default Stop Loss (pips)</span>
+                    <span id="tpDefaultSlValue">0</span>
+                </div>
+                <input type="range" class="trading-prefs-slider" id="tpDefaultSlSlider" min="0" max="200" step="5" value="0">
+                <div class="trading-prefs-limit-row">
+                    <span class="trading-prefs-limit-label">Max SL limit:</span>
+                    <input type="number" class="trading-prefs-limit-input" id="tpSlMaxLimit" value="200" step="10">
+                    <span class="trading-prefs-limit-unit">pips</span>
+                </div>
+                <div class="trading-prefs-hint">0 = No SL — slider max = your limit</div>
+            </div>
+        </div>
+
+        <!-- TRAILING STOP -->
+        <div class="trading-prefs-group">
+            <div class="trading-prefs-group-title">
+                <i class="fas fa-rotate"></i> Trailing Stop Loss
+            </div>
+
+            <div class="trading-prefs-checkbox">
+                <input type="checkbox" id="tpTrailingEnabled">
+                <label for="tpTrailingEnabled">Enable Trailing Stop Loss</label>
+            </div>
+
+            <div id="tpTrailingSettings" class="hidden">
+
+                <div class="trading-prefs-item">
+                    <div class="trading-prefs-label">
+                        <span>Activation Threshold</span>
+                        <span id="tpActivationValue">0</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpActivationSlider" min="0" max="100" step="5" value="0">
+                    <div class="trading-prefs-hint trading-prefs-hint-info">0 = activate immediately</div>
+                </div>
+
+                <div class="trading-prefs-item">
+                    <div class="trading-prefs-label"><span>Trailing Method</span></div>
+                    <select class="trading-prefs-select" id="tpTrailingMethod">
+                        <option value="fixed">Fixed Pip Distance</option>
+                        <option value="atr">ATR-Based (volatility adaptive)</option>
+                        <option value="percentage">Percentage of Move</option>
+                        <option value="step">Step Trailing</option>
+                    </select>
+                </div>
+
+                <!-- Fixed -->
+                <div id="tpMethodFixed" class="trading-prefs-method hidden">
+                    <div class="trading-prefs-label">
+                        <span>Trail Distance (pips)</span>
+                        <span id="tpFixedDistValue">20</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpFixedDistSlider" min="5" max="100" step="5" value="20">
+                    <div class="trading-prefs-hint trading-prefs-hint-info">SL moves every X pips in your favor</div>
+                </div>
+
+                <!-- ATR -->
+                <div id="tpMethodAtr" class="trading-prefs-method hidden">
+                    <div class="trading-prefs-label">
+                        <span>ATR Multiplier</span>
+                        <span id="tpAtrMultValue">2.0</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpAtrMultSlider" min="0.5" max="5" step="0.5" value="2.0">
+                    <div class="trading-prefs-label" style="margin-top:8px">
+                        <span>ATR Period</span>
+                        <span id="tpAtrPeriodValue">14</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpAtrPeriodSlider" min="7" max="21" step="1" value="14">
+                    <div class="trading-prefs-hint trading-prefs-hint-info">Adapts trail distance to market volatility</div>
+                </div>
+
+                <!-- Percentage -->
+                <div id="tpMethodPercentage" class="trading-prefs-method hidden">
+                    <div class="trading-prefs-label">
+                        <span>Trail Percentage (%)</span>
+                        <span id="tpTrailPctValue">50</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpTrailPctSlider" min="10" max="100" step="5" value="50">
+                    <div class="trading-prefs-hint trading-prefs-hint-info">SL trails X% of total move</div>
+                </div>
+
+                <!-- Step -->
+                <div id="tpMethodStep" class="trading-prefs-method hidden">
+                    <div class="trading-prefs-label">
+                        <span>Step Distance (pips)</span>
+                        <span id="tpStepDistValue">20</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpStepDistSlider" min="10" max="100" step="5" value="20">
+                    <div class="trading-prefs-label" style="margin-top:8px">
+                        <span>Lock Amount (pips)</span>
+                        <span id="tpLockAmtValue">10</span>
+                    </div>
+                    <input type="range" class="trading-prefs-slider" id="tpLockAmtSlider" min="5" max="50" step="5" value="10">
+                    <div class="trading-prefs-hint trading-prefs-hint-info">Every X pips move → lock Y pips profit</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TRADE PROTECTION -->
+        <div class="trading-prefs-group">
+            <div class="trading-prefs-group-title">
+                <i class="fas fa-triangle-exclamation"></i> Trade Protection
+            </div>
+            <div class="trading-prefs-checkbox">
+                <input type="checkbox" id="tpCloseWarning" checked>
+                <label for="tpCloseWarning">Confirm before closing a position</label>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="trading-prefs-footer">
+        <button class="trading-prefs-save-btn" id="tradingPrefsSave">
+            <i class="fas fa-check"></i> Save
+        </button>
+        <button class="trading-prefs-cancel-btn" id="tradingPrefsCancel">
+            Cancel
+        </button>
+    </div>
+
+</div>

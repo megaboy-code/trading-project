@@ -12,7 +12,10 @@ import { Panels }                              from '../panel';
 import { WatchlistModule }                     from '../watchlist/watchlist-module';
 import { EconomicCalendarModule }              from '../calendar/calendar-module';
 import { AlertsModule }                        from '../alerts/alerts-module';
+import { JournalMiniModule }                   from '../journal/journal-mini';
 import { OHLCData }                            from '../chart/chart-types';
+import { NotificationPayload }                 from '../generated/MegaFlowzDecoder';
+import { Severity }                            from '../generated/mega-flowz';
 
 declare global {
     interface Window {}
@@ -24,9 +27,10 @@ export class ModuleManager {
     private journalInstance:  any | null = null;
     private strategyInstance: any | null = null;
 
-    private watchlistInstance: WatchlistModule | null = null;
-    private calendarInstance:  EconomicCalendarModule | null = null;
-    private alertsInstance:    AlertsModule | null = null;
+    private watchlistInstance:    WatchlistModule | null = null;
+    private calendarInstance:     EconomicCalendarModule | null = null;
+    private alertsInstance:       AlertsModule | null = null;
+    private journalMiniInstance:  JournalMiniModule | null = null;
 
     private journalLoading:  boolean = false;
     private strategyLoading: boolean = false;
@@ -45,6 +49,7 @@ export class ModuleManager {
         this.initializeWatchlistModule();
         this.initializeCalendarModule();
         this.initializeAlertsModule();
+        this.initializeJournalMiniModule();
         this.setupDOMEventBridge();
 
         // ── Connect only after chart is ready — no race condition ──
@@ -60,6 +65,7 @@ export class ModuleManager {
         this.chart?.destroy();
         this.tradingInstance?.destroy();
         this.journalInstance?.destroy();
+        this.journalMiniInstance?.destroy();
         this.strategyInstance?.destroy();
         this.watchlistInstance?.destroy();
         this.calendarInstance?.destroy();
@@ -83,7 +89,7 @@ export class ModuleManager {
         {
             if (symbol !== this.connectionManager.getCurrentSymbol()) return;
             seriesManager?.updateBidAsk(bid, ask);
-            this.tradingInstance?.onTick(symbol, bid, ask);  // ✅ fixed
+            this.tradingInstance?.onTick(symbol, bid, ask);
         });
 
         // ── Bar update — direct to DataManager + SeriesManager ──
@@ -114,12 +120,10 @@ export class ModuleManager {
             const currentSymbol    = this.connectionManager.getCurrentSymbol();
             const currentTimeframe = this.connectionManager.getCurrentTimeframe();
 
-            // ── Debug — check if backend data matches current selection ──
             console.log(
                 `[CandleData] arrived: ${symbol} ${timeframe} | current: ${currentSymbol} ${currentTimeframe} | candles: ${candles.length}`
             );
 
-            // ── Discard stale data from previous symbol/tf switch ──
             if (symbol !== currentSymbol || timeframe !== currentTimeframe) {
                 console.warn(
                     `[CandleData] DISCARDED — stale data for ${symbol} ${timeframe}`
@@ -142,7 +146,6 @@ export class ModuleManager {
                 seriesManager?.setData(converted);
             }
 
-            // ✅ Fix — clear loading overlay after data arrives
             this.chart?.setReady();
 
             this.chart?.handleInitialDataLoaded({
@@ -164,9 +167,7 @@ export class ModuleManager {
         this.connectionManager.onWatchlistUpdate((
             symbol, bid, ask, spread, time, change) =>
         {
-            this.watchlistInstance?.updatePrice(
-                symbol, bid, change
-            );
+            this.watchlistInstance?.updatePrice(symbol, bid, change);
         });
 
         // ── Positions — direct to TradingModule ──
@@ -198,19 +199,10 @@ export class ModuleManager {
             this.tradingInstance?.handleTradeConfirmation();
         });
 
-        // ── Position closed ──
-        this.connectionManager.onPositionClosed((
-            success, ticket, message) =>
-        {
-            if (success) {
-                this.notifications.success(
-                    message, { title: 'Position Closed' }
-                );
-            } else {
-                this.notifications.error(
-                    message, { title: 'Close Failed' }
-                );
-            }
+        // ── Notification — universal rich toast ──
+        // Routes all position close, alerts, and future events
+        this.connectionManager.onNotification((data: NotificationPayload) => {
+            this.handleNotification(data);
         });
 
         // ── Position modified ──
@@ -281,6 +273,53 @@ export class ModuleManager {
                     break;
             }
         });
+    }
+
+    // ==================== NOTIFICATION HANDLER ====================
+
+    private handleNotification(data: NotificationPayload): void {
+        // ── Build rich message from trade fields ──
+        const parts: string[] = [];
+
+        if (data.direction && data.volume && data.symbol) {
+            parts.push(`${data.direction} ${data.volume}L ${data.symbol}`);
+        } else if (data.symbol) {
+            parts.push(data.symbol);
+        }
+
+        if (data.price) {
+            parts.push(`@ ${data.price}`);
+        }
+
+        if (data.open_price && data.price && data.open_price !== data.price) {
+            parts.push(`(open ${data.open_price})`);
+        }
+
+        if (data.profit !== 0) {
+            const sign = data.profit >= 0 ? '+' : '';
+            parts.push(`| P&L: ${sign}$${data.profit.toFixed(2)}`);
+        }
+
+        // ── Rich fields take priority — fall back to message only if nothing to show ──
+        const message = parts.length > 0 ? parts.join(' ') : data.message;
+        const title   = data.title || '';
+
+        // ── Severity → notification method ──
+        switch (data.severity) {
+            case Severity.Success:
+                this.notifications.success(message, { title });
+                break;
+            case Severity.Warning:
+                this.notifications.warning(message, { title });
+                break;
+            case Severity.Error:
+                this.notifications.error(message, { title });
+                break;
+            case Severity.Info:
+            default:
+                this.notifications.info(message, { title });
+                break;
+        }
     }
 
     // ==================== DOM EVENT BRIDGE ====================
@@ -451,7 +490,8 @@ export class ModuleManager {
         try {
             const { JournalModule } = await import('../journal/journal');
             this.journalInstance = new JournalModule();
-            this.journalInstance.initialize();
+            // ✅ FIX 2: call mount() not initialize()
+            this.journalInstance.mount();
         } catch (error) {
             this.notifications.error(
                 'Failed to load journal module',
@@ -539,6 +579,13 @@ export class ModuleManager {
         } catch (error) {}
     }
 
+    private initializeJournalMiniModule(): void {
+        try {
+            this.journalMiniInstance = new JournalMiniModule();
+            this.journalMiniInstance.initialize();
+        } catch (error) {}
+    }
+
     // ==================== NOTIFICATION HELPER ====================
 
     public showNotification(
@@ -559,6 +606,7 @@ export class ModuleManager {
     public getChart(): ChartModuleImpl | null                { return this.chart; }
     public getTradingModule()                                 { return this.tradingInstance; }
     public getJournalModule()                                 { return this.journalInstance; }
+    public getJournalMiniModule(): JournalMiniModule | null   { return this.journalMiniInstance; }
     public getStrategyModule()                                { return this.strategyInstance; }
     public getWatchlistModule(): WatchlistModule | null       { return this.watchlistInstance; }
     public getCalendarModule(): EconomicCalendarModule | null { return this.calendarInstance; }

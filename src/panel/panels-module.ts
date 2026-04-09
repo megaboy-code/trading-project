@@ -17,10 +17,11 @@ export class PanelsModule {
         'watchlist': '.watchlist-panel',
         'calendar':  '.calendar-panel',
         'alerts':    '.alerts-panel',
+        'journal':   '.journal-panel',
     };
 
     // ✅ Tools that do NOT expand the panel — trigger modals or tabs
-    private modalTools: string[] = ['settings', 'journal'];
+    private modalTools: string[] = ['settings'];
 
     // DOM Elements
     private panel: HTMLElement | null = null;
@@ -106,12 +107,6 @@ export class PanelsModule {
         switch (tool) {
             case 'settings':
                 document.dispatchEvent(new CustomEvent('chart-settings-modal-request'));
-                break;
-
-            case 'journal':
-                document.dispatchEvent(new CustomEvent('open-tab', {
-                    detail: { tab: 'journal' }
-                }));
                 break;
         }
     }

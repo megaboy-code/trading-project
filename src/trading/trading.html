@@ -10,7 +10,7 @@
             <i class="fas fa-sliders-h"></i>
             <span>Trading Control</span>
         </div>
-        <button class="panel-menu-btn">
+        <button class="panel-menu-btn" id="panelMenuBtn">
             <i class="fas fa-ellipsis"></i>
         </button>
     </div>
@@ -106,20 +106,23 @@
                 <button class="preset-btn" data-lot="1.00">1.00</button>
             </div>
 
-            <!-- ✅ MOVED UP: TP / SL before Risk % -->
+            <!-- TP / SL -->
             <div class="tpsl-block">
                 <div class="tpsl-block-header">
                     <div class="tpsl-block-title">
                         <i class="fas fa-shield-halved"></i> TP / SL
                     </div>
-                    <div class="tpsl-toggles">
-                        <button class="tpsl-toggle tp" id="tpToggle">
-                            <i class="fas fa-arrow-up"></i> TP
-                        </button>
-                        <button class="tpsl-toggle sl" id="slToggle">
-                            <i class="fas fa-arrow-down"></i> SL
-                        </button>
-                    </div>
+                </div>
+
+                <div class="tpsl-toggles">
+                    <button class="tpsl-toggle tp" id="tpToggle">
+                        <span class="tpsl-toggle-label">Take Profit</span>
+                        <span class="tpsl-toggle-sub">Tap to enable</span>
+                    </button>
+                    <button class="tpsl-toggle sl" id="slToggle">
+                        <span class="tpsl-toggle-label">Stop Loss</span>
+                        <span class="tpsl-toggle-sub">Tap to enable</span>
+                    </button>
                 </div>
 
                 <div class="tpsl-empty" id="tpslEmpty">
@@ -147,7 +150,7 @@
                     <span class="rr-value" id="rrValue">1 : 2.00</span>
                 </div>
 
-                <div class="pip-presets">
+                <div class="pip-presets hidden" id="pipPresets">
                     <button class="pip-preset-btn" data-pips="10">10p</button>
                     <button class="pip-preset-btn" data-pips="20">20p</button>
                     <button class="pip-preset-btn" data-pips="50">50p</button>
@@ -157,8 +160,8 @@
                 </div>
             </div>
 
-            <!-- ✅ MOVED DOWN: Risk % after TP / SL -->
-            <div class="risk-pct-block">
+            <!-- RISK % -->
+            <div class="risk-pct-block hidden" id="riskPctBlock">
                 <div class="risk-pct-header">
                     <div class="risk-pct-title">
                         <i class="fas fa-percent"></i> Risk %
@@ -238,3 +241,4 @@
 </div>
 
 <!--@include positions-modal.html-->
+<!--@include trading-settings-modal.html-->

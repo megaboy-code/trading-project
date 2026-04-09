@@ -3,19 +3,19 @@
 // FlatBuffers binary protocol — replaces all JSON
 // ================================================================
 
-import { MegaFlowzDecoder, DecodedMessage } from '../generated/MegaFlowzDecoder';
-import { AccountInfo, PositionData }        from '../types';
+import { MegaFlowzDecoder, DecodedMessage, NotificationPayload } from '../generated/MegaFlowzDecoder';
+import { AccountInfo, PositionData }                             from '../types';
 
 export interface ConnectionCallbacks {
     onCandleData?:       (symbol: string, timeframe: string, candles: any[]) => void;
     onBarUpdate?:        (symbol: string, timeframe: string, candle: any)    => void;
     onTickData?:         (symbol: string, bid: number, ask: number, spread: number, time: number) => void;
-    onAccountUpdate?:    (account: AccountInfo)    => void;
+    onAccountUpdate?:    (account: AccountInfo)      => void;
     onPositionsUpdate?:  (positions: PositionData[]) => void;
-    onStrategyData?:     (type: string, data: any) => void;
+    onStrategyData?:     (type: string, data: any)   => void;
     onTradeExecuted?:    (success: boolean, direction: string, symbol: string, volume: number, price: number, ticket: number, timestamp: number, message: string) => void;
-    onPositionClosed?:   (success: boolean, ticket: number, message: string) => void;
     onPositionModified?: (success: boolean, ticket: number, message: string) => void;
+    onNotification?:     (data: NotificationPayload) => void;
     onConnectionStatus?: (status: 'connected' | 'disconnected' | 'connecting' | 'error') => void;
     onMT5Status?:        (connected: boolean, statusText: string) => void;
     onWatchlistUpdate?:  (symbol: string, bid: number, ask: number, spread: number, time: number, change: number) => void;
@@ -203,21 +203,21 @@ export class ConnectionManager {
 
     // ==================== CALLBACK REGISTRATION ====================
 
-    public onCandleData(cb: ConnectionCallbacks['onCandleData']): void         { this.callbacks.onCandleData        = cb; }
-    public onBarUpdate(cb: ConnectionCallbacks['onBarUpdate']): void           { this.callbacks.onBarUpdate         = cb; }
-    public onTickData(cb: ConnectionCallbacks['onTickData']): void             { this.callbacks.onTickData          = cb; }
-    public onAccountUpdate(cb: ConnectionCallbacks['onAccountUpdate']): void   { this.callbacks.onAccountUpdate     = cb; }
-    public onPositionsUpdate(cb: ConnectionCallbacks['onPositionsUpdate']): void { this.callbacks.onPositionsUpdate = cb; }
-    public onStrategyData(cb: ConnectionCallbacks['onStrategyData']): void     { this.callbacks.onStrategyData      = cb; }
-    public onTradeExecuted(cb: ConnectionCallbacks['onTradeExecuted']): void   { this.callbacks.onTradeExecuted     = cb; }
-    public onPositionClosed(cb: ConnectionCallbacks['onPositionClosed']): void { this.callbacks.onPositionClosed    = cb; }
+    public onCandleData(cb: ConnectionCallbacks['onCandleData']): void             { this.callbacks.onCandleData       = cb; }
+    public onBarUpdate(cb: ConnectionCallbacks['onBarUpdate']): void               { this.callbacks.onBarUpdate        = cb; }
+    public onTickData(cb: ConnectionCallbacks['onTickData']): void                 { this.callbacks.onTickData         = cb; }
+    public onAccountUpdate(cb: ConnectionCallbacks['onAccountUpdate']): void       { this.callbacks.onAccountUpdate    = cb; }
+    public onPositionsUpdate(cb: ConnectionCallbacks['onPositionsUpdate']): void   { this.callbacks.onPositionsUpdate  = cb; }
+    public onStrategyData(cb: ConnectionCallbacks['onStrategyData']): void         { this.callbacks.onStrategyData     = cb; }
+    public onTradeExecuted(cb: ConnectionCallbacks['onTradeExecuted']): void       { this.callbacks.onTradeExecuted    = cb; }
     public onPositionModified(cb: ConnectionCallbacks['onPositionModified']): void { this.callbacks.onPositionModified = cb; }
+    public onNotification(cb: ConnectionCallbacks['onNotification']): void         { this.callbacks.onNotification     = cb; }
     public onConnectionStatus(cb: ConnectionCallbacks['onConnectionStatus']): void { this.callbacks.onConnectionStatus = cb; }
-    public onMT5Status(cb: ConnectionCallbacks['onMT5Status']): void           { this.callbacks.onMT5Status         = cb; }
-    public onWatchlistUpdate(cb: ConnectionCallbacks['onWatchlistUpdate']): void { this.callbacks.onWatchlistUpdate = cb; }
-    public onError(cb: ConnectionCallbacks['onError']): void                   { this.callbacks.onError             = cb; }
-    public onAutoTrading(cb: ConnectionCallbacks['onAutoTrading']): void       { this.callbacks.onAutoTrading       = cb; }
-    public onCacheCleared(cb: ConnectionCallbacks['onCacheCleared']): void     { this.callbacks.onCacheCleared      = cb; }
+    public onMT5Status(cb: ConnectionCallbacks['onMT5Status']): void               { this.callbacks.onMT5Status        = cb; }
+    public onWatchlistUpdate(cb: ConnectionCallbacks['onWatchlistUpdate']): void   { this.callbacks.onWatchlistUpdate  = cb; }
+    public onError(cb: ConnectionCallbacks['onError']): void                       { this.callbacks.onError            = cb; }
+    public onAutoTrading(cb: ConnectionCallbacks['onAutoTrading']): void           { this.callbacks.onAutoTrading      = cb; }
+    public onCacheCleared(cb: ConnectionCallbacks['onCacheCleared']): void         { this.callbacks.onCacheCleared     = cb; }
 
     // ==================== WEBSOCKET SETUP ====================
 
@@ -373,16 +373,6 @@ export class ConnectionManager {
                 }
                 break;
 
-            case 'position_closed':
-                if (this.callbacks.onPositionClosed) {
-                    this.callbacks.onPositionClosed(
-                        msg.data.success,
-                        msg.data.ticket,
-                        msg.data.message
-                    );
-                }
-                break;
-
             case 'position_modified':
                 if (this.callbacks.onPositionModified) {
                     this.callbacks.onPositionModified(
@@ -390,6 +380,13 @@ export class ConnectionManager {
                         msg.data.ticket,
                         msg.data.message
                     );
+                }
+                break;
+
+            // ── Universal notification — all rich toasts ──
+            case 'notification':
+                if (this.callbacks.onNotification) {
+                    this.callbacks.onNotification(msg.data);
                 }
                 break;
 
