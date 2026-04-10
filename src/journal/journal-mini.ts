@@ -22,6 +22,10 @@ export class JournalMiniModule {
     private winRateEl:    HTMLElement | null = null;
     private tradeCountEl: HTMLElement | null = null;
     private openFullBtn:  HTMLElement | null = null;
+    private menuBtn:      HTMLElement | null = null;
+    private dropdown:     HTMLElement | null = null;
+    private refreshBtn:   HTMLElement | null = null;
+    private exportBtn:    HTMLElement | null = null;
 
     // ==================== INITIALIZATION ====================
 
@@ -31,6 +35,10 @@ export class JournalMiniModule {
         this.winRateEl    = document.getElementById('journalWinRate');
         this.tradeCountEl = document.getElementById('journalTradeCount');
         this.openFullBtn  = document.getElementById('journalOpenFullBtn');
+        this.menuBtn      = document.getElementById('journalMenuBtn');
+        this.dropdown     = document.getElementById('journalDropdown');
+        this.refreshBtn   = document.getElementById('journalRefreshBtn');
+        this.exportBtn    = document.getElementById('journalExportBtn');
 
         this.setupEventListeners();
         this.render();
@@ -39,8 +47,32 @@ export class JournalMiniModule {
     }
 
     private setupEventListeners(): void {
+        // ── Full journal ──
         this.openFullBtn?.addEventListener('click', () => {
             document.dispatchEvent(new CustomEvent('open-journal-tab'));
+        });
+
+        // ── Three dot menu toggle ──
+        this.menuBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.dropdown?.classList.toggle('open');
+        });
+
+        // ── Close dropdown on outside click ──
+        document.addEventListener('click', () => {
+            this.dropdown?.classList.remove('open');
+        });
+
+        // ── Refresh ──
+        this.refreshBtn?.addEventListener('click', () => {
+            this.dropdown?.classList.remove('open');
+            document.dispatchEvent(new CustomEvent('journal-refresh'));
+        });
+
+        // ── Export CSV ──
+        this.exportBtn?.addEventListener('click', () => {
+            this.dropdown?.classList.remove('open');
+            this.exportCSV();
         });
     }
 
@@ -67,6 +99,31 @@ export class JournalMiniModule {
 
     public destroy(): void {
         this.openFullBtn?.removeEventListener('click', () => {});
+        this.menuBtn?.removeEventListener('click',    () => {});
+        this.refreshBtn?.removeEventListener('click', () => {});
+        this.exportBtn?.removeEventListener('click',  () => {});
+    }
+
+    // ==================== EXPORT CSV ====================
+
+    private exportCSV(): void {
+        if (this.trades.length === 0) return;
+
+        const header = 'Ticket,Pair,Direction,Size,PnL,Result,Date';
+        const rows   = this.trades.map(t =>
+            `${t.id},${t.pair},${t.direction},${t.size},${t.pnl.toFixed(2)},${t.result},${t.date.toISOString()}`
+        );
+
+        const csv  = [header, ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+
+        a.href     = url;
+        a.download = `journal_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+
+        URL.revokeObjectURL(url);
     }
 
     // ==================== RENDER ====================
@@ -96,10 +153,10 @@ export class JournalMiniModule {
         const winRate    = Math.round((wins / trades.length) * 100);
         const isPositive = totalPnl >= 0;
 
-        this.pnlEl.textContent     = `${isPositive ? '+' : '-'}$${Math.abs(totalPnl).toFixed(2)}`;
-        this.pnlEl.className       = `journal-mini-stat-value ${isPositive ? 'positive' : 'negative'}`;
-        this.winRateEl.textContent = `${winRate}%`;
-        this.winRateEl.className   = `journal-mini-stat-value ${winRate >= 50 ? 'positive' : 'negative'}`;
+        this.pnlEl.textContent        = `${isPositive ? '+' : '-'}$${Math.abs(totalPnl).toFixed(2)}`;
+        this.pnlEl.className          = `journal-mini-stat-value ${isPositive ? 'positive' : 'negative'}`;
+        this.winRateEl.textContent    = `${winRate}%`;
+        this.winRateEl.className      = `journal-mini-stat-value ${winRate >= 50 ? 'positive' : 'negative'}`;
         this.tradeCountEl.textContent = `${trades.length}`;
     }
 
