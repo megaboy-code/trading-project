@@ -157,7 +157,6 @@ export class MainChart {
         this._currentSymbol = symbol;
         this.chartInstance.updateSymbol(symbol);
         this.seriesManager.setSymbol(symbol);
-        this.seriesManager.clearData(); // ✅ Fix 2 — clear stale data before new symbol data arrives
         this.resetChartDataState();
         if (this.onSymbolChange) this.onSymbolChange(symbol);
     }
@@ -166,7 +165,6 @@ export class MainChart {
         if (this._currentTimeframe === timeframe) return;
         this._currentTimeframe = timeframe;
         this.volumeManager?.setTimeframe(timeframe);
-        this.seriesManager.clearData(); // ✅ Fix 2 — clear stale data before new TF data arrives
         this.resetChartDataState();
         if (this.onTimeframeChange) this.onTimeframeChange(timeframe);
     }
