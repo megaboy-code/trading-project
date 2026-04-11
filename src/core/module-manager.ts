@@ -52,7 +52,6 @@ export class ModuleManager {
         this.initializeJournalMiniModule();
         this.setupDOMEventBridge();
 
-        // ── Connect only after chart is ready — no race condition ──
         if (this.chart) {
             this.chart.onChartReadyCallback(() => {
                 this.wireDirectCallbacks();
@@ -238,10 +237,8 @@ export class ModuleManager {
             }));
 
             if (scope === 'today') {
-                // ── Mini journal — sidebar panel ──
                 this.journalMiniInstance?.setTrades(mapped);
             } else if (scope === 'month') {
-                // ── Full journal — calendar view ──
                 this.journalInstance?.setTrades(mapped);
             }
         });
@@ -494,4 +491,190 @@ export class ModuleManager {
         document.addEventListener('tab-switched', (e: Event) => {
             const { tabId } = (e as CustomEvent).detail;
             if (tabId === 'strategy') this.loadStrategyModule();
-            if (tabId === 'journal')  this.loadJournalModule​​​​​​​​​​​​​​​​
+            if (tabId === 'journal') this.loadJournalModule();
+        });
+
+        document.addEventListener('hotkey-panel-switch', (e: Event) => {
+            const { panel } = (e as CustomEvent).detail;
+            if (panel) this.panels.show(panel);
+        });
+
+        document.addEventListener('show-notification', (e: Event) => {
+            const { title, message, type } = (e as CustomEvent).detail;
+            this.showNotification(title, message, type);
+        });
+
+        document.addEventListener('trade-error', (e: Event) => {
+            const { message } = (e as CustomEvent).detail;
+            this.notifications.error(
+                message || 'Trade execution failed',
+                { title: 'Trade Error' }
+            );
+        });
+
+        document.addEventListener('hide-panel', () => {
+            this.panels.hide();
+        });
+
+        // ── Journal month navigate — full journal fires this ──
+        document.addEventListener('journal-month-changed', (e: Event) => {
+            const { year, month } = (e as CustomEvent).detail;
+            if (year && month !== undefined) {
+                this.connectionManager.getJournalMonth(year, month);
+            }
+        });
+
+        // ── Journal refresh — mini panel three dot menu ──
+        document.addEventListener('journal-refresh', () => {
+            this.connectionManager.getJournalToday();
+        });
+    }
+
+    // ==================== LAZY LOADERS ====================
+
+    private async loadJournalModule(): Promise<void> {
+        if (this.journalLoading) return;
+
+        if (this.journalInstance) {
+            const now = new Date();
+            this.connectionManager.getJournalMonth(
+                now.getFullYear(),
+                now.getMonth() + 1
+            );
+            return;
+        }
+
+        this.journalLoading = true;
+        try {
+            const { JournalModule } = await import('../journal/journal');
+            this.journalInstance = new JournalModule();
+            this.journalInstance.mount();
+
+            const now = new Date();
+            this.connectionManager.getJournalMonth(
+                now.getFullYear(),
+                now.getMonth() + 1
+            );
+        } catch (error) {
+            this.notifications.error(
+                'Failed to load journal module',
+                { title: 'Module Error' }
+            );
+        } finally {
+            this.journalLoading = false;
+        }
+    }
+
+    private async loadStrategyModule(): Promise<void> {
+        if (this.strategyInstance || this.strategyLoading) return;
+        this.strategyLoading = true;
+        try {
+            const { StrategyModule } = await import('../strategy/strategy');
+            this.strategyInstance = new StrategyModule(
+                () => this.connectionManager.getCurrentSymbol(),
+                () => this.connectionManager.getCurrentTimeframe()
+            );
+        } catch (error) {
+            this.notifications.error(
+                'Failed to load strategy module',
+                { title: 'Module Error' }
+            );
+        } finally {
+            this.strategyLoading = false;
+        }
+    }
+
+    // ==================== MODULE INITIALIZATION ====================
+
+    private initializeChartModule(): void {
+        try {
+            this.chart = new ChartModuleImpl();
+        } catch (error) {
+            this.notifications.error(
+                'Failed to initialize chart module',
+                { title: 'Module Error' }
+            );
+        }
+    }
+
+    private initializeTradingModule(): void {
+        try {
+            this.tradingInstance = new TradingModuleClass();
+        } catch (error) {
+            this.notifications.error(
+                'Failed to initialize trading module',
+                { title: 'Module Error' }
+            );
+        }
+    }
+
+    private initializeNotificationModule(): void {
+        try {
+            Notification.initialize();
+        } catch (error) {}
+    }
+
+    private initializeWatchlistModule(): void {
+        try {
+            this.watchlistInstance = new WatchlistModule(
+                this.connectionManager
+            );
+            this.watchlistInstance.initialize();
+        } catch (error) {
+            this.notifications.error(
+                'Failed to initialize watchlist',
+                { title: 'Module Error' }
+            );
+        }
+    }
+
+    private initializeCalendarModule(): void {
+        try {
+            this.calendarInstance = new EconomicCalendarModule();
+            this.calendarInstance.initialize();
+        } catch (error) {}
+    }
+
+    private initializeAlertsModule(): void {
+        try {
+            this.alertsInstance = new AlertsModule();
+            this.alertsInstance.initialize();
+        } catch (error) {}
+    }
+
+    private initializeJournalMiniModule(): void {
+        try {
+            this.journalMiniInstance = new JournalMiniModule();
+            this.journalMiniInstance.initialize();
+        } catch (error) {}
+    }
+
+    // ==================== NOTIFICATION HELPER ====================
+
+    public showNotification(
+        title:   string,
+        message: string,
+        type:    'success' | 'error' | 'warning' | 'info' = 'info'
+    ): void {
+        switch (type) {
+            case 'success': this.notifications.success(message, { title }); break;
+            case 'error':   this.notifications.error(message, { title });   break;
+            case 'warning': this.notifications.warning(message, { title }); break;
+            case 'info':    this.notifications.info(message, { title });    break;
+        }
+    }
+
+    // ==================== GETTERS ====================
+
+    public getChart(): ChartModuleImpl | null                { return this.chart; }
+    public getTradingModule()                                 { return this.tradingInstance; }
+    public getJournalModule()                                 { return this.journalInstance; }
+    public getJournalMiniModule(): JournalMiniModule | null   { return this.journalMiniInstance; }
+    public getStrategyModule()                                { return this.strategyInstance; }
+    public getWatchlistModule(): WatchlistModule | null       { return this.watchlistInstance; }
+    public getCalendarModule(): EconomicCalendarModule | null { return this.calendarInstance; }
+    public getAlertsModule(): AlertsModule | null             { return this.alertsInstance; }
+    public getConnectionManager(): ConnectionManager          { return this.connectionManager; }
+    public getPanelsModule(): typeof Panels                   { return this.panels; }
+    public getNotificationModule(): typeof Notification       { return this.notifications; }
+}
