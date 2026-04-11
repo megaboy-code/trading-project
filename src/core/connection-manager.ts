@@ -22,7 +22,7 @@ export interface ConnectionCallbacks {
     onError?:            (message: string) => void;
     onAutoTrading?:      (enabled: boolean, message: string) => void;
     onCacheCleared?:     (message: string) => void;
-    onJournalData?:      (trades: any[]) => void;
+    onJournalData?:      (trades: any[], scope: string) => void;  // ← scope added
 }
 
 export class ConnectionManager {
@@ -161,6 +161,11 @@ export class ConnectionManager {
     public getAccountInfo(): void              { this.sendCommand('GET_ACCOUNT_INFO'); }
     public clearCache(): void                  { this.sendCommand('CLEAR_CACHE'); }
     public getJournalToday(): void             { this.sendCommand('GET_JOURNAL_TODAY'); }
+
+    // ── Journal month — C++ calculates timestamps ──
+    public getJournalMonth(year: number, month: number): void {
+        this.sendCommand(`GET_JOURNAL_MONTH_${year}_${month}`);
+    }
 
     // ==================== STRATEGY COMMANDS ====================
 
@@ -394,9 +399,13 @@ export class ConnectionManager {
                 }
                 break;
 
+            // ── Journal data — split by scope ──
             case 'journal_data':
                 if (this.callbacks.onJournalData) {
-                    this.callbacks.onJournalData(msg.data.trades);
+                    this.callbacks.onJournalData(
+                        msg.data.trades,
+                        msg.data.scope
+                    );
                 }
                 break;
 
