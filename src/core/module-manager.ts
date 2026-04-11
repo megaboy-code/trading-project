@@ -220,19 +220,13 @@ export class ModuleManager {
 
         // ── Journal data — split by scope ──
         this.connectionManager.onJournalData((trades, scope) => {
-            if (!Array.isArray(trades) || trades.length === 0) return;
-
             const mapped = trades.map((t: any) => ({
                 id:        t.ticket ?? t.id,
                 pair:      t.symbol,
-                direction: (t.type === 0 || t.type === 'BUY')
-                               ? 'LONG'
-                               : 'SHORT' as 'LONG' | 'SHORT',
+                direction: t.type === 'BUY' ? 'LONG' : 'SHORT' as 'LONG' | 'SHORT',
                 size:      String(t.volume),
                 pnl:       t.profit,
-                result:    t.profit >= 0
-                               ? 'WIN'
-                               : 'LOSS' as 'WIN' | 'LOSS',
+                result:    t.profit >= 0 ? 'WIN' : 'LOSS' as 'WIN' | 'LOSS',
                 date:      new Date(t.close_time * 1000)
             }));
 
@@ -491,7 +485,7 @@ export class ModuleManager {
         document.addEventListener('tab-switched', (e: Event) => {
             const { tabId } = (e as CustomEvent).detail;
             if (tabId === 'strategy') this.loadStrategyModule();
-            if (tabId === 'journal') this.loadJournalModule();
+            if (tabId === 'journal')  this.loadJournalModule();
         });
 
         document.addEventListener('hotkey-panel-switch', (e: Event) => {
@@ -524,9 +518,9 @@ export class ModuleManager {
             }
         });
 
-        // ── Journal refresh — mini panel three dot menu ──
+        // ── Journal refresh — disabled (🐛 known issue) ──
         document.addEventListener('journal-refresh', () => {
-            this.connectionManager.getJournalToday();
+            // 🐛 Refresh temporarily disabled — scope mismatch under investigation
         });
     }
 
