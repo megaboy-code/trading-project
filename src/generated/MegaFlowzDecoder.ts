@@ -172,6 +172,7 @@ export interface JournalTradeData {
 
 export interface JournalDataPayload {
     trades: JournalTradeData[];
+    scope:  string;          // "today" | "month"
 }
 
 // ================================================================
@@ -525,7 +526,10 @@ export class MegaFlowzDecoder {
 
                     return {
                         type: 'journal_data',
-                        data: { trades }
+                        data: {
+                            trades,
+                            scope: p.scope() ?? 'today'  // ← read scope
+                        }
                     };
                 }
 
