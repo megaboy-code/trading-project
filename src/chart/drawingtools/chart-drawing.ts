@@ -1,15 +1,18 @@
 // ================================================================
-// 🎨 CHART DRAWING MODULE - Drawing tools layer
+// 🎨 CHART DRAWING - Orchestrator
 // ================================================================
 
-import { 
-  IChartApi, 
-  ISeriesApi, 
-  SeriesType 
+import {
+  IChartApi,
+  ISeriesApi,
+  SeriesType
 } from 'lightweight-charts';
 
 import { createLineToolsPlugin } from 'lightweight-charts-line-tools-core';
-import { DrawingToolbar } from './ui/drawing-toolbar';
+import { DrawingToolbar }        from './ui/drawing-toolbar';
+import { DrawingPersistence }    from './drawing-persistence';
+import { DrawingTFManager }      from './drawing-tf-manager';
+import { DrawingTradeArrows }    from './drawing-trade-arrows';
 
 // ==================== TOOL GROUP MAP ====================
 
@@ -37,36 +40,12 @@ const TOOL_GROUP_MAP: Record<string, string> = {
   TradeArrow:        'signals',
 };
 
-const NON_PERSISTENT_TOOLS = new Set<string>(['TradeArrow']);
 const registeredGroups = new Set<string>();
-
-// ==================== TF INTERVALS ====================
-
-const TF_INTERVALS: Record<string, number> = {
-  M1:  60,
-  M5:  300,
-  M15: 900,
-  M30: 1800,
-  H1:  3600,
-  H4:  14400,
-  D1:  86400,
-  W1:  604800,
-  MN:  2592000
-};
 
 export interface DrawingToolsConfig {
   precision:      number;
   showLabels:     boolean;
   priceFormatter: (price: number) => string;
-}
-
-// ==================== META ====================
-
-interface ToolMeta {
-  timeframe: string;
-  symbol:    string;
-  allTF:     boolean;
-  deleted:   boolean;
 }
 
 export class ChartDrawingModule {
@@ -93,23 +72,19 @@ export class ChartDrawingModule {
 
   private themeObserver: MutationObserver | null = null;
 
-  private currentSymbol:    string;
-  private currentTimeframe: string;
-
-  private showBuyArrows:  boolean = true;
-  private showSellArrows: boolean = true;
-
-  private defaultBuyArrowColor:  string = '#238636';
-  private defaultSellArrowColor: string = '#da3633';
+  private _currentSymbol:    string;
+  private _currentTimeframe: string;
 
   // ✅ Fix 1 — chart type switch flag
   private _isSwitchingChartType: boolean = false;
 
-  // ✅ Fix 3 — in-memory meta map keyed by tool id
-  private _metaMap: Map<string, ToolMeta> = new Map();
+  // ==================== SUB MODULES ====================
+  private persistence: DrawingPersistence;
+  private tfManager:   DrawingTFManager;
+  private arrows:      DrawingTradeArrows;
 
   private get STORAGE_KEY(): string {
-    return `chart_drawings_${this.currentSymbol}_${this.currentTimeframe}`;
+    return `chart_drawings_${this._currentSymbol}_${this._currentTimeframe}`;
   }
 
   constructor(
@@ -129,11 +104,33 @@ export class ChartDrawingModule {
     this.setDrawingStateCallback   = callbacks?.setDrawingState;
     this.setSelectionStateCallback = callbacks?.setSelectionState;
 
-    this.currentSymbol    = initialSymbol    || 'EURUSD';
-    this.currentTimeframe = initialTimeframe || 'H1';
+    this._currentSymbol    = initialSymbol    || 'EURUSD';
+    this._currentTimeframe = initialTimeframe || 'H1';
+
+    // ==================== INIT SUB MODULES ====================
+
+    this.persistence = new DrawingPersistence(
+      () => this.lineTools,
+      () => this.isInitialized,
+      () => this._currentSymbol,
+      () => this._currentTimeframe
+    );
+
+    this.tfManager = new DrawingTFManager(
+      () => this.lineTools,
+      () => this.isInitialized,
+      this.persistence,
+      () => this.arrows.removeTradeArrows()
+    );
+
+    this.arrows = new DrawingTradeArrows(
+      () => this.lineTools,
+      () => this.isInitialized,
+      (group: string) => this.loadAndRegisterGroup(group)
+    );
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('beforeunload', () => this.purgeAndSave());
+      window.addEventListener('beforeunload', () => this.persistence.purgeAndSave());
     }
   }
 
@@ -167,7 +164,11 @@ export class ChartDrawingModule {
 
       this.isInitialized = true;
 
-      await this.loadDrawings();
+      await this.persistence.loadDrawings(
+        (g) => this.loadAndRegisterGroup(g),
+        TOOL_GROUP_MAP,
+        (tf) => this.tfManager.applyTFVisibility(tf)
+      );
 
       console.log('✅ Drawing module initialized');
       return true;
@@ -216,7 +217,7 @@ export class ChartDrawingModule {
         }
       });
 
-      this.saveDrawings();
+      this.persistence.saveDrawings();
     } catch (e) {
       console.error('❌ Failed to update tools text color:', e);
     }
@@ -231,9 +232,9 @@ export class ChartDrawingModule {
       const { key, value } = (e as CustomEvent).detail;
 
       if (key === 'showBuyArrows') {
-        this.showBuyArrows = value as boolean;
+        this.arrows.showBuyArrows = value as boolean;
         if (!value) {
-          this.removeTradeArrows('buy');
+          this.arrows.removeTradeArrows('buy');
         } else {
           document.dispatchEvent(new CustomEvent('chart-arrows-toggle-on', {
             detail: { type: 'buy' }
@@ -242,62 +243,14 @@ export class ChartDrawingModule {
       }
 
       if (key === 'showSellArrows') {
-        this.showSellArrows = value as boolean;
+        this.arrows.showSellArrows = value as boolean;
         if (!value) {
-          this.removeTradeArrows('sell');
+          this.arrows.removeTradeArrows('sell');
         } else {
           document.dispatchEvent(new CustomEvent('chart-arrows-toggle-on', {
             detail: { type: 'sell' }
           }));
         }
-      }
-    });
-
-    document.addEventListener('chart-arrow-priceline-change', (e: Event) => {
-      const { priceLine } = (e as CustomEvent).detail as { priceLine: 'hover' | 'always' };
-      if (!this.lineTools || !this.isInitialized) return;
-
-      try {
-        const json  = this.lineTools.exportLineTools();
-        const tools = JSON.parse(json);
-        if (!Array.isArray(tools)) return;
-
-        tools.forEach((tool: any) => {
-          if (tool.toolType !== 'TradeArrow') return;
-          this.lineTools.applyLineToolOptions({
-            id:       tool.id,
-            toolType: 'TradeArrow',
-            options:  { arrow: { priceLine } },
-          });
-        });
-      } catch (error) {
-        console.error('❌ Failed to update arrow price line mode:', error);
-      }
-    });
-
-    document.addEventListener('chart-arrow-color-change', (e: Event) => {
-      const { type, color } = (e as CustomEvent).detail as { type: 'buy' | 'sell'; color: string };
-      if (!this.lineTools || !this.isInitialized) return;
-
-      if (type === 'buy')  this.defaultBuyArrowColor  = color;
-      if (type === 'sell') this.defaultSellArrowColor = color;
-
-      try {
-        const json  = this.lineTools.exportLineTools();
-        const tools = JSON.parse(json);
-        if (!Array.isArray(tools)) return;
-
-        tools.forEach((tool: any) => {
-          if (tool.toolType !== 'TradeArrow') return;
-          if (tool.options?.arrow?.type !== type) return;
-          this.lineTools.applyLineToolOptions({
-            id:       tool.id,
-            toolType: 'TradeArrow',
-            options:  { arrow: { color } },
-          });
-        });
-      } catch (error) {
-        console.error('❌ Failed to update arrow color:', error);
       }
     });
   }
@@ -436,22 +389,21 @@ export class ChartDrawingModule {
       this.lineTools.on('line-tool-created', (tool: any) => {
         // ✅ Fix 3 — inject _meta at draw time
         if (tool?.id) {
-          this._metaMap.set(tool.id, {
-            timeframe: this.currentTimeframe,
-            symbol:    this.currentSymbol,
-            allTF:     true,
-            deleted:   false
-          });
+          this.persistence.injectMeta(
+            tool.id,
+            this._currentSymbol,
+            this._currentTimeframe
+          );
         }
         this.pendingToolFormatting.push(tool);
         this.scheduleBatchFormatting();
-        this.saveDrawings();
+        this.persistence.saveDrawings();
       });
     }
 
     if (typeof this.lineTools.subscribeLineToolsAfterEdit === 'function') {
       this.lineTools.subscribeLineToolsAfterEdit(() => {
-        this.saveDrawings();
+        this.persistence.saveDrawings();
       });
     }
   }
@@ -467,9 +419,8 @@ export class ChartDrawingModule {
         updateToolProperties: (toolId: string, updates: any)   => this.updateToolProperties(toolId, updates),
         lockTool:             (toolId: string, locked: boolean) => this.lockTool(toolId, locked),
         deleteTool:           (toolId: string)                  => this.deleteTool(toolId),
-        // ✅ Fix 3 — wire allTF toggle from toolbar
-        setToolAllTF:         (toolId: string, allTF: boolean)  => this.setToolAllTF(toolId, allTF),
-        getToolMeta:          (toolId: string)                  => this._metaMap.get(toolId) ?? null
+        setToolAllTF:         (toolId: string, allTF: boolean)  => this.tfManager.setToolAllTF(toolId, allTF),
+        getToolMeta:          (toolId: string)                  => this.tfManager.getToolMeta(toolId)
       }
     );
     await this.toolbar.initialize();
@@ -538,114 +489,23 @@ export class ChartDrawingModule {
   }
 
   // ================================================================
-  // FIX 3 — ALL TF TOGGLE
-  // ================================================================
-
-  public setToolAllTF(toolId: string, allTF: boolean): void {
-    const meta = this._metaMap.get(toolId);
-    if (!meta) return;
-    meta.allTF = allTF;
-    this._metaMap.set(toolId, meta);
-    this.saveDrawings();
-    console.log(`📐 Tool ${toolId} allTF set to ${allTF}`);
-  }
-
-  public getToolMeta(toolId: string): ToolMeta | null {
-    return this._metaMap.get(toolId) ?? null;
-  }
-
-  // ================================================================
   // SYMBOL + TF SWITCHING
   // ================================================================
 
-  public saveAndSwitchTimeframe(timeframe: string): void {
-    if (this.currentTimeframe === timeframe) return;
-    this.saveDrawings();
-    this.currentTimeframe = timeframe;
-    console.log(`📐 TF tracking updated: ${timeframe}`);
-  }
-
-  public saveAndSwitchSymbol(symbol: string): void {
-    if (this.currentSymbol === symbol) return;
-    this.saveDrawings();
-    this.currentSymbol = symbol;
-    console.log(`📐 Symbol tracking updated: ${symbol}`);
-  }
-
   public async onTimeframeChange(timeframe: string): Promise<void> {
-    if (this.currentTimeframe === timeframe) return;
-
-    this.saveDrawings();
-
-    const oldTimeframe    = this.currentTimeframe;
-    this.currentTimeframe = timeframe;
-
-    this.removeTradeArrows();
-    this.applyTFVisibility(timeframe);
-
-    console.log(`📐 TF tracking updated: ${timeframe}`);
+    await this.tfManager.onTimeframeChange(
+      timeframe,
+      this._currentTimeframe,
+      (tf) => { this._currentTimeframe = tf; }
+    );
   }
 
   public async onSymbolChange(symbol: string): Promise<void> {
-    this.saveAndSwitchSymbol(symbol);
-    this.removeTradeArrows();
-  }
-
-  // ✅ Fix 3 — apply visibility per tool based on _meta on TF switch
-  private applyTFVisibility(newTimeframe: string): void {
-    if (!this.lineTools || !this.isInitialized) return;
-
-    try {
-      const json  = this.lineTools.exportLineTools();
-      const tools = JSON.parse(json);
-      if (!Array.isArray(tools)) return;
-
-      tools.forEach((tool: any) => {
-        if (!tool?.id) return;
-
-        const meta = this._metaMap.get(tool.id);
-        if (!meta) return;
-        if (meta.deleted) return;
-
-        if (meta.allTF) {
-          // ✅ Snap timestamps to new TF bar grid
-          const snappedPoints = this.snapPoints(tool.points, newTimeframe);
-          if (snappedPoints) {
-            this.lineTools.applyLineToolOptions({
-              id:       tool.id,
-              toolType: tool.toolType,
-              options:  { ...tool.options, visible: true },
-              points:   snappedPoints
-            });
-          }
-        } else {
-          // ✅ Per-TF — hide or show based on ownership
-          const visible = meta.timeframe === newTimeframe;
-          this.lineTools.applyLineToolOptions({
-            id:       tool.id,
-            toolType: tool.toolType,
-            options:  { ...tool.options, visible }
-          });
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ applyTFVisibility failed:', error);
-    }
-  }
-
-  // ✅ Fix 3 — snap tool points to nearest TF bar boundary
-  private snapPoints(points: any[], timeframe: string): any[] | null {
-    if (!Array.isArray(points) || points.length === 0) return null;
-    const interval = TF_INTERVALS[timeframe];
-    if (!interval) return null;
-
-    return points.map(point => ({
-      ...point,
-      timestamp: point.timestamp
-        ? Math.round(point.timestamp / interval) * interval
-        : point.timestamp
-    }));
+    await this.tfManager.onSymbolChange(
+      symbol,
+      this._currentSymbol,
+      (sym) => { this._currentSymbol = sym; }
+    );
   }
 
   public clearToolsOnly(): void {
@@ -663,7 +523,6 @@ export class ChartDrawingModule {
     if (!this.lineTools || !this.isInitialized) return;
 
     // ✅ Fix 1 — skip loadDrawings during chart type switch
-    // updateSeries() handles the reimport in that case
     if (this._isSwitchingChartType) return;
 
     try {
@@ -673,9 +532,13 @@ export class ChartDrawingModule {
 
       if (!this.lineTools || !this.isInitialized) return;
 
-      await this.loadDrawings();
-      console.log(`📐 Drawings restored for ${this.currentSymbol} ${this.currentTimeframe}`);
+      await this.persistence.loadDrawings(
+        (g) => this.loadAndRegisterGroup(g),
+        TOOL_GROUP_MAP,
+        (tf) => this.tfManager.applyTFVisibility(tf)
+      );
 
+      console.log(`📐 Drawings restored for ${this._currentSymbol} ${this._currentTimeframe}`);
       document.dispatchEvent(new CustomEvent('chart-drawings-ready'));
 
     } catch (error) {
@@ -695,9 +558,7 @@ export class ChartDrawingModule {
 
     try {
       const groupName = TOOL_GROUP_MAP[toolType];
-      if (groupName) {
-        await this.loadAndRegisterGroup(groupName);
-      }
+      if (groupName) await this.loadAndRegisterGroup(groupName);
 
       if (options) {
         this.lineTools.addLineTool(toolType, [], options);
@@ -713,7 +574,6 @@ export class ChartDrawingModule {
   public clearAllDrawings(): void {
     if (!this.lineTools || !this.isInitialized) return;
     try {
-      // ✅ Fix 3 — hide all tools, clear storage, no detach
       const json  = this.lineTools.exportLineTools();
       const tools = JSON.parse(json);
       if (Array.isArray(tools)) {
@@ -727,9 +587,9 @@ export class ChartDrawingModule {
         });
       }
 
-      this._metaMap.clear();
+      this.persistence.clearMeta();
       localStorage.removeItem(this.STORAGE_KEY);
-      console.log(`🗑️ Drawings cleared for ${this.currentSymbol} ${this.currentTimeframe}`);
+      console.log(`🗑️ Drawings cleared for ${this._currentSymbol} ${this._currentTimeframe}`);
     } catch (error) {
       console.error('❌ Failed to clear drawings:', error);
     }
@@ -740,7 +600,7 @@ export class ChartDrawingModule {
     try {
       if (typeof this.lineTools.removeSelectedLineTools === 'function') {
         this.lineTools.removeSelectedLineTools();
-        this.saveDrawings();
+        this.persistence.saveDrawings();
       }
     } catch (error) {
       console.error('❌ Failed to remove selected drawings:', error);
@@ -748,7 +608,7 @@ export class ChartDrawingModule {
   }
 
   // ================================================================
-  // TRADE ARROWS
+  // TRADE ARROWS — delegate to sub module
   // ================================================================
 
   public async placeTradeArrow(params: {
@@ -760,55 +620,11 @@ export class ChartDrawingModule {
     color?:      string;
     priceLine?:  'hover' | 'always';
   }): Promise<void> {
-    if (!this.lineTools || !this.isInitialized) return;
-
-    if (params.type === 'buy'  && !this.showBuyArrows)  return;
-    if (params.type === 'sell' && !this.showSellArrows) return;
-
-    try {
-      await this.loadAndRegisterGroup('signals');
-
-      const color = params.color ?? (
-        params.type === 'buy'
-          ? this.defaultBuyArrowColor
-          : this.defaultSellArrowColor
-      );
-
-      this.lineTools.createOrUpdateLineTool(
-        'TradeArrow',
-        [{ timestamp: params.timestamp, price: params.price }],
-        {
-          arrow: {
-            type:       params.type,
-            color,
-            size:       10,
-            stemHeight: 20,
-            priceLine:  params.priceLine ?? 'hover',
-            priceLabel: params.priceLabel,
-          },
-        },
-        params.id
-      );
-
-      console.log(`✅ Trade arrow placed: ${params.type} @ ${params.priceLabel}`);
-
-    } catch (error) {
-      console.error('❌ Failed to place trade arrow:', error);
-    }
+    await this.arrows.placeTradeArrow(params);
   }
 
   public removeTradeArrows(type?: 'buy' | 'sell'): void {
-    if (!this.lineTools || !this.isInitialized) return;
-    try {
-      if (typeof this.lineTools.removeLineToolsByIdRegex === 'function') {
-        const pattern = type
-          ? new RegExp(`^trade-arrow-${type}`)
-          : /^trade-arrow/;
-        this.lineTools.removeLineToolsByIdRegex(pattern);
-      }
-    } catch (error) {
-      console.error('❌ Failed to remove trade arrows:', error);
-    }
+    this.arrows.removeTradeArrows(type);
   }
 
   // ================================================================
@@ -842,7 +658,7 @@ export class ChartDrawingModule {
           mergedOptions,
           toolId
         );
-        this.saveDrawings();
+        this.persistence.saveDrawings();
       }
     } catch (error) {
       console.error('❌ Failed to update tool properties:', error);
@@ -871,7 +687,6 @@ export class ChartDrawingModule {
     if (!this.lineTools || !this.isInitialized) return;
 
     try {
-      // check locked
       if (typeof this.lineTools.getLineToolByID === 'function') {
         const toolDataJson = this.lineTools.getLineToolByID(toolId);
         if (toolDataJson) {
@@ -889,30 +704,16 @@ export class ChartDrawingModule {
         }
       }
 
-      // ✅ Remove from localStorage immediately
-      this.removeToolFromStorage(toolId);
+      // ✅ Mark deleted in metaMap — prevents saveDrawings from restoring it
+      this.persistence.deleteMeta(toolId);
 
-      // ✅ Remove from metaMap
-      this._metaMap.delete(toolId);
+      // ✅ Remove from localStorage immediately
+      this.persistence.removeToolFromStorage(toolId);
 
       console.log(`🗑️ Tool ${toolId} deleted`);
 
     } catch (error) {
       console.error('❌ Failed to delete tool:', error);
-    }
-  }
-
-  // ✅ Fix 3 — remove single tool from localStorage without touching engine
-  private removeToolFromStorage(toolId: string): void {
-    try {
-      const saved = localStorage.getItem(this.STORAGE_KEY);
-      if (!saved) return;
-      const tools = JSON.parse(saved);
-      if (!Array.isArray(tools)) return;
-      const filtered = tools.filter((t: any) => t.id !== toolId);
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
-    } catch (error) {
-      console.error('❌ Failed to remove tool from storage:', error);
     }
   }
 
@@ -981,7 +782,7 @@ export class ChartDrawingModule {
     try {
       if (typeof this.lineTools.createOrUpdateLineTool === 'function') {
         this.lineTools.createOrUpdateLineTool(type, points, options, id);
-        this.saveDrawings();
+        this.persistence.saveDrawings();
       }
     } catch (error) {
       console.error('❌ Failed to create/update line tool:', error);
@@ -993,7 +794,7 @@ export class ChartDrawingModule {
     try {
       if (typeof this.lineTools.applyLineToolOptions === 'function') {
         this.lineTools.applyLineToolOptions(toolData);
-        this.saveDrawings();
+        this.persistence.saveDrawings();
       }
     } catch (error) {
       console.error('❌ Failed to apply line tool options:', error);
@@ -1014,151 +815,18 @@ export class ChartDrawingModule {
   }
 
   // ================================================================
-  // PERSISTENCE
+  // PERSISTENCE — delegate
   // ================================================================
 
-  public saveDrawings(): void {
-    if (!this.lineTools || !this.isInitialized) return;
-    try {
-      const allDrawings = this.exportDrawings();
-      const tools       = JSON.parse(allDrawings);
-
-      const persistable = Array.isArray(tools)
-        ? tools
-            .filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
-            .map((t: any) => {
-              // ✅ Fix 3 — inject _meta into each tool before saving
-              const meta = this._metaMap.get(t.id);
-              return {
-                ...t,
-                _meta: meta ?? {
-                  timeframe: this.currentTimeframe,
-                  symbol:    this.currentSymbol,
-                  allTF:     true,
-                  deleted:   false
-                }
-              };
-            })
-        : [];
-
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(persistable));
-    } catch (error) {
-      console.error('❌ Failed to save drawings:', error);
-    }
-  }
-
-  // ✅ Fix 3 — purge deleted tools before saving on beforeunload
-  private purgeAndSave(): void {
-    if (!this.lineTools || !this.isInitialized) return;
-    try {
-      const allDrawings = this.exportDrawings();
-      const tools       = JSON.parse(allDrawings);
-
-      const persistable = Array.isArray(tools)
-        ? tools
-            .filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
-            .map((t: any) => ({
-              ...t,
-              _meta: this._metaMap.get(t.id) ?? {
-                timeframe: this.currentTimeframe,
-                symbol:    this.currentSymbol,
-                allTF:     true,
-                deleted:   false
-              }
-            }))
-            .filter((t: any) => !t._meta.deleted)
-        : [];
-
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(persistable));
-    } catch (error) {
-      console.error('❌ Failed to purge and save drawings:', error);
-    }
-  }
-
-  private async loadDrawings(): Promise<void> {
-    if (!this.lineTools || !this.isInitialized) return;
-    try {
-      const saved = localStorage.getItem(this.STORAGE_KEY);
-
-      if (saved && saved !== '[]') {
-        const tools = JSON.parse(saved);
-        if (Array.isArray(tools) && tools.length > 0) {
-          const groupsNeeded = new Set<string>();
-          tools.forEach((tool: any) => {
-            if (NON_PERSISTENT_TOOLS.has(tool.toolType)) return;
-            if (tool._meta?.deleted) return;
-            const group = TOOL_GROUP_MAP[tool.toolType];
-            if (group) groupsNeeded.add(group);
-          });
-
-          await Promise.all(
-            Array.from(groupsNeeded).map(g => this.loadAndRegisterGroup(g))
-          );
-        }
-
-        const persistable = Array.isArray(tools)
-          ? tools.filter((t: any) =>
-              !NON_PERSISTENT_TOOLS.has(t.toolType) &&
-              !t._meta?.deleted
-            )
-          : [];
-
-        if (persistable.length > 0) {
-          // ✅ Fix 3 — restore _meta into metaMap, strip _meta before passing to core
-          persistable.forEach((t: any) => {
-            if (t._meta && t.id) {
-              this._metaMap.set(t.id, t._meta);
-            }
-          });
-
-          const cleanTools = persistable.map(({ _meta, ...rest }: any) => rest);
-          this.importDrawings(JSON.stringify(cleanTools));
-
-          // ✅ Fix 3 — apply TF visibility after load
-          this.applyTFVisibility(this.currentTimeframe);
-        }
-
-        console.log(`✅ Drawings restored for ${this.currentSymbol} ${this.currentTimeframe}`);
-
-      } else {
-        console.log(`📋 No drawings for ${this.currentSymbol} ${this.currentTimeframe}`);
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to load drawings:', error);
-    }
-  }
-
-  public clearSavedDrawings(): void {
-    try {
-      localStorage.removeItem(this.STORAGE_KEY);
-    } catch (error) {
-      console.error('❌ Failed to clear saved drawings:', error);
-    }
-  }
+  public saveDrawings(): void          { this.persistence.saveDrawings(); }
+  public clearSavedDrawings(): void    { this.persistence.clearSavedDrawings(); }
 
   public exportDrawings(): string {
-    if (!this.lineTools || !this.isInitialized) return '[]';
-    try {
-      if (typeof this.lineTools.exportLineTools === 'function') {
-        return this.lineTools.exportLineTools();
-      }
-    } catch (error) {
-      console.error('❌ Failed to export drawings:', error);
-    }
-    return '[]';
+    return this.persistence.exportDrawings();
   }
 
   public importDrawings(json: string): void {
-    if (!this.lineTools || !this.isInitialized) return;
-    try {
-      if (typeof this.lineTools.importLineTools === 'function') {
-        this.lineTools.importLineTools(json);
-        console.log('✅ Drawings imported successfully');
-      }
-    } catch (error) {
-      console.error('❌ Failed to import drawings:', error);
-    }
+    this.persistence.importDrawings(json);
   }
 
   // ================================================================
@@ -1226,7 +894,7 @@ export class ChartDrawingModule {
   public updateSeries(newSeries: ISeriesApi<SeriesType>): void {
     if (!this.chart || !this.lineTools) return;
 
-    const savedDrawings = this.exportDrawings();
+    const savedDrawings = this.persistence.exportDrawings();
     this.series = newSeries;
 
     try {
@@ -1247,12 +915,15 @@ export class ChartDrawingModule {
 
       if (savedDrawings && savedDrawings !== '[]') {
         try {
-          const tools = JSON.parse(savedDrawings);
+          const tools      = JSON.parse(savedDrawings);
           const persistable = Array.isArray(tools)
-            ? tools.filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
+            ? tools.filter((t: any) => {
+                const meta = this.persistence.getMeta(t.id);
+                return !meta?.deleted;
+              })
             : [];
           if (persistable.length > 0) {
-            this.importDrawings(JSON.stringify(persistable));
+            this.persistence.importDrawings(JSON.stringify(persistable));
           }
         } catch (e) {}
       }
@@ -1292,7 +963,7 @@ export class ChartDrawingModule {
   public destroy(): void {
     console.log('🧹 Destroying drawing module...');
 
-    this.purgeAndSave();
+    this.persistence.purgeAndSave();
 
     if (this.themeObserver) {
       this.themeObserver.disconnect();
@@ -1310,6 +981,7 @@ export class ChartDrawingModule {
     }
 
     this.pendingToolFormatting = [];
+    this.arrows.destroy();
 
     const oldLineTools = this.lineTools;
     this.lineTools     = null;
@@ -1318,7 +990,7 @@ export class ChartDrawingModule {
     this.isSelectionMode = false;
 
     if (typeof window !== 'undefined') {
-      window.removeEventListener('beforeunload', this.purgeAndSave);
+      window.removeEventListener('beforeunload', () => this.persistence.purgeAndSave());
     }
 
     setTimeout(() => {
@@ -1331,7 +1003,7 @@ export class ChartDrawingModule {
     this.series        = null;
     this.isInitialized = false;
     this.eventHandlers = {};
-    this._metaMap.clear();
+    this.persistence.clearMeta();
 
     console.log('✅ Drawing module destroyed');
   }
