@@ -3,18 +3,14 @@
 // Real MT5 prices via WebSocket
 // localStorage persists watchlist state
 // Daily change % from cached D1 open
+// Config-driven — symbols from backend config, no hardcoded list
 // ================================================================
 
 import { ConnectionManager } from '../core/connection-manager';
 
 interface WatchlistSymbol {
-    id:     string;
-    name:   string;
-    cat:    string;
-    type:   'forex' | 'metal' | 'crypto' | 'index';
-    base?:  string;
-    quote?: string;
-    img?:   string;
+    name:        string;
+    description: string;
 }
 
 interface ElementRefs {
@@ -22,8 +18,7 @@ interface ElementRefs {
     change: HTMLElement;
 }
 
-const DEFAULT_SYMBOLS = ['BTCUSD', 'EURUSD', 'XAUUSD', 'ETHUSD', 'USDJPY'];
-const STORAGE_KEY     = 'watchlist_symbols';
+const STORAGE_KEY = 'watchlist_symbols';
 
 export class WatchlistModule {
 
@@ -36,37 +31,57 @@ export class WatchlistModule {
     private added:       Set<string> = new Set();
     private currentSort: 'az' | 'chg' = 'az';
 
-    // ✅ Fix #12 — element reference map for direct DOM access
+    // ── Element reference map for direct DOM access ──
     private elementRefs: Map<string, ElementRefs> = new Map();
 
-    // ✅ Cache last known price + change per symbol to skip redundant DOM writes
+    // ── Cache last known price + change per symbol ──
     private priceCache: Map<string, { price: number; change?: number }> = new Map();
 
-    // ── Full symbol database ──
-    private readonly SYMBOLS: WatchlistSymbol[] = [
-        { id: 'EURUSD',  name: 'EUR/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'eu', quote: 'us' },
-        { id: 'GBPUSD',  name: 'GBP/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'gb', quote: 'us' },
-        { id: 'USDJPY',  name: 'USD/JPY',  cat: 'Forex · Major',  type: 'forex',  base: 'us', quote: 'jp' },
-        { id: 'AUDUSD',  name: 'AUD/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'au', quote: 'us' },
-        { id: 'USDCAD',  name: 'USD/CAD',  cat: 'Forex · Major',  type: 'forex',  base: 'us', quote: 'ca' },
-        { id: 'NZDUSD',  name: 'NZD/USD',  cat: 'Forex · Major',  type: 'forex',  base: 'nz', quote: 'us' },
-        { id: 'USDCHF',  name: 'USD/CHF',  cat: 'Forex · Major',  type: 'forex',  base: 'us', quote: 'ch' },
-        { id: 'EURGBP',  name: 'EUR/GBP',  cat: 'Forex · Cross',  type: 'forex',  base: 'eu', quote: 'gb' },
-        { id: 'EURJPY',  name: 'EUR/JPY',  cat: 'Forex · Cross',  type: 'forex',  base: 'eu', quote: 'jp' },
-        { id: 'GBPJPY',  name: 'GBP/JPY',  cat: 'Forex · Cross',  type: 'forex',  base: 'gb', quote: 'jp' },
-        { id: 'XAUUSD',  name: 'XAU/USD',  cat: 'Metal · Gold',   type: 'metal',  img: 'https://assets.coincap.io/assets/icons/xau@2x.png'  },
-        { id: 'XAGUSD',  name: 'XAG/USD',  cat: 'Metal · Silver', type: 'metal',  img: 'https://assets.coincap.io/assets/icons/xag@2x.png'  },
-        { id: 'BTCUSD',  name: 'BTC/USD',  cat: 'Crypto',         type: 'crypto', img: 'https://assets.coincap.io/assets/icons/btc@2x.png'  },
-        { id: 'ETHUSD',  name: 'ETH/USD',  cat: 'Crypto',         type: 'crypto', img: 'https://assets.coincap.io/assets/icons/eth@2x.png'  },
-        { id: 'SOLUSD',  name: 'SOL/USD',  cat: 'Crypto',         type: 'crypto', img: 'https://assets.coincap.io/assets/icons/sol@2x.png'  },
-        { id: 'US30',    name: 'US30',     cat: 'Index · Dow',    type: 'index',  img: 'https://flagcdn.com/w320/us.png'                     },
-        { id: 'US500',   name: 'US500',    cat: 'Index · S&P500', type: 'index',  img: 'https://flagcdn.com/w320/us.png'                     },
-        { id: 'NAS100',  name: 'NAS100',   cat: 'Index · Nasdaq', type: 'index',  img: 'https://flagcdn.com/w320/us.png'                     },
-        { id: 'GER40',   name: 'GER40',    cat: 'Index · DAX',    type: 'index',  img: 'https://flagcdn.com/w320/de.png'                     },
-        { id: 'UK100',   name: 'UK100',    cat: 'Index · FTSE',   type: 'index',  img: 'https://flagcdn.com/w320/gb.png'                     },
-    ];
+    // ── Config-driven symbol list from backend ──
+    private configSymbols: WatchlistSymbol[] = [];
 
-    // ✅ Fix #15 — connectionManager injected directly
+    // ── Frontend visual maps — decoration only, backend never sees these ──
+    private readonly symbolIconMap: Record<string, {
+        base:      string;
+        quote:     string;
+        baseType:  'flag' | 'icon';
+        quoteType: 'flag' | 'icon';
+    }> = {
+        'EURUSD':  { base: 'https://flagcdn.com/w320/eu.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'GBPUSD':  { base: 'https://flagcdn.com/w320/gb.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'USDJPY':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/jp.png', baseType: 'flag', quoteType: 'flag' },
+        'AUDUSD':  { base: 'https://flagcdn.com/w320/au.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'USDCAD':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/ca.png', baseType: 'flag', quoteType: 'flag' },
+        'NZDUSD':  { base: 'https://flagcdn.com/w320/nz.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'USDCHF':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/ch.png', baseType: 'flag', quoteType: 'flag' },
+        'EURGBP':  { base: 'https://flagcdn.com/w320/eu.png', quote: 'https://flagcdn.com/w320/gb.png', baseType: 'flag', quoteType: 'flag' },
+        'EURJPY':  { base: 'https://flagcdn.com/w320/eu.png', quote: 'https://flagcdn.com/w320/jp.png', baseType: 'flag', quoteType: 'flag' },
+        'GBPJPY':  { base: 'https://flagcdn.com/w320/gb.png', quote: 'https://flagcdn.com/w320/jp.png', baseType: 'flag', quoteType: 'flag' },
+        'XAUUSD':  { base: 'xau', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'XAGUSD':  { base: 'xag', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'BTCUSD':  { base: 'btc', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'ETHUSD':  { base: 'eth', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'SOLUSD':  { base: 'sol', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'LTCUSD':  { base: 'ltc', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'XRPUSD':  { base: 'xrp', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
+        'US30':    { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'US500':   { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'NAS100':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
+        'GER40':   { base: 'https://flagcdn.com/w320/de.png', quote: 'https://flagcdn.com/w320/de.png', baseType: 'flag', quoteType: 'flag' },
+        'UK100':   { base: 'https://flagcdn.com/w320/gb.png', quote: 'https://flagcdn.com/w320/gb.png', baseType: 'flag', quoteType: 'flag' },
+    };
+
+    private readonly iconCircleMap: Record<string, string> = {
+        'btc': '<i class="fab fa-bitcoin"></i>',
+        'eth': '<i class="fab fa-ethereum"></i>',
+        'sol': '<span>◎</span>',
+        'ltc': '<span>Ł</span>',
+        'xrp': '<span>X</span>',
+        'xau': '<i class="fas fa-coins"></i>',
+        'xag': '<i class="fas fa-coins"></i>',
+        'oil': '<i class="fas fa-oil-well"></i>',
+    };
+
     constructor(private connectionManager: ConnectionManager) {}
 
     // ================================================================
@@ -82,11 +97,19 @@ export class WatchlistModule {
 
         if (!this.container || !this.itemsEl) return;
 
-        this.loadFromStorage();
-        this.renderSymbols();
         this.bindEvents();
 
-        // ✅ FlatBuffers — primitives direct, no WebSocketMessage
+        // ── Listen for backend config ──
+        document.addEventListener('available-config-received', (e: Event) => {
+            const config = (e as CustomEvent).detail;
+            if (!config?.symbols) return;
+
+            this.configSymbols = config.symbols;
+            this.loadFromStorage();
+            this.renderSymbols();
+        });
+
+        // ── Tick updates ──
         this.connectionManager.onWatchlistUpdate((
             symbol, bid, ask, spread, time, change) =>
         {
@@ -104,13 +127,19 @@ export class WatchlistModule {
             if (saved) {
                 const symbols: string[] = JSON.parse(saved);
                 if (Array.isArray(symbols) && symbols.length > 0) {
-                    this.added = new Set(symbols);
-                    return;
+                    // ── Only keep symbols that exist in current config ──
+                    const validNames = new Set(this.configSymbols.map(s => s.name));
+                    const valid      = symbols.filter(s => validNames.has(s));
+                    if (valid.length > 0) {
+                        this.added = new Set(valid);
+                        return;
+                    }
                 }
             }
         } catch {}
 
-        this.added = new Set(DEFAULT_SYMBOLS);
+        // ── Default: first 5 from config ──
+        this.added = new Set(this.configSymbols.slice(0, 5).map(s => s.name));
         this.saveToStorage();
     }
 
@@ -132,7 +161,7 @@ export class WatchlistModule {
         this.itemsEl.innerHTML = '';
         this.elementRefs.clear();
 
-        const symbols = this.SYMBOLS.filter(s => this.added.has(s.id));
+        const symbols = this.configSymbols.filter(s => this.added.has(s.name));
         symbols.forEach((sym, idx) => {
             const item = this.buildWatchItem(sym);
             if (idx === 0) item.classList.add('active');
@@ -140,13 +169,12 @@ export class WatchlistModule {
         });
     }
 
-    // ✅ Fix #13 — createElement instead of innerHTML
     private buildWatchItem(sym: WatchlistSymbol): HTMLElement {
         const item = document.createElement('div');
         item.className = 'watch-item';
-        item.setAttribute('data-symbol', sym.id);
+        item.setAttribute('data-symbol', sym.name);
 
-        item.appendChild(this.buildIconElement(sym));
+        item.appendChild(this.buildIconElement(sym.name));
 
         const wrap = document.createElement('div');
         wrap.className = 'watch-symbol-wrap';
@@ -157,7 +185,7 @@ export class WatchlistModule {
 
         const catEl = document.createElement('div');
         catEl.className   = 'watch-category';
-        catEl.textContent = sym.cat;
+        catEl.textContent = sym.description;
 
         wrap.appendChild(nameEl);
         wrap.appendChild(catEl);
@@ -181,25 +209,37 @@ export class WatchlistModule {
         item.appendChild(chgEl);
         item.appendChild(deleteBtn);
 
-        // ✅ Fix #12 — store refs immediately after building
-        this.elementRefs.set(sym.id, { price: priceEl, change: chgEl });
+        this.elementRefs.set(sym.name, { price: priceEl, change: chgEl });
 
         return item;
     }
 
-    // ✅ Fix #13 — createElement for icon
-    private buildIconElement(sym: WatchlistSymbol): HTMLElement {
-        if (sym.type === 'forex') {
+    private buildIconElement(symbolName: string): HTMLElement {
+        // ── Strip broker suffix for icon lookup e.g. ETHUSDm → ETHUSD ──
+        const lookup = this.stripSuffix(symbolName);
+        const config = this.symbolIconMap[lookup];
+
+        if (!config) {
+            const fallback = document.createElement('div');
+            fallback.className = 'wl-flag-container';
+            const circle = document.createElement('div');
+            circle.className = 'wl-flag-circle wl-flag-base';
+            circle.style.background = '#444';
+            fallback.appendChild(circle);
+            return fallback;
+        }
+
+        if (config.baseType === 'flag' && config.quoteType === 'flag') {
             const container = document.createElement('div');
             container.className = 'wl-flag-container';
 
             const base = document.createElement('div');
-            base.className            = 'wl-flag-circle wl-flag-base';
-            base.style.backgroundImage = `url('https://flagcdn.com/w320/${sym.base}.png')`;
+            base.className             = 'wl-flag-circle wl-flag-base';
+            base.style.backgroundImage = `url('${config.base}')`;
 
             const quote = document.createElement('div');
-            quote.className            = 'wl-flag-circle wl-flag-quote';
-            quote.style.backgroundImage = `url('https://flagcdn.com/w320/${sym.quote}.png')`;
+            quote.className             = 'wl-flag-circle wl-flag-quote';
+            quote.style.backgroundImage = `url('${config.quote}')`;
 
             container.appendChild(base);
             container.appendChild(quote);
@@ -210,25 +250,21 @@ export class WatchlistModule {
         wrap.className = 'wl-symbol-icon-wrap';
 
         const iconWrap = document.createElement('div');
-        iconWrap.className = `wl-symbol-icon ${sym.type}`;
+        iconWrap.className = `wl-symbol-icon`;
 
-        const img = document.createElement('img');
-        img.src = sym.img || '';
-        img.alt = sym.name;
+        if (config.baseType === 'icon') {
+            iconWrap.innerHTML = this.iconCircleMap[config.base] || '';
+        } else {
+            iconWrap.style.backgroundImage = `url('${config.base}')`;
+        }
 
-        const fallback = document.createElement('i');
-        fallback.className    = 'fas fa-circle-dot';
-        fallback.style.display = 'none';
-
-        img.addEventListener('error', () => {
-            img.style.display      = 'none';
-            fallback.style.display = 'flex';
-        });
-
-        iconWrap.appendChild(img);
-        iconWrap.appendChild(fallback);
         wrap.appendChild(iconWrap);
         return wrap;
+    }
+
+    // ── Strip common broker suffixes for icon/flag lookup ──
+    private stripSuffix(name: string): string {
+        return name.replace(/[mMcC]$/, '').replace(/\.(.*)/,'');
     }
 
     // ================================================================
@@ -258,7 +294,6 @@ export class WatchlistModule {
             }
         });
 
-        // ✅ Fix #14 — event delegation on itemsEl
         this.itemsEl?.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
             const delBtn = target.closest('.watch-delete');
@@ -279,7 +314,7 @@ export class WatchlistModule {
     }
 
     // ================================================================
-    // SEARCH
+    // SEARCH — filters configSymbols
     // ================================================================
 
     private toggleSearch(): void {
@@ -298,17 +333,16 @@ export class WatchlistModule {
         if (this.searchResults) this.searchResults.innerHTML = '';
     }
 
-    // ✅ Fix #13 — createElement in search results
     private handleSearch(): void {
         const q = this.searchInput?.value.trim().toLowerCase() || '';
         if (!this.searchResults) return;
         this.searchResults.innerHTML = '';
         if (!q) return;
 
-        const matches = this.SYMBOLS.filter(s =>
-            !this.added.has(s.id) &&
+        const matches = this.configSymbols.filter(s =>
+            !this.added.has(s.name) &&
             (s.name.toLowerCase().includes(q) ||
-             s.id.toLowerCase().includes(q))
+             s.description.toLowerCase().includes(q))
         ).slice(0, 5);
 
         if (!matches.length) {
@@ -323,7 +357,7 @@ export class WatchlistModule {
             const item = document.createElement('div');
             item.className = 'search-result-item';
 
-            item.appendChild(this.buildIconElement(sym));
+            item.appendChild(this.buildIconElement(sym.name));
 
             const nameSpan = document.createElement('span');
             nameSpan.className   = 'search-result-name';
@@ -331,7 +365,7 @@ export class WatchlistModule {
 
             const catSpan = document.createElement('span');
             catSpan.className   = 'search-result-cat';
-            catSpan.textContent = sym.cat;
+            catSpan.textContent = sym.description;
 
             item.appendChild(nameSpan);
             item.appendChild(catSpan);
@@ -346,15 +380,14 @@ export class WatchlistModule {
     // ================================================================
 
     private addSymbol(sym: WatchlistSymbol): void {
-        this.added.add(sym.id);
+        this.added.add(sym.name);
         this.saveToStorage();
 
         const item = this.buildWatchItem(sym);
         this.itemsEl?.appendChild(item);
         this.closeSearch();
 
-        // ✅ Fix #15 — direct command
-        this.connectionManager.sendCommand(`WATCHLIST_ADD_${sym.id}`);
+        this.connectionManager.sendCommand(`WATCHLIST_ADD_${sym.name}`);
     }
 
     private removeSymbol(id: string, el: HTMLElement): void {
@@ -362,11 +395,9 @@ export class WatchlistModule {
         this.saveToStorage();
         el.remove();
 
-        // ✅ Fix #12 — clean up refs on remove
         this.elementRefs.delete(id);
         this.priceCache.delete(id);
 
-        // ✅ Fix #15 — direct command
         this.connectionManager.sendCommand(`WATCHLIST_REMOVE_${id}`);
 
         const first = this.itemsEl?.querySelector('.watch-item');
@@ -389,7 +420,7 @@ export class WatchlistModule {
     }
 
     // ================================================================
-    // CHART SWITCH
+    // CHART SWITCH — dispatches broker symbol directly
     // ================================================================
 
     private switchChartSymbol(symbol: string): void {
@@ -399,9 +430,7 @@ export class WatchlistModule {
     }
 
     // ================================================================
-    // PRICE UPDATE
-    // ✅ Fix #9/#12 — direct refs, no querySelector on every tick
-    // Called directly from onWatchlistUpdate callback
+    // PRICE UPDATE — direct refs, no querySelector on every tick
     // ================================================================
 
     public updatePrice(
