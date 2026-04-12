@@ -414,6 +414,7 @@ export class ConnectionManager {
                 break;
 
             case 'available_config':
+                console.log('RAW available_config:', msg.data);
                 if (this.callbacks.onAvailableConfig) {
                     this.callbacks.onAvailableConfig(msg.data);
                 }
