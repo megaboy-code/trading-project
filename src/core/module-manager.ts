@@ -529,6 +529,11 @@ export class ModuleManager {
         document.addEventListener('journal-refresh', () => {
             // 🐛 Refresh temporarily disabled — scope mismatch under investigation
         });
+
+        document.addEventListener('symbol-search-request', (e: Event) => {
+            const { query } = (e as CustomEvent).detail;
+            if (query) this.connectionManager.searchSymbols(query);
+        });
     }
 
     // ==================== LAZY LOADERS ====================
