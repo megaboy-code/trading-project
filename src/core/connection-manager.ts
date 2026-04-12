@@ -3,7 +3,7 @@
 // FlatBuffers binary protocol — replaces all JSON
 // ================================================================
 
-import { MegaFlowzDecoder, DecodedMessage, NotificationPayload } from '../generated/MegaFlowzDecoder';
+import { MegaFlowzDecoder, DecodedMessage, NotificationPayload, AvailableConfigPayload } from '../generated/MegaFlowzDecoder';
 import { AccountInfo, PositionData }                             from '../types';
 
 export interface ConnectionCallbacks {
@@ -22,7 +22,8 @@ export interface ConnectionCallbacks {
     onError?:            (message: string) => void;
     onAutoTrading?:      (enabled: boolean, message: string) => void;
     onCacheCleared?:     (message: string) => void;
-    onJournalData?:      (trades: any[], scope: string) => void;  // ← scope added
+    onJournalData?:      (trades: any[], scope: string) => void;
+    onAvailableConfig?:  (data: AvailableConfigPayload) => void;
 }
 
 export class ConnectionManager {
@@ -167,6 +168,11 @@ export class ConnectionManager {
         this.sendCommand(`GET_JOURNAL_MONTH_${year}_${month}`);
     }
 
+    // ── Symbol search — searches cached MT5 symbol list ──
+    public searchSymbols(query: string): void {
+        this.sendCommand(`SEARCH_SYMBOLS_${query.toUpperCase()}`);
+    }
+
     // ==================== STRATEGY COMMANDS ====================
 
     public deployStrategy(
@@ -226,6 +232,7 @@ export class ConnectionManager {
     public onAutoTrading(cb: ConnectionCallbacks['onAutoTrading']): void           { this.callbacks.onAutoTrading      = cb; }
     public onCacheCleared(cb: ConnectionCallbacks['onCacheCleared']): void         { this.callbacks.onCacheCleared     = cb; }
     public onJournalData(cb: ConnectionCallbacks['onJournalData']): void           { this.callbacks.onJournalData      = cb; }
+    public onAvailableConfig(cb: ConnectionCallbacks['onAvailableConfig']): void   { this.callbacks.onAvailableConfig  = cb; }
 
     // ==================== WEBSOCKET SETUP ====================
 
@@ -262,7 +269,6 @@ export class ConnectionManager {
         };
 
         this.ws.onmessage = (event: MessageEvent) => {
-            // ── All messages are binary FlatBuffers ──
             if (!(event.data instanceof ArrayBuffer)) return;
             const msg = MegaFlowzDecoder.decode(event.data);
             this.routeMessage(msg);
@@ -392,20 +398,24 @@ export class ConnectionManager {
                 }
                 break;
 
-            // ── Universal notification — all rich toasts ──
             case 'notification':
                 if (this.callbacks.onNotification) {
                     this.callbacks.onNotification(msg.data);
                 }
                 break;
 
-            // ── Journal data — split by scope ──
             case 'journal_data':
                 if (this.callbacks.onJournalData) {
                     this.callbacks.onJournalData(
                         msg.data.trades,
                         msg.data.scope
                     );
+                }
+                break;
+
+            case 'available_config':
+                if (this.callbacks.onAvailableConfig) {
+                    this.callbacks.onAvailableConfig(msg.data);
                 }
                 break;
 
