@@ -1,5 +1,5 @@
 // ================================================================
-// 📋 WATCHLIST MODULE
+// 📋 WATCHLIST MODULE-
 // Real MT5 prices via WebSocket
 // localStorage persists watchlist state
 // Daily change % from cached D1 open
