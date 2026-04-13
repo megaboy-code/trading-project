@@ -57,6 +57,15 @@ const categoryMap: Record<string, string[]> = {
     top_movers:  ['XAUUSD', 'BTCUSD', 'XRPUSD', 'NAS100', 'TSLA', 'AAPL'],
 };
 
+// ── Strip broker suffixes for icon lookup e.g. ETHUSDm → ETHUSD ──
+function stripBrokerSuffix(symbol: string): string {
+    return symbol
+        .toUpperCase()
+        .replace('/', '')
+        .replace(/\.[A-Z0-9]+$/, '')
+        .replace(/[MC]$/, '');
+}
+
 // ================================================================
 // LOCAL CONFIG INTERFACES — no imports from generated files
 // ================================================================
@@ -106,11 +115,10 @@ export class ChartUI {
     private activeCategory: string = 'favorites';
 
     // ── Bound listeners ──
-    private boundClickOutside:       (e: Event) => void;
-    private boundIndicatorClose:     (e: Event) => void;
-    private boundSymbolModalClose:   (e: Event) => void;
-    private boundAvailableConfig:    (e: Event) => void;
-    private boundSymbolSearchResult: (e: Event) => void;
+    private boundClickOutside:     (e: Event) => void;
+    private boundIndicatorClose:   (e: Event) => void;
+    private boundSymbolModalClose: (e: Event) => void;
+    private boundAvailableConfig:  (e: Event) => void;
 
     // ── Active indicator category ──
     private activeIndCat: string = 'favorites';
@@ -126,11 +134,10 @@ export class ChartUI {
         this.currentTimeframe = initialTimeframe;
         this.currentChartType = initialChartType;
 
-        this.boundClickOutside       = () => this.closeAllDropdowns();
-        this.boundIndicatorClose     = (e: Event) => this.handleIndicatorClickOutside(e);
-        this.boundSymbolModalClose   = (e: Event) => this.handleSymbolModalClickOutside(e);
-        this.boundAvailableConfig    = (e: Event) => this.handleAvailableConfig(e);
-        this.boundSymbolSearchResult = (e: Event) => this.handleSymbolSearchResult(e);
+        this.boundClickOutside     = () => this.closeAllDropdowns();
+        this.boundIndicatorClose   = (e: Event) => this.handleIndicatorClickOutside(e);
+        this.boundSymbolModalClose = (e: Event) => this.handleSymbolModalClickOutside(e);
+        this.boundAvailableConfig  = (e: Event) => this.handleAvailableConfig(e);
     }
 
     public initialize(): void {
@@ -146,9 +153,6 @@ export class ChartUI {
 
         // ── Listen for config from backend ──
         document.addEventListener('available-config-received', this.boundAvailableConfig);
-
-        // ── Listen for symbol search results ──
-        document.addEventListener('symbol-search-result', this.boundSymbolSearchResult);
 
         this.isInitialized = true;
     }
@@ -182,24 +186,21 @@ export class ChartUI {
 
         if (!tfGroup) return;
 
-        // ── Remove old visible buttons (keep tfMore) ──
         Array.from(tfGroup.children).forEach(child => {
             if ((child as HTMLElement).id !== 'tfMore') {
                 tfGroup.removeChild(child);
             }
         });
 
-        // ── Inject visible TF buttons before tfMore ──
         this.config.timeframes_visible.forEach(tf => {
             const btn = document.createElement('button');
-            btn.className    = 'tf-btn';
-            btn.dataset.tf   = tf;
-            btn.textContent  = tf;
+            btn.className   = 'tf-btn';
+            btn.dataset.tf  = tf;
+            btn.textContent = tf;
             if (tf === this.currentTimeframe) btn.classList.add('active');
             tfGroup.insertBefore(btn, tfMore);
         });
 
-        // ── Inject more TF items ──
         if (tfMoreDropdown) {
             tfMoreDropdown.innerHTML = '';
             this.config.timeframes_more.forEach(tf => {
@@ -223,12 +224,9 @@ export class ChartUI {
         const modalBody = document.getElementById('symbolModalBody');
         if (!modalBody) return;
 
-        // ── Keep empty state elements ──
         const emptyFav    = document.getElementById('symbolEmptyFavorites');
         const emptySearch = document.getElementById('symbolEmptySearch');
-        const searching   = document.getElementById('symbolSearching');
 
-        // ── Clear existing rows ──
         modalBody.querySelectorAll('.symbol-modal-row').forEach(el => el.remove());
 
         const favorites = this.loadSymbolFavorites();
@@ -238,15 +236,14 @@ export class ChartUI {
             modalBody.insertBefore(row, emptyFav);
         });
 
-        // ── Apply current category filter ──
         this.filterByCategory(this.activeCategory);
     }
 
     private createSymbolRow(sym: ConfigSymbol, isStarred: boolean): HTMLElement {
         const row = document.createElement('div');
-        row.className        = 'symbol-modal-row';
-        row.dataset.value    = sym.name;
-        row.dataset.desc     = sym.description;
+        row.className     = 'symbol-modal-row';
+        row.dataset.value = sym.name;
+        row.dataset.desc  = sym.description;
 
         if (sym.name === this.currentSymbol) row.classList.add('active');
 
@@ -268,7 +265,8 @@ export class ChartUI {
     }
 
     private buildFlagStack(symbol: string): string {
-        const config = symbolIconMap[symbol];
+        const lookup = stripBrokerSuffix(symbol);
+        const config = symbolIconMap[lookup];
 
         if (!config) {
             return `<div class="symbol-flag-stack">
@@ -293,20 +291,6 @@ export class ChartUI {
 
     private renderIndicatorRows(): void {
         if (!this.config) return;
-
-        const list = document.getElementById('indicatorsRightList');
-        if (!list) return;
-
-        // ── Keep empty state elements ──
-        const emptyFav    = document.getElementById('indEmptyFavorites');
-        const emptySearch = document.getElementById('indEmptySearch');
-
-        // ── Clear existing rows ──
-        list.querySelectorAll('.ind-row').forEach(el => el.remove());
-
-        const favorites = this.loadFavorites();
-
-        // ── Render based on active category ──
         this.renderIndCategory(this.activeIndCat);
     }
 
@@ -318,7 +302,6 @@ export class ChartUI {
 
         const label = document.getElementById('indicatorsRightLabel');
 
-        // ── Clear existing rows ──
         list.querySelectorAll('.ind-row').forEach(el => el.remove());
 
         const favorites = this.loadFavorites();
@@ -332,11 +315,7 @@ export class ChartUI {
 
         if (label) label.textContent = labelMap[cat] || cat;
 
-        let items: ConfigItem[]  = [];
-        let type:  string        = cat;
-
         if (cat === 'favorites') {
-            // ── Build favorites from all categories ──
             const allItems = [
                 ...this.config.indicators.map(i => ({ ...i, type: 'indicator' })),
                 ...this.config.strategies.map(i => ({ ...i, type: 'strategy' })),
@@ -351,7 +330,6 @@ export class ChartUI {
             }
 
             document.getElementById('indEmptyFavorites')?.style.setProperty('display', 'none');
-
             favItems.forEach(item => {
                 list.appendChild(this.createIndRow(item, item.type, true));
             });
@@ -360,22 +338,27 @@ export class ChartUI {
 
         document.getElementById('indEmptyFavorites')?.style.setProperty('display', 'none');
 
+        let items: ConfigItem[] = [];
         if (cat === 'indicators') items = this.config.indicators;
         if (cat === 'strategies') items = this.config.strategies;
         if (cat === 'patterns')   items = this.config.patterns;
 
         items.forEach(item => {
             const isStarred = favorites.includes(item.key);
-            list.appendChild(this.createIndRow(item, cat === 'indicators' ? 'indicator' : cat.slice(0, -1), isStarred));
+            list.appendChild(this.createIndRow(
+                item,
+                cat === 'indicators' ? 'indicator' : cat.slice(0, -1),
+                isStarred
+            ));
         });
     }
 
     private createIndRow(item: ConfigItem, type: string, isStarred: boolean): HTMLElement {
         const row = document.createElement('div');
-        row.className      = 'ind-row';
-        row.dataset.value  = item.key;
-        row.dataset.type   = type;
-        row.dataset.name   = item.label;
+        row.className     = 'ind-row';
+        row.dataset.value = item.key;
+        row.dataset.type  = type;
+        row.dataset.name  = item.label;
 
         const starClass  = isStarred ? 'ind-star-btn active' : 'ind-star-btn';
         const badgeClass = `ind-badge ${item.badge}`;
@@ -456,7 +439,7 @@ export class ChartUI {
     // ================================================================
 
     private setupSymbolControls(): void {
-        const symbolPill  = document.getElementById('symbolPill');
+        const symbolPill   = document.getElementById('symbolPill');
         const hiddenSelect = document.getElementById('chartPairsSelect') as HTMLSelectElement;
 
         if (!symbolPill || !hiddenSelect) return;
@@ -486,10 +469,10 @@ export class ChartUI {
     // ================================================================
 
     private setupSymbolModal(): void {
-        const overlay      = document.getElementById('symbolModalOverlay');
-        const closeBtn     = document.getElementById('symbolModalClose');
-        const searchInput  = document.getElementById('symbolSearchInput') as HTMLInputElement;
-        const hiddenSelect = document.getElementById('chartPairsSelect') as HTMLSelectElement;
+        const overlay        = document.getElementById('symbolModalOverlay');
+        const closeBtn       = document.getElementById('symbolModalClose');
+        const searchInput    = document.getElementById('symbolSearchInput') as HTMLInputElement;
+        const hiddenSelect   = document.getElementById('chartPairsSelect') as HTMLSelectElement;
         const categorySelect = document.getElementById('symbolCategorySelect') as HTMLSelectElement;
 
         if (!overlay) return;
@@ -503,7 +486,6 @@ export class ChartUI {
 
         document.addEventListener('click', this.boundSymbolModalClose);
 
-        // ── Category filter ──
         if (categorySelect) {
             categorySelect.addEventListener('change', (e: Event) => {
                 const cat = (e.target as HTMLSelectElement).value;
@@ -512,7 +494,7 @@ export class ChartUI {
             });
         }
 
-        // ── Search input ──
+        // ── Search — local only, no backend requests ──
         if (searchInput) {
             searchInput.addEventListener('input', (e: Event) => {
                 const query = (e.target as HTMLInputElement).value;
@@ -521,13 +503,11 @@ export class ChartUI {
             searchInput.addEventListener('click', (e: Event) => e.stopPropagation());
         }
 
-        // ── Row click + star click ──
         const modalBody = document.getElementById('symbolModalBody');
         if (modalBody) {
             modalBody.addEventListener('click', (e: Event) => {
                 const target = e.target as HTMLElement;
 
-                // ── Star click ──
                 const starBtn = target.closest('.symbol-star-btn') as HTMLElement;
                 if (starBtn) {
                     e.stopPropagation();
@@ -536,7 +516,6 @@ export class ChartUI {
                     return;
                 }
 
-                // ── Row click ──
                 const row = target.closest('.symbol-modal-row') as HTMLElement;
                 if (!row) return;
 
@@ -556,82 +535,22 @@ export class ChartUI {
         }
     }
 
+    // ── Local search only — no backend requests ──
     private handleSymbolSearch(query: string): void {
         const trimmed = query.trim();
 
         if (trimmed === '') {
-            this.clearSearchState();
             this.filterByCategory(this.activeCategory);
+            const emptySearch = document.getElementById('symbolEmptySearch');
+            if (emptySearch) emptySearch.style.display = 'none';
             return;
         }
 
-        // ── Local filter first ──
         this.filterSymbolModal(trimmed.toLowerCase());
-
-        // ── Debounce MT5 search for unknown symbols ──
-        if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
-        this.searchDebounceTimer = setTimeout(() => {
-            if (trimmed.length >= 2 && trimmed !== this.lastSearchQuery) {
-                this.lastSearchQuery = trimmed;
-                this.showSearchingState();
-                document.dispatchEvent(new CustomEvent('symbol-search-request', {
-                    detail: { query: trimmed }
-                }));
-            }
-        }, 400);
-    }
-
-    private handleSymbolSearchResult(e: Event): void {
-        const { symbols } = (e as CustomEvent).detail as { symbols: ConfigSymbol[] };
-        this.hideSearchingState();
-
-        if (!symbols || symbols.length === 0) return;
-
-        const modalBody = document.getElementById('symbolModalBody');
-        if (!modalBody) return;
-
-        const favorites = this.loadSymbolFavorites();
-
-        // ── Add results not already in list ──
-        const existing = new Set(
-            Array.from(modalBody.querySelectorAll('.symbol-modal-row'))
-                .map(el => (el as HTMLElement).dataset.value)
-        );
-
-        const emptyFav = document.getElementById('symbolEmptyFavorites');
-
-        symbols.forEach(sym => {
-            if (existing.has(sym.name)) return;
-            const row = this.createSymbolRow(sym, favorites.includes(sym.name));
-            row.classList.add('search-result');
-            modalBody.insertBefore(row, emptyFav);
-        });
-    }
-
-    private showSearchingState(): void {
-        const el = document.getElementById('symbolSearching');
-        if (el) el.style.display = 'flex';
-    }
-
-    private hideSearchingState(): void {
-        const el = document.getElementById('symbolSearching');
-        if (el) el.style.display = 'none';
-    }
-
-    private clearSearchState(): void {
-        this.hideSearchingState();
-        this.lastSearchQuery = '';
-
-        // ── Remove search result rows ──
-        const modalBody = document.getElementById('symbolModalBody');
-        if (modalBody) {
-            modalBody.querySelectorAll('.symbol-modal-row.search-result')
-                .forEach(el => el.remove());
-        }
     }
 
     private openSymbolModal(): void {
-        const overlay    = document.getElementById('symbolModalOverlay');
+        const overlay     = document.getElementById('symbolModalOverlay');
         const searchInput = document.getElementById('symbolSearchInput') as HTMLInputElement;
         if (!overlay) return;
 
@@ -654,7 +573,13 @@ export class ChartUI {
     private closeSymbolModal(): void {
         const overlay = document.getElementById('symbolModalOverlay');
         if (overlay) overlay.classList.remove('open');
-        this.clearSearchState();
+
+        // ── Reset search ──
+        const searchInput = document.getElementById('symbolSearchInput') as HTMLInputElement;
+        if (searchInput) searchInput.value = '';
+        const emptySearch = document.getElementById('symbolEmptySearch');
+        if (emptySearch) emptySearch.style.display = 'none';
+        this.filterByCategory(this.activeCategory);
     }
 
     private handleSymbolModalClickOutside(e: Event): void {
@@ -672,19 +597,20 @@ export class ChartUI {
     // ================================================================
 
     private filterByCategory(cat: string): void {
-        const modalBody    = document.getElementById('symbolModalBody');
-        const emptyFav     = document.getElementById('symbolEmptyFavorites');
-        const emptySearch  = document.getElementById('symbolEmptySearch');
+        const modalBody   = document.getElementById('symbolModalBody');
+        const emptyFav    = document.getElementById('symbolEmptyFavorites');
+        const emptySearch = document.getElementById('symbolEmptySearch');
         if (!modalBody) return;
 
-        const favorites    = this.loadSymbolFavorites();
-        const catSymbols   = categoryMap[cat] || null;
+        const favorites  = this.loadSymbolFavorites();
+        const catSymbols = categoryMap[cat] || null;
 
-        let visibleCount   = 0;
+        let visibleCount = 0;
 
         modalBody.querySelectorAll('.symbol-modal-row').forEach(el => {
             const row   = el as HTMLElement;
             const value = row.dataset.value || '';
+            const clean = stripBrokerSuffix(value);
 
             let show = false;
 
@@ -693,7 +619,7 @@ export class ChartUI {
             } else if (cat === 'all') {
                 show = true;
             } else if (catSymbols) {
-                show = catSymbols.includes(value);
+                show = catSymbols.includes(value) || catSymbols.includes(clean);
             } else {
                 show = true;
             }
@@ -759,7 +685,6 @@ export class ChartUI {
 
         this.saveSymbolFavorites(favs);
 
-        // ── Sync all star buttons for this symbol ──
         document.querySelectorAll(`.symbol-star-btn[data-value="${value}"]`).forEach(btn => {
             btn.classList.toggle('active', favs.includes(value));
         });
@@ -780,27 +705,28 @@ export class ChartUI {
         const quoteEl = document.getElementById('symbolFlagQuote');
         if (!baseEl || !quoteEl) return;
 
-        const config = symbolIconMap[symbol];
+        const lookup = stripBrokerSuffix(symbol);
+        const config = symbolIconMap[lookup];
         if (!config) return;
 
         if (config.baseType === 'flag') {
-            baseEl.className           = 'flag-circle flag-base';
+            baseEl.className             = 'flag-circle flag-base';
             baseEl.style.backgroundImage = `url('${config.base}')`;
-            baseEl.innerHTML           = '';
+            baseEl.innerHTML             = '';
         } else {
-            baseEl.className           = `flag-circle flag-base icon-circle ${config.base}`;
+            baseEl.className             = `flag-circle flag-base icon-circle ${config.base}`;
             baseEl.style.backgroundImage = '';
-            baseEl.innerHTML           = iconCircleMap[config.base] || '';
+            baseEl.innerHTML             = iconCircleMap[config.base] || '';
         }
 
         if (config.quoteType === 'flag') {
-            quoteEl.className           = 'flag-circle flag-quote';
+            quoteEl.className             = 'flag-circle flag-quote';
             quoteEl.style.backgroundImage = `url('${config.quote}')`;
-            quoteEl.innerHTML           = '';
+            quoteEl.innerHTML             = '';
         } else {
-            quoteEl.className           = `flag-circle flag-quote icon-circle ${config.quote}`;
+            quoteEl.className             = `flag-circle flag-quote icon-circle ${config.quote}`;
             quoteEl.style.backgroundImage = '';
-            quoteEl.innerHTML           = iconCircleMap[config.quote] || '';
+            quoteEl.innerHTML             = iconCircleMap[config.quote] || '';
         }
     }
 
@@ -950,9 +876,9 @@ export class ChartUI {
         const typeMap: Record<string, { icon: string; label: string }> = {
             'candlestick': { icon: 'fa-chart-candlestick', label: 'Candles'  },
             'bar':         { icon: 'fa-chart-bar',         label: 'Bars'     },
-            'line':        { icon: 'fa-chart-line',         label: 'Line'     },
-            'area':        { icon: 'fa-chart-area',         label: 'Area'     },
-            'baseline':    { icon: 'fa-minus',              label: 'Baseline' }
+            'line':        { icon: 'fa-chart-line',        label: 'Line'     },
+            'area':        { icon: 'fa-chart-area',        label: 'Area'     },
+            'baseline':    { icon: 'fa-minus',             label: 'Baseline' }
         };
 
         const mapped     = typeMap[type] || typeMap['candlestick'];
@@ -1014,7 +940,6 @@ export class ChartUI {
             list.addEventListener('click', (e: Event) => {
                 const target = e.target as HTMLElement;
 
-                // ── Star click ──
                 const starBtn = target.closest('.ind-star-btn') as HTMLElement;
                 if (starBtn) {
                     e.stopPropagation();
@@ -1024,7 +949,6 @@ export class ChartUI {
                     return;
                 }
 
-                // ── Row click ──
                 const row = target.closest('.ind-row') as HTMLElement;
                 if (!row) return;
 
@@ -1123,7 +1047,7 @@ export class ChartUI {
     }
 
     // ================================================================
-    // STRATEGY DEPLOY — reads from config
+    // STRATEGY DEPLOY
     // ================================================================
 
     private deployStrategyFromModal(key: string): void {
@@ -1231,7 +1155,6 @@ export class ChartUI {
         document.removeEventListener('click', this.boundIndicatorClose);
         document.removeEventListener('click', this.boundSymbolModalClose);
         document.removeEventListener('available-config-received', this.boundAvailableConfig);
-        document.removeEventListener('symbol-search-result',      this.boundSymbolSearchResult);
         if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
         this.isInitialized = false;
     }
