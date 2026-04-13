@@ -84,7 +84,7 @@ export class DrawingPersistence {
             this._metaMap.set(toolId, {
                 timeframe,
                 symbol,
-                allTF:   true,
+                allTF:   false,
                 deleted: false
             });
         }
