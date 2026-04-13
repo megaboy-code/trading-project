@@ -46,6 +46,12 @@ export class DrawingTFManager {
         this.persistence.saveDrawings();
         onTFUpdated(newTimeframe);
         this.removeTradeArrows();
+
+        // ✅ Wait for new TF scale to stabilize before applying visibility
+        await new Promise<void>(resolve => requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve())
+        ));
+
         this.applyTFVisibility(newTimeframe);
     }
 
@@ -62,7 +68,6 @@ export class DrawingTFManager {
 
     // ==================== VISIBILITY ====================
 
-    // ✅ Fix 2 — removed early return guard so visibility always applies
     public applyTFVisibility(newTimeframe: string): void {
         const lt = this.lineTools();
         if (!lt || !this.isInitialized()) return;
