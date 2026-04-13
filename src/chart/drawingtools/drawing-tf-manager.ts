@@ -18,21 +18,20 @@ export const TF_INTERVALS: Record<string, number> = {
 
 export class DrawingTFManager {
     constructor(
-        private lineTools:        () => any,
-        private isInitialized:    () => boolean,
-        private persistence:      DrawingPersistence,
+        private lineTools:         () => any,
+        private isInitialized:     () => boolean,
+        private persistence:       DrawingPersistence,
         private removeTradeArrows: () => void
     ) {}
 
     // ==================== SYMBOL / TF SWITCH ====================
 
     public saveAndSwitchTimeframe(
-        newTimeframe:      string,
-        currentTimeframe:  string,
-        onTFUpdated:       (tf: string) => void
+        newTimeframe:     string,
+        currentTimeframe: string,
+        onTFUpdated:      (tf: string) => void
     ): void {
         if (currentTimeframe === newTimeframe) return;
-        // ✅ Save under OLD key before updating
         this.persistence.saveDrawings();
         onTFUpdated(newTimeframe);
         console.log(`📐 TF tracking updated: ${newTimeframe}`);
@@ -74,6 +73,7 @@ export class DrawingTFManager {
 
     // ==================== VISIBILITY ====================
 
+    // ✅ Now uses persistence.shouldToolBeVisible — single source of truth
     public applyTFVisibility(newTimeframe: string): void {
         const lt = this.lineTools();
         if (!lt || !this.isInitialized()) return;
@@ -86,29 +86,32 @@ export class DrawingTFManager {
             tools.forEach((tool: any) => {
                 if (!tool?.id) return;
 
-                const meta = this.persistence.getMeta(tool.id);
-                if (!meta) return;
-                if (meta.deleted) return;
+                const visible = this.persistence.shouldToolBeVisible(
+                    tool.id,
+                    newTimeframe
+                );
 
-                if (meta.allTF) {
-                    // ✅ Snap timestamps to new TF bar grid
+                // ✅ Only apply if visibility needs to change
+                if (tool.options?.visible === visible) return;
+
+                lt.applyLineToolOptions({
+                    id:       tool.id,
+                    toolType: tool.toolType,
+                    options:  { ...tool.options, visible }
+                });
+
+                // ✅ Snap timestamps for allTF tools
+                const meta = this.persistence.getMeta(tool.id);
+                if (meta?.allTF && !meta.deleted && tool.points?.length > 0) {
                     const snappedPoints = this.snapPoints(tool.points, newTimeframe);
                     if (snappedPoints) {
                         lt.applyLineToolOptions({
                             id:       tool.id,
                             toolType: tool.toolType,
-                            options:  { ...tool.options, visible: true },
+                            options:  { ...tool.options, visible },
                             points:   snappedPoints
                         });
                     }
-                } else {
-                    // ✅ Per-TF — hide or show based on ownership
-                    const visible = meta.timeframe === newTimeframe;
-                    lt.applyLineToolOptions({
-                        id:       tool.id,
-                        toolType: tool.toolType,
-                        options:  { ...tool.options, visible }
-                    });
                 }
             });
 

@@ -164,10 +164,10 @@ export class ChartDrawingModule {
 
       this.isInitialized = true;
 
+      // ✅ No third argument — visibility handled inside loadDrawings
       await this.persistence.loadDrawings(
         (g) => this.loadAndRegisterGroup(g),
-        TOOL_GROUP_MAP,
-        (tf) => this.tfManager.applyTFVisibility(tf)
+        TOOL_GROUP_MAP
       );
 
       console.log('✅ Drawing module initialized');
@@ -532,10 +532,10 @@ export class ChartDrawingModule {
 
       if (!this.lineTools || !this.isInitialized) return;
 
+      // ✅ No third argument — visibility handled inside loadDrawings
       await this.persistence.loadDrawings(
         (g) => this.loadAndRegisterGroup(g),
-        TOOL_GROUP_MAP,
-        (tf) => this.tfManager.applyTFVisibility(tf)
+        TOOL_GROUP_MAP
       );
 
       console.log(`📐 Drawings restored for ${this._currentSymbol} ${this._currentTimeframe}`);
@@ -574,8 +574,7 @@ export class ChartDrawingModule {
   public clearAllDrawings(): void {
     if (!this.lineTools || !this.isInitialized) return;
     try {
-      // ✅ Remove all tools from engine — clear all button is intentional
-      // user wants everything gone, safe to call removeAllLineTools here
+      // ✅ Safe to call removeAllLineTools — user intentionally clearing all
       if (typeof this.lineTools.removeAllLineTools === 'function') {
         this.lineTools.removeAllLineTools();
       }
@@ -697,7 +696,7 @@ export class ChartDrawingModule {
         }
       }
 
-      // ✅ Mark deleted in metaMap — prevents saveDrawings from restoring it
+      // ✅ Mark deleted in metaMap
       this.persistence.deleteMeta(toolId);
 
       // ✅ Remove from localStorage immediately
@@ -908,7 +907,7 @@ export class ChartDrawingModule {
 
       if (savedDrawings && savedDrawings !== '[]') {
         try {
-          const tools      = JSON.parse(savedDrawings);
+          const tools       = JSON.parse(savedDrawings);
           const persistable = Array.isArray(tools)
             ? tools
                 .filter((t: any) => t.points && t.points.length > 0)
@@ -918,7 +917,14 @@ export class ChartDrawingModule {
                 })
                 .map((t: any) => ({
                   ...t,
-                  options: { ...t.options, visible: true }
+                  options: {
+                    ...t.options,
+                    // ✅ Use shouldToolBeVisible for correct visibility on series switch
+                    visible: this.persistence.shouldToolBeVisible(
+                      t.id,
+                      this._currentTimeframe
+                    )
+                  }
                 }))
             : [];
           if (persistable.length > 0) {
@@ -965,8 +971,7 @@ export class ChartDrawingModule {
     // ✅ purgeAndSave — clean localStorage + remove deleted tools from engine
     this.persistence.purgeAndSave();
 
-    // ✅ Remove all tools from engine on destroy — safe here,
-    // detach performance bug irrelevant since engine is being torn down
+    // ✅ Remove all tools from engine on destroy — safe here
     if (this.lineTools && typeof this.lineTools.removeAllLineTools === 'function') {
       try { this.lineTools.removeAllLineTools(); } catch (error) {}
     }

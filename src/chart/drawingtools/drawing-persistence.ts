@@ -29,6 +29,20 @@ export class DrawingPersistence {
         return `chart_drawings_${symbol}_${timeframe}`;
     }
 
+    // ==================== VISIBILITY RESOLVER ====================
+
+    // ✅ Single source of truth for tool visibility
+    // deleted   → always hidden
+    // allTF     → always visible
+    // per-TF    → only visible on matching timeframe
+    public shouldToolBeVisible(toolId: string, timeframe: string): boolean {
+        const meta = this._metaMap.get(toolId);
+        if (!meta) return true;
+        if (meta.deleted) return false;
+        if (meta.allTF) return true;
+        return meta.timeframe === timeframe;
+    }
+
     // ==================== META ====================
 
     public getMeta(toolId: string): ToolMeta | null {
@@ -96,8 +110,8 @@ export class DrawingPersistence {
                     })
                     .map((t: any) => ({
                         ...t,
-                        // ✅ Always save visible:true — applyTFVisibility
-                        // handles per-TF visibility after load
+                        // ✅ Always save visible:true — shouldToolBeVisible
+                        // resolves correct visibility on load
                         options: { ...t.options, visible: true },
                         _meta: this._metaMap.get(t.id) ?? {
                             timeframe: this.currentTimeframe(),
@@ -124,7 +138,6 @@ export class DrawingPersistence {
             const allDrawings = this.exportDrawings();
             const tools       = JSON.parse(allDrawings);
 
-            // ✅ Collect deleted ids to remove from engine on destroy
             const deletedIds: string[] = [];
 
             const persistable = Array.isArray(tools)
@@ -152,8 +165,6 @@ export class DrawingPersistence {
 
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(persistable));
 
-            // ✅ Safe to call remove on destroy — engine is being torn down
-            // No performance concern at this point
             if (deletedIds.length > 0 && typeof lt.removeLineToolsById === 'function') {
                 lt.removeLineToolsById(deletedIds);
             }
@@ -167,8 +178,7 @@ export class DrawingPersistence {
 
     public async loadDrawings(
         loadAndRegisterGroup: (group: string) => Promise<void>,
-        TOOL_GROUP_MAP: Record<string, string>,
-        applyTFVisibility: (tf: string) => void
+        TOOL_GROUP_MAP: Record<string, string>
     ): Promise<void> {
         const lt = this.lineTools();
         if (!lt || !this.isInitialized()) return;
@@ -209,9 +219,8 @@ export class DrawingPersistence {
                         }
                     });
 
-                    // ✅ Final filter — skip deleted tools
-                    // ✅ Reset visible:true — applyTFVisibility handles per-TF
-                    //    visibility after import
+                    // ✅ Use shouldToolBeVisible — correct visibility at import time
+                    // No post-patch applyTFVisibility needed
                     const cleanTools = persistable
                         .filter((t: any) => {
                             const meta = this._metaMap.get(t.id);
@@ -219,12 +228,14 @@ export class DrawingPersistence {
                         })
                         .map(({ _meta, ...rest }: any) => ({
                             ...rest,
-                            options: { ...rest.options, visible: true }
+                            options: {
+                                ...rest.options,
+                                visible: this.shouldToolBeVisible(rest.id, this.currentTimeframe())
+                            }
                         }));
 
                     if (cleanTools.length > 0) {
                         this.importDrawings(JSON.stringify(cleanTools));
-                        applyTFVisibility(this.currentTimeframe());
                     }
                 }
 
