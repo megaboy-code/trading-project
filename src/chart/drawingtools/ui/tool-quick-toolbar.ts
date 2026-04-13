@@ -213,7 +213,7 @@ export class ToolQuickToolbar {
     const controls = QUICK_CONTROLS[toolType] || [];
     const hasText  = this.toolHasText();
 
-    // ✅ Fix 3 — read allTF from meta for initial button state
+    // ✅ Read allTF from meta for initial button state
     const meta  = this.currentTool?.id
       ? this.callbacks.getToolMeta(this.currentTool.id)
       : null;
@@ -538,16 +538,26 @@ export class ToolQuickToolbar {
       }
     });
 
-    // ✅ Fix 3 — allTF toggle button
+    // ✅ allTF toggle button — update directly with known new value
     this.container.querySelector('#qtbAllTFBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.closeDropdowns();
       if (!this.currentTool?.id) return;
 
-      const meta  = this.callbacks.getToolMeta(this.currentTool.id);
-      const allTF = meta?.allTF ?? true;
-      this.callbacks.onAllTFToggle(this.currentTool.id, !allTF);
-      this.updateAllTFButton();
+      const meta   = this.callbacks.getToolMeta(this.currentTool.id);
+      const allTF  = meta?.allTF ?? true;
+      const newVal = !allTF;
+
+      this.callbacks.onAllTFToggle(this.currentTool.id, newVal);
+
+      // ✅ Update button directly with known new value — don't re-read meta
+      const btn = this.container?.querySelector('#qtbAllTFBtn') as HTMLElement;
+      if (btn) {
+        btn.classList.toggle('qtb-btn-active', newVal);
+        btn.title = newVal
+          ? 'Showing on all timeframes'
+          : 'Locked to current timeframe';
+      }
     });
 
     // Delete
