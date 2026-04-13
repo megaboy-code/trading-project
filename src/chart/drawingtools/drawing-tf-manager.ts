@@ -10,7 +10,8 @@ export class DrawingTFManager {
         private lineTools:         () => any,
         private isInitialized:     () => boolean,
         private persistence:       DrawingPersistence,
-        private removeTradeArrows: () => void
+        private removeTradeArrows: () => void,
+        private currentTimeframe:  () => string
     ) {}
 
     // ==================== SYMBOL / TF SWITCH ====================
@@ -128,6 +129,8 @@ export class DrawingTFManager {
 
     public setToolAllTF(toolId: string, allTF: boolean): void {
         this.persistence.setAllTF(toolId, allTF);
+        // ✅ Apply visibility immediately to current TF — no flicker on toggle
+        this.applyTFVisibility(this.currentTimeframe());
         console.log(`📐 Tool ${toolId} allTF set to ${allTF}`);
     }
 
