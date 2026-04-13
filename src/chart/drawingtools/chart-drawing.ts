@@ -574,17 +574,10 @@ export class ChartDrawingModule {
   public clearAllDrawings(): void {
     if (!this.lineTools || !this.isInitialized) return;
     try {
-      const json  = this.lineTools.exportLineTools();
-      const tools = JSON.parse(json);
-      if (Array.isArray(tools)) {
-        tools.forEach((tool: any) => {
-          if (!tool?.id) return;
-          this.lineTools.applyLineToolOptions({
-            id:       tool.id,
-            toolType: tool.toolType,
-            options:  { ...tool.options, visible: false }
-          });
-        });
+      // ✅ Remove all tools from engine — clear all button is intentional
+      // user wants everything gone, safe to call removeAllLineTools here
+      if (typeof this.lineTools.removeAllLineTools === 'function') {
+        this.lineTools.removeAllLineTools();
       }
 
       this.persistence.clearMeta();
@@ -917,10 +910,16 @@ export class ChartDrawingModule {
         try {
           const tools      = JSON.parse(savedDrawings);
           const persistable = Array.isArray(tools)
-            ? tools.filter((t: any) => {
-                const meta = this.persistence.getMeta(t.id);
-                return !meta?.deleted;
-              })
+            ? tools
+                .filter((t: any) => t.points && t.points.length > 0)
+                .filter((t: any) => {
+                  const meta = this.persistence.getMeta(t.id);
+                  return !meta?.deleted;
+                })
+                .map((t: any) => ({
+                  ...t,
+                  options: { ...t.options, visible: true }
+                }))
             : [];
           if (persistable.length > 0) {
             this.persistence.importDrawings(JSON.stringify(persistable));
@@ -963,7 +962,14 @@ export class ChartDrawingModule {
   public destroy(): void {
     console.log('🧹 Destroying drawing module...');
 
+    // ✅ purgeAndSave — clean localStorage + remove deleted tools from engine
     this.persistence.purgeAndSave();
+
+    // ✅ Remove all tools from engine on destroy — safe here,
+    // detach performance bug irrelevant since engine is being torn down
+    if (this.lineTools && typeof this.lineTools.removeAllLineTools === 'function') {
+      try { this.lineTools.removeAllLineTools(); } catch (error) {}
+    }
 
     if (this.themeObserver) {
       this.themeObserver.disconnect();
