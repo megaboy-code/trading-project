@@ -1,12 +1,10 @@
 // ================================================================
-// 📋 WATCHLIST MODULE-
+// 📋 WATCHLIST MODULE
 // Real MT5 prices via WebSocket
 // localStorage persists watchlist state
 // Daily change % from cached D1 open
 // Config-driven — symbols from backend config, no hardcoded list
 // ================================================================
-
-import { ConnectionManager } from '../core/connection-manager';
 
 interface WatchlistSymbol {
     name:        string;
@@ -82,8 +80,6 @@ export class WatchlistModule {
         'oil': '<i class="fas fa-oil-well"></i>',
     };
 
-    constructor(private connectionManager: ConnectionManager) {}
-
     // ================================================================
     // INITIALIZE
     // ================================================================
@@ -107,13 +103,6 @@ export class WatchlistModule {
             this.configSymbols = config.symbols;
             this.loadFromStorage();
             this.renderSymbols();
-        });
-
-        // ── Tick updates ──
-        this.connectionManager.onWatchlistUpdate((
-            symbol, bid, ask, spread, time, change) =>
-        {
-            this.updatePrice(symbol, bid, change);
         });
     }
 
@@ -215,7 +204,6 @@ export class WatchlistModule {
     }
 
     private buildIconElement(symbolName: string): HTMLElement {
-        // ── Strip broker suffix for icon lookup e.g. ETHUSDm → ETHUSD ──
         const lookup = this.stripSuffix(symbolName);
         const config = this.symbolIconMap[lookup];
 
@@ -223,7 +211,7 @@ export class WatchlistModule {
             const fallback = document.createElement('div');
             fallback.className = 'wl-flag-container';
             const circle = document.createElement('div');
-            circle.className = 'wl-flag-circle wl-flag-base';
+            circle.className        = 'wl-flag-circle wl-flag-base';
             circle.style.background = '#444';
             fallback.appendChild(circle);
             return fallback;
@@ -250,7 +238,7 @@ export class WatchlistModule {
         wrap.className = 'wl-symbol-icon-wrap';
 
         const iconWrap = document.createElement('div');
-        iconWrap.className = `wl-symbol-icon`;
+        iconWrap.className = 'wl-symbol-icon';
 
         if (config.baseType === 'icon') {
             iconWrap.innerHTML = this.iconCircleMap[config.base] || '';
@@ -262,9 +250,13 @@ export class WatchlistModule {
         return wrap;
     }
 
-    // ── Strip common broker suffixes for icon/flag lookup ──
+    // ── Strip broker suffixes for icon/flag lookup ──
     private stripSuffix(name: string): string {
-        return name.replace(/[mMcC]$/, '').replace(/\.(.*)/,'');
+        return name
+            .toUpperCase()
+            .replace('/', '')
+            .replace(/\.[A-Z0-9]+$/, '')
+            .replace(/[MC]$/, '');
     }
 
     // ================================================================
@@ -387,7 +379,9 @@ export class WatchlistModule {
         this.itemsEl?.appendChild(item);
         this.closeSearch();
 
-        this.connectionManager.sendCommand(`WATCHLIST_ADD_${sym.name}`);
+        document.dispatchEvent(new CustomEvent('watchlist-add', {
+            detail: { symbol: sym.name }
+        }));
     }
 
     private removeSymbol(id: string, el: HTMLElement): void {
@@ -398,7 +392,9 @@ export class WatchlistModule {
         this.elementRefs.delete(id);
         this.priceCache.delete(id);
 
-        this.connectionManager.sendCommand(`WATCHLIST_REMOVE_${id}`);
+        document.dispatchEvent(new CustomEvent('watchlist-remove', {
+            detail: { symbol: id }
+        }));
 
         const first = this.itemsEl?.querySelector('.watch-item');
         if (first && !this.itemsEl?.querySelector('.watch-item.active')) {
@@ -430,7 +426,8 @@ export class WatchlistModule {
     }
 
     // ================================================================
-    // PRICE UPDATE — direct refs, no querySelector on every tick
+    // PRICE UPDATE
+    // Called directly from module-manager onWatchlistUpdate
     // ================================================================
 
     public updatePrice(
