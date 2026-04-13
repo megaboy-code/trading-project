@@ -113,11 +113,13 @@ export class ChartDrawingModule {
     );
 
     this.tfManager = new DrawingTFManager(
-      () => this.lineTools,
-      () => this.isInitialized,
-      this.persistence,
-      () => this.arrows.removeTradeArrows()
-    );
+    () => this.lineTools,
+    () => this.isInitialized,
+    this.persistence,
+    () => this.arrows.removeTradeArrows(),
+    () => this._currentTimeframe  
+);
+
 
     this.arrows = new DrawingTradeArrows(
       () => this.lineTools,
