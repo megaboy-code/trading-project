@@ -45,7 +45,7 @@ export class DrawingPersistence {
             meta.deleted = true;
             this._metaMap.set(toolId, meta);
         } else {
-            // ✅ No meta found — create one marked deleted so it's always filtered
+            // ✅ No meta — create one marked deleted so it's always filtered
             this._metaMap.set(toolId, {
                 timeframe: this.currentTimeframe(),
                 symbol:    this.currentSymbol(),
@@ -89,14 +89,21 @@ export class DrawingPersistence {
 
             const persistable = Array.isArray(tools)
                 ? tools
+                    // ✅ Skip non-persistent tools
                     .filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
+                    // ✅ Skip tools with no points — unfinished drawings
+                    .filter((t: any) => t.points && t.points.length > 0)
+                    // ✅ Skip deleted tools
                     .filter((t: any) => {
-                        // ✅ Filter out deleted tools on every save
                         const meta = this._metaMap.get(t.id);
                         return !meta?.deleted;
                     })
                     .map((t: any) => ({
                         ...t,
+                        // ✅ Always save visible:true — applyTFVisibility handles
+                        // per-TF visibility after load. Saved visible state must
+                        // never interfere with delete hide logic.
+                        options: { ...t.options, visible: true },
                         _meta: this._metaMap.get(t.id) ?? {
                             timeframe: this.currentTimeframe(),
                             symbol:    this.currentSymbol(),
@@ -125,8 +132,10 @@ export class DrawingPersistence {
             const persistable = Array.isArray(tools)
                 ? tools
                     .filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
+                    .filter((t: any) => t.points && t.points.length > 0)
                     .map((t: any) => ({
                         ...t,
+                        options: { ...t.options, visible: true },
                         _meta: this._metaMap.get(t.id) ?? {
                             timeframe: this.currentTimeframe(),
                             symbol:    this.currentSymbol(),
@@ -182,20 +191,27 @@ export class DrawingPersistence {
                 if (persistable.length > 0) {
                     persistable.forEach((t: any) => {
                         if (t._meta && t.id) {
-                            // ✅ Fix — never overwrite deleted:true with saved deleted:false
+                            // ✅ Never overwrite deleted:true with saved deleted:false
                             const existingMeta = this._metaMap.get(t.id);
                             if (existingMeta?.deleted) return;
                             this._metaMap.set(t.id, t._meta);
                         }
                     });
 
-                    // ✅ Only import tools not marked deleted in _metaMap
+                    // ✅ Final filter — skip any tool marked deleted in _metaMap
+                    // ✅ Reset visible:true on all tools — applyTFVisibility
+                    //    will correctly hide per-TF tools after import.
+                    //    This ensures saved visible:false never blocks
+                    //    a tool from appearing on its correct TF.
                     const cleanTools = persistable
                         .filter((t: any) => {
                             const meta = this._metaMap.get(t.id);
                             return !meta?.deleted;
                         })
-                        .map(({ _meta, ...rest }: any) => rest);
+                        .map(({ _meta, ...rest }: any) => ({
+                            ...rest,
+                            options: { ...rest.options, visible: true }
+                        }));
 
                     if (cleanTools.length > 0) {
                         this.importDrawings(JSON.stringify(cleanTools));
