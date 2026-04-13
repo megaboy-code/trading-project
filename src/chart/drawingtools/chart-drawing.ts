@@ -87,6 +87,10 @@ export class ChartDrawingModule {
     return `chart_drawings_${this._currentSymbol}_${this._currentTimeframe}`;
   }
 
+  private get ALL_STORAGE_KEY(): string {
+    return `chart_drawings_${this._currentSymbol}_ALL`;
+  }
+
   constructor(
     chart:     IChartApi,
     series:    ISeriesApi<SeriesType>,
@@ -164,7 +168,6 @@ export class ChartDrawingModule {
 
       this.isInitialized = true;
 
-      // ✅ No third argument — visibility handled inside loadDrawings
       await this.persistence.loadDrawings(
         (g) => this.loadAndRegisterGroup(g),
         TOOL_GROUP_MAP
@@ -387,7 +390,6 @@ export class ChartDrawingModule {
 
     if (typeof this.lineTools.on === 'function') {
       this.lineTools.on('line-tool-created', (tool: any) => {
-        // ✅ Fix 3 — inject _meta at draw time
         if (tool?.id) {
           this.persistence.injectMeta(
             tool.id,
@@ -532,7 +534,6 @@ export class ChartDrawingModule {
 
       if (!this.lineTools || !this.isInitialized) return;
 
-      // ✅ No third argument — visibility handled inside loadDrawings
       await this.persistence.loadDrawings(
         (g) => this.loadAndRegisterGroup(g),
         TOOL_GROUP_MAP
@@ -574,13 +575,16 @@ export class ChartDrawingModule {
   public clearAllDrawings(): void {
     if (!this.lineTools || !this.isInitialized) return;
     try {
-      // ✅ Safe to call removeAllLineTools — user intentionally clearing all
       if (typeof this.lineTools.removeAllLineTools === 'function') {
         this.lineTools.removeAllLineTools();
       }
 
       this.persistence.clearMeta();
+
+      // ✅ Clear both TF key and ALL key
       localStorage.removeItem(this.STORAGE_KEY);
+      localStorage.removeItem(this.ALL_STORAGE_KEY);
+
       console.log(`🗑️ Drawings cleared for ${this._currentSymbol} ${this._currentTimeframe}`);
     } catch (error) {
       console.error('❌ Failed to clear drawings:', error);
@@ -674,7 +678,7 @@ export class ChartDrawingModule {
     });
   }
 
-  // ✅ Fix 3 — soft delete: hide + clear from localStorage, no detach
+  // ✅ Soft delete — hide + clear from storage, no detach
   public deleteTool(toolId: string): void {
     if (!this.lineTools || !this.isInitialized) return;
 
@@ -699,7 +703,7 @@ export class ChartDrawingModule {
       // ✅ Mark deleted in metaMap
       this.persistence.deleteMeta(toolId);
 
-      // ✅ Remove from localStorage immediately
+      // ✅ Remove from correct storage key via persistence
       this.persistence.removeToolFromStorage(toolId);
 
       console.log(`🗑️ Tool ${toolId} deleted`);
@@ -968,10 +972,8 @@ export class ChartDrawingModule {
   public destroy(): void {
     console.log('🧹 Destroying drawing module...');
 
-    // ✅ purgeAndSave — clean localStorage + remove deleted tools from engine
     this.persistence.purgeAndSave();
 
-    // ✅ Remove all tools from engine on destroy — safe here
     if (this.lineTools && typeof this.lineTools.removeAllLineTools === 'function') {
       try { this.lineTools.removeAllLineTools(); } catch (error) {}
     }
