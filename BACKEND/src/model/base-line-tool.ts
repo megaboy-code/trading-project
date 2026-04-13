@@ -168,6 +168,8 @@ export abstract class BaseLineTool<HorzScaleItem> extends PriceDataSource<HorzSc
 	 * @returns A `PrimitiveHoveredItem` if the tool is hit, otherwise `null`.
 	 */
 	public hitTest(x: number, y: number): PrimitiveHoveredItem | null {
+		// ✅ Fix 2 — Skip hit-test when hidden
+		if (this._options?.visible === false) return null;
 
 		// Check for override first
 		if (this._overrideCursor) {
@@ -500,6 +502,9 @@ export abstract class BaseLineTool<HorzScaleItem> extends PriceDataSource<HorzSc
 	}
 
 	public updateAllViews(): void {
+		// ✅ Fix 1 — Skip updateAllViews() when hidden
+		if (this._options?.visible === false) return;
+
 		this._paneViews.forEach(view => view.update());
 
 		if (this.pointsCount === -1) {
@@ -510,7 +515,7 @@ export abstract class BaseLineTool<HorzScaleItem> extends PriceDataSource<HorzSc
 		this._timeAxisLabelViews.forEach(view => view.update());
 
 		this._priceAxisLabelStackingManager.updateStacking();
-	}	
+	}
 
 	public priceAxisLabelColor(): string | null {
 		return '#2962FF';
