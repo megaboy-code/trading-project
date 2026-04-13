@@ -2,7 +2,6 @@
 // ⚡ CHART UTILITIES - Shared helpers
 // ================================================================
 
-// ✅ Module-level constants — not rebuilt on every call
 const CRYPTO_SYMBOLS = ['BTC', 'ETH', 'XRP', 'LTC', 'ADA', 'DOT', 'LINK', 'SOL', 'BNB', 'XLM', 'DOGE', 'SHIB'];
 
 const MAJOR_FOREX_PAIRS = [
@@ -16,9 +15,18 @@ const MAJOR_FOREX_PAIRS = [
 
 const INDICES = ['US30', 'SPX', 'NAS', 'DJI', 'DAX', 'FTSE', 'NIKKEI', 'JPN', 'CAC', 'HSI'];
 
+// ── Strip broker suffixes e.g. ETHUSDm → ETHUSD, EURUSD.m → EURUSD ──
+function stripBrokerSuffix(symbol: string): string {
+    return symbol
+        .toUpperCase()
+        .replace('/', '')
+        .replace(/\.[A-Z0-9]+$/, '')
+        .replace(/[MC]$/, '');
+}
+
 export function getDecimalPrecision(symbol: string): number {
     if (!symbol) return 5;
-    const sym = symbol.toUpperCase().replace('/', '');
+    const sym = stripBrokerSuffix(symbol);
 
     const isCrypto = CRYPTO_SYMBOLS.some(crypto => sym.includes(crypto));
 
