@@ -83,14 +83,6 @@ export class ChartDrawingModule {
   private tfManager:   DrawingTFManager;
   private arrows:      DrawingTradeArrows;
 
-  private get STORAGE_KEY(): string {
-    return `chart_drawings_${this._currentSymbol}_${this._currentTimeframe}`;
-  }
-
-  private get ALL_STORAGE_KEY(): string {
-    return `chart_drawings_${this._currentSymbol}_ALL`;
-  }
-
   constructor(
     chart:     IChartApi,
     series:    ISeriesApi<SeriesType>,
@@ -575,17 +567,18 @@ export class ChartDrawingModule {
   public clearAllDrawings(): void {
     if (!this.lineTools || !this.isInitialized) return;
     try {
+      // ✅ Remove all tools from engine
       if (typeof this.lineTools.removeAllLineTools === 'function') {
         this.lineTools.removeAllLineTools();
       }
 
       this.persistence.clearMeta();
 
-      // ✅ Clear both TF key and ALL key
-      localStorage.removeItem(this.STORAGE_KEY);
-      localStorage.removeItem(this.ALL_STORAGE_KEY);
+      // ✅ Delegate storage clear to persistence
+      // clearSavedDrawings removes only current symbol tools
+      this.persistence.clearSavedDrawings();
 
-      console.log(`🗑️ Drawings cleared for ${this._currentSymbol} ${this._currentTimeframe}`);
+      console.log(`🗑️ Drawings cleared for ${this._currentSymbol}`);
     } catch (error) {
       console.error('❌ Failed to clear drawings:', error);
     }
@@ -678,7 +671,7 @@ export class ChartDrawingModule {
     });
   }
 
-  // ✅ Soft delete — hide + clear from storage, no detach
+  // ✅ Soft delete — hide + remove from global storage, no detach
   public deleteTool(toolId: string): void {
     if (!this.lineTools || !this.isInitialized) return;
 
@@ -703,7 +696,7 @@ export class ChartDrawingModule {
       // ✅ Mark deleted in metaMap
       this.persistence.deleteMeta(toolId);
 
-      // ✅ Remove from correct storage key via persistence
+      // ✅ Remove from global storage immediately — single key, single operation
       this.persistence.removeToolFromStorage(toolId);
 
       console.log(`🗑️ Tool ${toolId} deleted`);
@@ -923,7 +916,6 @@ export class ChartDrawingModule {
                   ...t,
                   options: {
                     ...t.options,
-                    // ✅ Use shouldToolBeVisible for correct visibility on series switch
                     visible: this.persistence.shouldToolBeVisible(
                       t.id,
                       this._currentTimeframe
@@ -972,8 +964,10 @@ export class ChartDrawingModule {
   public destroy(): void {
     console.log('🧹 Destroying drawing module...');
 
+    // ✅ purgeAndSave — clean global storage + remove deleted ghosts from engine
     this.persistence.purgeAndSave();
 
+    // ✅ Remove all tools from engine on destroy — safe here
     if (this.lineTools && typeof this.lineTools.removeAllLineTools === 'function') {
       try { this.lineTools.removeAllLineTools(); } catch (error) {}
     }
