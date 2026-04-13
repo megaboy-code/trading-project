@@ -2,6 +2,8 @@
 // 🎨 DRAWING PERSISTENCE - Save, load, purge drawing tools
 // ================================================================
 
+import { TF_INTERVALS } from './drawing-constants';
+
 const NON_PERSISTENT_TOOLS = new Set<string>(['TradeArrow']);
 
 export interface ToolMeta {
@@ -282,8 +284,26 @@ export class DrawingPersistence {
                     }
                 }));
 
-            if (cleanTools.length > 0) {
-                this.importDrawings(JSON.stringify(cleanTools));
+            // ✅ Snap allTF tool points to current TF candle opens on load
+            const interval = TF_INTERVALS[this.currentTimeframe()];
+            const snappedTools = cleanTools.map((t: any) => {
+                const meta = this._metaMap.get(t.id);
+                if (meta?.allTF && t.points?.length > 0 && interval) {
+                    return {
+                        ...t,
+                        points: t.points.map((p: any) => ({
+                            ...p,
+                            timestamp: p.timestamp
+                                ? Math.floor(p.timestamp / interval) * interval
+                                : p.timestamp
+                        }))
+                    };
+                }
+                return t;
+            });
+
+            if (snappedTools.length > 0) {
+                this.importDrawings(JSON.stringify(snappedTools));
             }
 
             console.log(`✅ Drawings restored for ${this.currentSymbol()} ${this.currentTimeframe()}`);
