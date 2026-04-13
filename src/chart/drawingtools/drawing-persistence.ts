@@ -35,7 +35,6 @@ export class DrawingPersistence {
 
     // ==================== MIGRATION ====================
 
-    // ✅ One-time migration — clear all old per-symbol-TF keys
     private migrateOldKeys(): void {
         if (localStorage.getItem(MIGRATED_FLAG_KEY)) return;
         try {
@@ -79,9 +78,9 @@ export class DrawingPersistence {
 
     public shouldToolBeVisible(toolId: string, timeframe: string): boolean {
         const meta = this._metaMap.get(toolId);
-        if (!meta)          return true;
-        if (meta.deleted)   return false;
-        if (meta.allTF)     return true;
+        if (!meta)        return true;
+        if (meta.deleted) return false;
+        if (meta.allTF)   return true;
         return meta.timeframe === timeframe;
     }
 
@@ -121,9 +120,17 @@ export class DrawingPersistence {
         }
     }
 
+    // ✅ Fix 1 — create meta if missing instead of silently returning
     public setAllTF(toolId: string, allTF: boolean): void {
-        const meta = this._metaMap.get(toolId);
-        if (!meta) return;
+        let meta = this._metaMap.get(toolId);
+        if (!meta) {
+            meta = {
+                timeframe: this.currentTimeframe(),
+                symbol:    this.currentSymbol(),
+                allTF:     true,
+                deleted:   false
+            };
+        }
         meta.allTF = allTF;
         this._metaMap.set(toolId, meta);
         this.saveDrawings();
@@ -143,14 +150,10 @@ export class DrawingPersistence {
             const engineTools  = JSON.parse(engineExport);
             if (!Array.isArray(engineTools)) return;
 
-            // ✅ Read existing global storage
             const existingTools = this.readAllTools();
-
-            // ✅ Build map of existing tools by ID for merge
-            const existingMap = new Map<string, StoredTool>();
+            const existingMap   = new Map<string, StoredTool>();
             existingTools.forEach(t => existingMap.set(t.id, t));
 
-            // ✅ Process current engine tools
             engineTools
                 .filter((t: any) => !NON_PERSISTENT_TOOLS.has(t.toolType))
                 .filter((t: any) => t.points && t.points.length > 0)
@@ -163,15 +166,18 @@ export class DrawingPersistence {
                     };
 
                     if (meta.deleted) {
-                        // ✅ Remove deleted tools from global storage
                         existingMap.delete(t.id);
                         return;
                     }
 
                     existingMap.set(t.id, {
                         ...t,
-                        options: { ...t.options, visible: true },
-                        _meta:   meta
+                        // ✅ Fix 3 — store actual visibility, not forced true
+                        options: {
+                            ...t.options,
+                            visible: this.shouldToolBeVisible(t.id, this.currentTimeframe())
+                        },
+                        _meta: meta
                     });
                 });
 
@@ -191,9 +197,9 @@ export class DrawingPersistence {
             const engineTools  = JSON.parse(engineExport);
             if (!Array.isArray(engineTools)) return;
 
-            const deletedIds:  string[]      = [];
-            const existingTools              = this.readAllTools();
-            const existingMap                = new Map<string, StoredTool>();
+            const deletedIds:   string[]      = [];
+            const existingTools               = this.readAllTools();
+            const existingMap                 = new Map<string, StoredTool>();
             existingTools.forEach(t => existingMap.set(t.id, t));
 
             engineTools
@@ -215,14 +221,16 @@ export class DrawingPersistence {
 
                     existingMap.set(t.id, {
                         ...t,
-                        options: { ...t.options, visible: true },
-                        _meta:   meta
+                        options: {
+                            ...t.options,
+                            visible: this.shouldToolBeVisible(t.id, this.currentTimeframe())
+                        },
+                        _meta: meta
                     });
                 });
 
             this.writeAllTools(Array.from(existingMap.values()));
 
-            // ✅ Remove deleted ghosts from engine on destroy
             if (deletedIds.length > 0 && typeof lt.removeLineToolsById === 'function') {
                 lt.removeLineToolsById(deletedIds);
             }
@@ -241,7 +249,6 @@ export class DrawingPersistence {
         const lt = this.lineTools();
         if (!lt || !this.isInitialized()) return;
         try {
-            // ✅ Run one-time migration first
             this.migrateOldKeys();
 
             const allTools = this.readAllTools();
@@ -254,12 +261,9 @@ export class DrawingPersistence {
             const symbol    = this.currentSymbol();
             const timeframe = this.currentTimeframe();
 
-            // ✅ Filter tools for current symbol + TF
-            // allTF tools show on any TF for the same symbol
-            // per-TF tools only show on exact TF match
             const relevant = allTools.filter((t: StoredTool) => {
-                if (!t._meta) return false;
-                if (t._meta.deleted) return false;
+                if (!t._meta)          return false;
+                if (t._meta.deleted)   return false;
                 if (t._meta.symbol !== symbol) return false;
                 return t._meta.allTF || t._meta.timeframe === timeframe;
             });
@@ -269,7 +273,6 @@ export class DrawingPersistence {
                 return;
             }
 
-            // ✅ Load required tool groups
             const groupsNeeded = new Set<string>();
             relevant.forEach((tool: StoredTool) => {
                 if (NON_PERSISTENT_TOOLS.has(tool.toolType)) return;
@@ -290,36 +293,19 @@ export class DrawingPersistence {
                 }
             });
 
-            // ✅ Build clean tools with correct visibility
-            // Snap allTF tool timestamps to current TF bar grid
-            const interval = TF_INTERVALS[timeframe];
-
+            // ✅ Fix 3 — resolve visibility correctly on load, no forced visible:true
             const cleanTools = relevant
                 .filter((t: StoredTool) => {
                     const meta = this._metaMap.get(t.id);
                     return !meta?.deleted;
                 })
-                .map(({ _meta, ...rest }: any) => {
-                    const meta    = this._metaMap.get(rest.id);
-                    const visible = this.shouldToolBeVisible(rest.id, timeframe);
-
-                    // ✅ Snap timestamps for allTF tools
-                    let points = rest.points;
-                    if (meta?.allTF && points?.length > 0 && interval) {
-                        points = points.map((p: any) => ({
-                            ...p,
-                            timestamp: p.timestamp
-                                ? Math.floor(p.timestamp / interval) * interval
-                                : p.timestamp
-                        }));
+                .map(({ _meta, ...rest }: any) => ({
+                    ...rest,
+                    options: {
+                        ...rest.options,
+                        visible: this.shouldToolBeVisible(rest.id, timeframe)
                     }
-
-                    return {
-                        ...rest,
-                        points,
-                        options: { ...rest.options, visible }
-                    };
-                });
+                }));
 
             if (cleanTools.length > 0) {
                 this.importDrawings(JSON.stringify(cleanTools));
@@ -334,7 +320,6 @@ export class DrawingPersistence {
 
     // ==================== REMOVE ONE FROM STORAGE ====================
 
-    // ✅ Single key — just filter by ID
     public removeToolFromStorage(toolId: string): void {
         try {
             const tools    = this.readAllTools();
@@ -375,7 +360,6 @@ export class DrawingPersistence {
 
     public clearSavedDrawings(): void {
         try {
-            // ✅ Only remove tools for current symbol from global storage
             const tools    = this.readAllTools();
             const symbol   = this.currentSymbol();
             const filtered = tools.filter(t => t._meta?.symbol !== symbol);
