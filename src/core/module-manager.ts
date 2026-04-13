@@ -167,7 +167,9 @@ export class ModuleManager {
             symbol, bid, ask, spread, time, change) =>
         {
             this.watchlistInstance?.updatePrice(symbol, bid, change);
-            this.tradingInstance?.onTick(symbol, bid, ask);
+            if (symbol === this.connectionManager.getCurrentSymbol()) {
+                this.tradingInstance?.onTick(symbol, bid, ask);
+            }
         });
 
         // ── Positions — direct to TradingModule ──
