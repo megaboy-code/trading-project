@@ -15,196 +15,202 @@
         </button>
     </div>
 
-    <!-- P&L HERO + METRICS -->
-    <div class="panel-section">
-        <div class="trading-hero elevated">
-            <div class="pnl-label">Total P&L</div>
-            <div class="pnl-main">
-                <span class="pnl-value positive" id="heroPnl">+$324.50</span>
-                <span class="pnl-percent positive" id="heroPct">+3.24%</span>
-            </div>
-            <div class="pnl-change">
-                <i class="fas fa-arrow-trend-up"></i>
-                <span id="heroToday">+$45.20 today</span>
-            </div>
-        </div>
-        <div class="metrics-grid">
-            <div class="metric-card elevated">
-                <div class="metric-label">Balance</div>
-                <div class="metric-value" id="accountBalance">$10,000.00</div>
-            </div>
-            <div class="metric-card elevated">
-                <div class="metric-label">Equity</div>
-                <div class="metric-value highlight" id="accountEquity">$10,324.50</div>
-            </div>
-            <div class="metric-card elevated">
-                <div class="metric-label">Margin</div>
-                <div class="metric-value" id="accountMargin">$920.00</div>
-            </div>
-            <div class="metric-card elevated">
-                <div class="metric-label">Free Margin</div>
-                <div class="metric-value" id="accountFreeMargin">$9,079.00</div>
-            </div>
-        </div>
-    </div>
+    <!-- SCROLLABLE BODY -->
+    <div class="trading-panel-body">
 
-    <!-- BUY / SELL -->
-    <div class="panel-section">
-        <div class="button-group">
-            <button class="trade-btn buy" id="buyButton">
-                BUY
-                <span id="buyBtnPrice">1.08497</span>
-            </button>
-            <button class="trade-btn sell" id="sellButton">
-                SELL
-                <span id="sellBtnPrice">1.08485</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- LOT SIZE -->
-    <div class="panel-section">
-        <div class="section-title">
-            <div class="section-title-left">
-                <i class="fas fa-layer-group"></i> Position Size
-            </div>
-            <div class="section-badge" id="safeModeToggle">
-                <i class="fas fa-lock" id="safeModeIcon"></i>
-                <span id="safeModeLabel">SAFE</span>
-            </div>
-        </div>
-
-        <div class="lot-card elevated">
-
-            <div class="lot-header">
-                <div class="lot-header-label">
-                    <i class="fas fa-cubes"></i> Lot Size
+        <!-- P&L HERO + METRICS -->
+        <div class="panel-section">
+            <div class="trading-hero elevated">
+                <div class="pnl-label">Total P&L</div>
+                <div class="pnl-main">
+                    <span class="pnl-value positive" id="heroPnl">+$324.50</span>
+                    <span class="pnl-percent positive" id="heroPct">+3.24%</span>
                 </div>
-                <div class="lot-display-big" id="lotDisplay">0.01</div>
+                <div class="pnl-change">
+                    <i class="fas fa-arrow-trend-up"></i>
+                    <span id="heroToday">+$45.20 today</span>
+                </div>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card elevated">
+                    <div class="metric-label">Balance</div>
+                    <div class="metric-value" id="accountBalance">$10,000.00</div>
+                </div>
+                <div class="metric-card elevated">
+                    <div class="metric-label">Equity</div>
+                    <div class="metric-value highlight" id="accountEquity">$10,324.50</div>
+                </div>
+                <div class="metric-card elevated">
+                    <div class="metric-label">Margin</div>
+                    <div class="metric-value" id="accountMargin">$920.00</div>
+                </div>
+                <div class="metric-card elevated">
+                    <div class="metric-label">Free Margin</div>
+                    <div class="metric-value" id="accountFreeMargin">$9,079.00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BUY / SELL -->
+        <div class="panel-section">
+            <div class="button-group">
+                <button class="trade-btn buy" id="buyButton">
+                    BUY
+                    <span id="buyBtnPrice">1.08497</span>
+                </button>
+                <button class="trade-btn sell" id="sellButton">
+                    SELL
+                    <span id="sellBtnPrice">1.08485</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- LOT SIZE -->
+        <div class="panel-section">
+            <div class="section-title">
+                <div class="section-title-left">
+                    <i class="fas fa-layer-group"></i> Position Size
+                </div>
+                <div class="section-badge" id="safeModeToggle">
+                    <i class="fas fa-lock" id="safeModeIcon"></i>
+                    <span id="safeModeLabel">SAFE</span>
+                </div>
             </div>
 
-            <div class="lot-meta">
-                <span class="lot-max" id="lotMaxBadge">Max: 2.72</span>
-            </div>
+            <div class="lot-card elevated">
 
-            <input type="range" class="lot-slider" id="lotSlider" min="0.01" max="2.72" step="0.01" value="0.01">
-            <div class="slider-labels">
-                <span>0.01</span>
-                <span id="sliderMaxLabel">2.72</span>
-            </div>
+                <div class="lot-header">
+                    <div class="lot-header-label">
+                        <i class="fas fa-cubes"></i> Lot Size
+                    </div>
+                    <div class="lot-display-big" id="lotDisplay">0.01</div>
+                </div>
 
-            <div class="margin-warning hidden" id="marginWarning">
-                <i class="fas fa-triangle-exclamation"></i>
-                <span id="marginWarningText">Exceeds free margin</span>
-            </div>
+                <div class="lot-meta">
+                    <span class="lot-max" id="lotMaxBadge">Max: 2.72</span>
+                </div>
 
-            <div class="lot-presets">
-                <button class="preset-btn active" data-lot="0.01">0.01</button>
-                <button class="preset-btn" data-lot="0.05">0.05</button>
-                <button class="preset-btn" data-lot="0.10">0.10</button>
-                <button class="preset-btn" data-lot="0.50">0.50</button>
-                <button class="preset-btn" data-lot="1.00">1.00</button>
-            </div>
+                <input type="range" class="lot-slider" id="lotSlider" min="0.01" max="2.72" step="0.01" value="0.01">
+                <div class="slider-labels">
+                    <span>0.01</span>
+                    <span id="sliderMaxLabel">2.72</span>
+                </div>
 
-            <!-- TP / SL -->
-            <div class="tpsl-block">
-                <div class="tpsl-block-header">
-                    <div class="tpsl-block-title">
-                        <i class="fas fa-shield-halved"></i> TP / SL
+                <div class="margin-warning hidden" id="marginWarning">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span id="marginWarningText">Exceeds free margin</span>
+                </div>
+
+                <div class="lot-presets">
+                    <button class="preset-btn active" data-lot="0.01">0.01</button>
+                    <button class="preset-btn" data-lot="0.05">0.05</button>
+                    <button class="preset-btn" data-lot="0.10">0.10</button>
+                    <button class="preset-btn" data-lot="0.50">0.50</button>
+                    <button class="preset-btn" data-lot="1.00">1.00</button>
+                </div>
+
+                <!-- TP / SL -->
+                <div class="tpsl-block">
+                    <div class="tpsl-block-header">
+                        <div class="tpsl-block-title">
+                            <i class="fas fa-shield-halved"></i> TP / SL
+                        </div>
+                    </div>
+
+                    <div class="tpsl-toggles">
+                        <button class="tpsl-toggle tp" id="tpToggle">
+                            <span class="tpsl-toggle-label">Take Profit</span>
+                            <span class="tpsl-toggle-sub">Tap to enable</span>
+                        </button>
+                        <button class="tpsl-toggle sl" id="slToggle">
+                            <span class="tpsl-toggle-label">Stop Loss</span>
+                            <span class="tpsl-toggle-sub">Tap to enable</span>
+                        </button>
+                    </div>
+
+                    <div class="tpsl-empty" id="tpslEmpty">
+                        No TP or SL — trade executes at market
+                    </div>
+
+                    <div class="tpsl-row tp hidden" id="tpRow">
+                        <span class="tpsl-row-label tp">
+                            <i class="fas fa-arrow-up"></i> TP
+                        </span>
+                        <input type="number" class="tpsl-input" id="tpInput" step="0.00001">
+                        <span class="tpsl-pips positive" id="tpPips">+21.5p</span>
+                    </div>
+
+                    <div class="tpsl-row sl hidden" id="slRow">
+                        <span class="tpsl-row-label sl">
+                            <i class="fas fa-arrow-down"></i> SL
+                        </span>
+                        <input type="number" class="tpsl-input" id="slInput" step="0.00001">
+                        <span class="tpsl-pips negative" id="slPips">-23.5p</span>
+                    </div>
+
+                    <div class="rr-row hidden" id="rrDisplay">
+                        <span class="rr-label">Risk / Reward</span>
+                        <span class="rr-value" id="rrValue">1 : 2.00</span>
+                    </div>
+
+                    <div class="pip-presets hidden" id="pipPresets">
+                        <button class="pip-preset-btn" data-pips="10">10p</button>
+                        <button class="pip-preset-btn" data-pips="20">20p</button>
+                        <button class="pip-preset-btn" data-pips="50">50p</button>
+                        <button class="pip-preset-btn" data-pips="100">100p</button>
+                        <button class="pip-preset-btn" data-rr="2">1:2</button>
+                        <button class="pip-preset-btn" data-rr="3">1:3</button>
                     </div>
                 </div>
 
-                <div class="tpsl-toggles">
-                    <button class="tpsl-toggle tp" id="tpToggle">
-                        <span class="tpsl-toggle-label">Take Profit</span>
-                        <span class="tpsl-toggle-sub">Tap to enable</span>
-                    </button>
-                    <button class="tpsl-toggle sl" id="slToggle">
-                        <span class="tpsl-toggle-label">Stop Loss</span>
-                        <span class="tpsl-toggle-sub">Tap to enable</span>
-                    </button>
-                </div>
-
-                <div class="tpsl-empty" id="tpslEmpty">
-                    No TP or SL — trade executes at market
-                </div>
-
-                <div class="tpsl-row tp hidden" id="tpRow">
-                    <span class="tpsl-row-label tp">
-                        <i class="fas fa-arrow-up"></i> TP
-                    </span>
-                    <input type="number" class="tpsl-input" id="tpInput" step="0.00001">
-                    <span class="tpsl-pips positive" id="tpPips">+21.5p</span>
-                </div>
-
-                <div class="tpsl-row sl hidden" id="slRow">
-                    <span class="tpsl-row-label sl">
-                        <i class="fas fa-arrow-down"></i> SL
-                    </span>
-                    <input type="number" class="tpsl-input" id="slInput" step="0.00001">
-                    <span class="tpsl-pips negative" id="slPips">-23.5p</span>
-                </div>
-
-                <div class="rr-row hidden" id="rrDisplay">
-                    <span class="rr-label">Risk / Reward</span>
-                    <span class="rr-value" id="rrValue">1 : 2.00</span>
-                </div>
-
-                <div class="pip-presets hidden" id="pipPresets">
-                    <button class="pip-preset-btn" data-pips="10">10p</button>
-                    <button class="pip-preset-btn" data-pips="20">20p</button>
-                    <button class="pip-preset-btn" data-pips="50">50p</button>
-                    <button class="pip-preset-btn" data-pips="100">100p</button>
-                    <button class="pip-preset-btn" data-rr="2">1:2</button>
-                    <button class="pip-preset-btn" data-rr="3">1:3</button>
-                </div>
-            </div>
-
-            <!-- RISK % -->
-            <div class="risk-pct-block hidden" id="riskPctBlock">
-                <div class="risk-pct-header">
-                    <div class="risk-pct-title">
-                        <i class="fas fa-percent"></i> Risk %
+                <!-- RISK % -->
+                <div class="risk-pct-block hidden" id="riskPctBlock">
+                    <div class="risk-pct-header">
+                        <div class="risk-pct-title">
+                            <i class="fas fa-percent"></i> Risk %
+                        </div>
+                        <span class="risk-pct-badge" id="riskPctBadge">0.00%</span>
                     </div>
-                    <span class="risk-pct-badge" id="riskPctBadge">0.00%</span>
+                    <div class="risk-pct-presets">
+                        <button class="risk-pct-btn" data-pct="0.5">0.5%</button>
+                        <button class="risk-pct-btn" data-pct="1">1%</button>
+                        <button class="risk-pct-btn" data-pct="2">2%</button>
+                        <button class="risk-pct-btn" data-pct="3">3%</button>
+                        <button class="risk-pct-btn" data-pct="5">5%</button>
+                    </div>
+                    <div class="risk-pct-input-row">
+                        <span class="risk-pct-label">Custom %</span>
+                        <input type="number" class="risk-pct-input" id="riskPctInput"
+                               placeholder="0.00" min="0.01" max="100" step="0.1">
+                    </div>
+                    <div class="risk-pct-note" id="riskPctNote">
+                        Enable SL to auto-calculate lot size
+                    </div>
                 </div>
-                <div class="risk-pct-presets">
-                    <button class="risk-pct-btn" data-pct="0.5">0.5%</button>
-                    <button class="risk-pct-btn" data-pct="1">1%</button>
-                    <button class="risk-pct-btn" data-pct="2">2%</button>
-                    <button class="risk-pct-btn" data-pct="3">3%</button>
-                    <button class="risk-pct-btn" data-pct="5">5%</button>
-                </div>
-                <div class="risk-pct-input-row">
-                    <span class="risk-pct-label">Custom %</span>
-                    <input type="number" class="risk-pct-input" id="riskPctInput"
-                           placeholder="0.00" min="0.01" max="100" step="0.1">
-                </div>
-                <div class="risk-pct-note" id="riskPctNote">
-                    Enable SL to auto-calculate lot size
-                </div>
-            </div>
 
-            <!-- Lot Stats -->
-            <div class="lot-stats">
-                <div class="stat-item">
-                    <div class="stat-label">Risk</div>
-                    <div class="stat-value" id="riskAmount">--</div>
+                <!-- Lot Stats -->
+                <div class="lot-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Risk</div>
+                        <div class="stat-value" id="riskAmount">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Margin</div>
+                        <div class="stat-value" id="marginAmount">$33.33</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Value</div>
+                        <div class="stat-value" id="positionValue">$1,085</div>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-label">Margin</div>
-                    <div class="stat-value" id="marginAmount">$33.33</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Value</div>
-                    <div class="stat-value" id="positionValue">$1,085</div>
-                </div>
-            </div>
 
+            </div>
         </div>
-    </div>
 
-    <!-- FOOTER: OPEN POSITIONS + CLOSE ALL -->
+    </div>
+    <!-- END SCROLLABLE BODY -->
+
+    <!-- FOOTER: OPEN POSITIONS + CLOSE ALL (fixed, outside scroll) -->
     <div class="panel-footer">
         <button class="positions-btn-footer" id="openPositionsBtn">
             <i class="fas fa-table-list"></i>
