@@ -1,20 +1,12 @@
 <!-- ================================================================ -->
-<!-- ⚙️ TRADING PREFERENCES MODAL                                    -->
+<!-- ⚙️ TRADING PREFERENCES DROPDOWN                                 -->
 <!-- ================================================================ -->
-
-<div class="trading-prefs-backdrop hidden" id="tradingPrefsBackdrop"></div>
-
-<div class="trading-prefs-modal hidden" id="tradingPrefsModal">
+<div class="trading-prefs-drop" id="tradingPrefsDrop">
 
     <!-- HEADER -->
-    <div class="trading-prefs-header">
-        <div class="trading-prefs-header-left">
-            <i class="fas fa-sliders-h"></i>
-            <span>Trading Preferences</span>
-        </div>
-        <button class="trading-prefs-close" id="tradingPrefsClose">
-            <i class="fas fa-times"></i>
-        </button>
+    <div class="trading-prefs-drop-header">
+        <i class="fas fa-sliders-h"></i>
+        <span>Trading Preferences</span>
     </div>
 
     <!-- BODY -->
@@ -196,16 +188,15 @@
             </div>
         </div>
 
-    </div>
+        <!-- FOOTER ACTIONS -->
+        <div class="trading-prefs-drop-footer">
+            <button class="trading-prefs-save-btn" id="tradingPrefsSave">
+                <i class="fas fa-check"></i> Save
+            </button>
+            <button class="trading-prefs-cancel-btn" id="tradingPrefsCancel">
+                Cancel
+            </button>
+        </div>
 
-    <!-- FOOTER -->
-    <div class="trading-prefs-footer">
-        <button class="trading-prefs-save-btn" id="tradingPrefsSave">
-            <i class="fas fa-check"></i> Save
-        </button>
-        <button class="trading-prefs-cancel-btn" id="tradingPrefsCancel">
-            Cancel
-        </button>
     </div>
-
 </div>
