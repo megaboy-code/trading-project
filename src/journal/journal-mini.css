@@ -41,18 +41,19 @@
 .journal-dropdown {
     display: none;
     position: absolute;
-    top: 38px;
-    right: 8px;
-    background: var(--bg-panel);
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    z-index: 100;
-    min-width: 140px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    z-index: 999;
+    min-width: 160px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     overflow: hidden;
+    flex-direction: column;
 }
 
-.journal-dropdown.open { display: block; }
+.journal-dropdown.open { display: flex; }
 
 .journal-dropdown-item {
     display: flex;
@@ -62,16 +63,16 @@
     padding: 8px 12px;
     background: transparent;
     border: none;
-    color: var(--text-primary);
-    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-base);
     font-family: var(--text-sans);
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: background 0.15s ease;
     text-align: left;
 }
 
-.journal-dropdown-item:hover { background: var(--bg-hover); }
-.journal-dropdown-item i     { color: var(--text-muted); font-size: var(--text-sm); }
+.journal-dropdown-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.journal-dropdown-item i     { color: var(--text-muted); font-size: var(--text-base); }
 
 /* ── Column headers ── */
 .journal-mini-cols {
