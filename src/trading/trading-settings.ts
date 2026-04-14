@@ -79,8 +79,15 @@ export class TradingSettings {
     // ================================================================
 
     public open(): void {
+        const btn  = document.getElementById('panelMenuBtn');
+        const drop = document.getElementById('tradingPrefsDrop');
+        if (!drop) return;
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            drop.style.top = `${rect.bottom + 6}px`;
+        }
         this.populateUI();
-        document.getElementById('tradingPrefsDrop')?.classList.add('show');
+        drop.classList.add('show');
     }
 
     public close(): void {
@@ -98,8 +105,13 @@ export class TradingSettings {
 
         this.boundMenuBtn = (e) => {
             (e as Event).stopPropagation();
+            const isOpen = drop.classList.contains('show');
+            if (!isOpen) {
+                const rect = btn.getBoundingClientRect();
+                drop.style.top = `${rect.bottom + 6}px`;
+                this.populateUI();
+            }
             drop.classList.toggle('show');
-            if (drop.classList.contains('show')) this.populateUI();
         };
         btn.addEventListener('click', this.boundMenuBtn);
 
@@ -344,25 +356,24 @@ export class TradingSettings {
     // ================================================================
 
     public destroy(): void {
-        const btn     = document.getElementById('panelMenuBtn');
-        const drop    = document.getElementById('tradingPrefsDrop');
-        const saveBtn = document.getElementById('tradingPrefsSave');
+        const btn       = document.getElementById('panelMenuBtn');
+        const drop      = document.getElementById('tradingPrefsDrop');
+        const saveBtn   = document.getElementById('tradingPrefsSave');
         const cancelBtn = document.getElementById('tradingPrefsCancel');
         const trailing  = document.getElementById('tpTrailingEnabled');
         const method    = document.getElementById('tpTrailingMethod');
         const tpLimit   = document.getElementById('tpTpMaxLimit');
         const slLimit   = document.getElementById('tpSlMaxLimit');
 
-        if (this.boundMenuBtn    && btn)      btn.removeEventListener('click',   this.boundMenuBtn);
-        if (this.boundOutsideClick)           document.removeEventListener('click', this.boundOutsideClick);
-        if (this.boundSave       && saveBtn)  saveBtn.removeEventListener('click',  this.boundSave);
-        if (this.boundCancel     && cancelBtn) cancelBtn.removeEventListener('click', this.boundCancel);
-        if (this.boundTrailing   && trailing) trailing.removeEventListener('change', this.boundTrailing);
-        if (this.boundMethod     && method)   method.removeEventListener('change',   this.boundMethod);
-        if (this.boundTpLimit    && tpLimit)  tpLimit.removeEventListener('change',  this.boundTpLimit);
-        if (this.boundSlLimit    && slLimit)  slLimit.removeEventListener('change',  this.boundSlLimit);
+        if (this.boundMenuBtn      && btn)       btn.removeEventListener('click',   this.boundMenuBtn);
+        if (this.boundOutsideClick)              document.removeEventListener('click', this.boundOutsideClick);
+        if (this.boundSave         && saveBtn)   saveBtn.removeEventListener('click',  this.boundSave);
+        if (this.boundCancel       && cancelBtn) cancelBtn.removeEventListener('click', this.boundCancel);
+        if (this.boundTrailing     && trailing)  trailing.removeEventListener('change', this.boundTrailing);
+        if (this.boundMethod       && method)    method.removeEventListener('change',   this.boundMethod);
+        if (this.boundTpLimit      && tpLimit)   tpLimit.removeEventListener('change',  this.boundTpLimit);
+        if (this.boundSlLimit      && slLimit)   slLimit.removeEventListener('change',  this.boundSlLimit);
 
-        // Stop dropdown clicks from propagating
         drop?.removeEventListener('click', (e) => e.stopPropagation());
     }
 }
