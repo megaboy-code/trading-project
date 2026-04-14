@@ -1,467 +1,232 @@
-/* ============================================
-   PANELS MODULE - Right Sidebar (Refactored)
-   ============================================ */
+// ================================================================
+// ⚡ PANELS MODULE - Icon Click Toggle
+// ================================================================
 
-/* ==================== PANEL STATES ==================== */
-.tools-panel {
-    height: calc(100vh - var(--header-height));
-    position: fixed;
-    right: 0;
-    top: var(--header-height);
-    z-index: 1000;
-    background: var(--bg-card);
-    border-left: 1px solid var(--border);
-    /* ✅ FIX #7: Removed width transition to prevent layout recalc on panel expansion */
-    transition: background-color 0.25s ease,
-                border-color 0.25s ease;
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    width: var(--sidebar-right-width);
-}
+import {
+    PanelMap,
+    PanelState,
+    IPanelUI
+} from './panel-types';
 
-.tools-panel.collapsed { width: var(--sidebar-right-width) !important; }
-.tools-panel.expanded  { width: var(--panel-width) !important; }
+export class PanelsModule {
+    private isPanelExpanded: boolean = false;
+    private activeTool: string = 'trading';
 
-/* ==================== PANEL CONTENT ==================== */
-.panel-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: var(--panel-content-width) !important;
-    height: 100%;
-    padding: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    display: none !important;
-    background: var(--bg-card);
-    box-sizing: border-box;
-    transition: background-color 0.25s ease;
-}
+    private panelMap: PanelMap = {
+        'trading':   '.trading-panel',
+        'watchlist': '.watchlist-panel',
+        'calendar':  '.calendar-panel',
+        'alerts':    '.alerts-panel',
+        'journal':   '.journal-panel',
+    };
 
-.tools-panel.expanded .panel-content.active {
-    display: flex !important;
-    flex-direction: column;
-}
+    // ✅ Tools that do NOT expand the panel — trigger modals or tabs
+    private modalTools: string[] = ['settings'];
 
-.tools-panel.expanded .panel-content:not(.active) {
-    display: none !important;
-}
+    // DOM Elements
+    private panel: HTMLElement | null = null;
+    private toolIcons: NodeListOf<Element> | null = null;
+    private panelContents: NodeListOf<Element> | null = null;
+    private mainChartArea: HTMLElement | null = null;
 
-/* ==================== TOOL ICONS ==================== */
-.tool-icons {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    width: var(--sidebar-right-width);
-    height: 100%;
-    background: var(--bg-card);
-    border-left: 1px solid var(--border);
-    position: absolute;
-    right: 0;
-    top: 0;
-    z-index: 2;
-    transition: background-color 0.25s ease, border-color 0.25s ease;
-}
+    private panelUI: IPanelUI | null = null;
 
-/* ── Top group ── */
-.tool-icons-top {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    width: 100%;
-}
-
-/* ── Bottom group ── */
-.tool-icons-bottom {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    width: 100%;
-}
-
-/* ── Divider ── */
-.tool-icons-divider {
-    width: 24px;
-    height: 1px;
-    background: var(--border);
-    margin: 4px auto;
-}
-
-/* ==================== TOOL ICON BUTTON ==================== */
-.tool-icon {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 7px;
-    cursor: pointer;
-    color: var(--text-muted);
-    font-size: 15px;
-    position: relative;
-    border: 1px solid transparent;
-    /* ✅ FIX: Removed transition: all */
-}
-
-.tool-icon:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border);
-}
-
-.tool-icon.active {
-    background: rgba(var(--accent-info-rgb), 0.12);
-    color: var(--accent-info);
-    border-color: rgba(var(--accent-info-rgb), 0.25);
-}
-
-/* ── Active left bar indicator ── */
-.tool-icon.active::after {
-    content: '';
-    position: absolute;
-    left: -7px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 18px;
-    background: var(--accent-info);
-    border-radius: 2px;
-}
-
-/* ── Settings — no active state ── */
-.tool-icon.settings.active {
-    background: transparent;
-    color: var(--text-muted);
-    border-color: transparent;
-}
-
-.tool-icon.settings.active::after { display: none; }
-
-.tool-icon.settings:hover i {
-    animation: spin 1.2s linear infinite;
-}
-
-/* ==================== TOOLTIP ==================== */
-.tool-icon[data-tooltip]::before {
-    content: attr(data-tooltip);
-    position: absolute;
-    right: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    white-space: nowrap;
-    padding: 4px 8px;
-    border-radius: 5px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    box-shadow: var(--shadow-sm);
-    z-index: 9999;
-    font-family: var(--text-sans);
-}
-
-.tool-icon[data-tooltip]:hover::before { opacity: 1; }
-
-/* ── Override active::after conflict ── */
-.tool-icon.active[data-tooltip]::before {
-    content: attr(data-tooltip);
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    padding: 4px 8px;
-    border-radius: 5px;
-    width: auto;
-    height: auto;
-    left: auto;
-    top: 50%;
-    right: calc(100% + 10px);
-    transform: translateY(-50%);
-    opacity: 0;
-}
-
-.tool-icon.active[data-tooltip]:hover::before { opacity: 1; }
-
-/* ── Tooltip arrow ── */
-.tool-icon[data-tooltip]::after {
-    content: '';
-    position: absolute;
-    right: calc(100% + 5px);
-    top: 50%;
-    transform: translateY(-50%);
-    border: 4px solid transparent;
-    border-left-color: var(--border);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    z-index: 9999;
-    width: auto;
-    height: auto;
-    background: none;
-    border-radius: 0;
-}
-
-.tool-icon[data-tooltip]:hover::after { opacity: 1; }
-
-/* ── Fix active::after conflict with tooltip arrow ── */
-.tool-icon.active::after {
-    content: '';
-    position: absolute;
-    left: -7px;
-    top: 50%;
-    right: auto;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 18px;
-    background: var(--accent-info);
-    border-radius: 2px;
-    border: none;
-    opacity: 1;
-}
-
-.tool-icon.active:hover::after {
-    content: '';
-    left: -7px;
-    right: auto;
-    width: 3px;
-    height: 18px;
-    background: var(--accent-info);
-    border-left-color: transparent;
-    opacity: 1;
-}
-
-/* ==================== BADGE ==================== */
-.tool-badge {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    background: var(--accent-sell);
-    color: #ffffff;
-    font-size: 0.48rem;
-    font-weight: 700;
-    min-width: 13px;
-    height: 13px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 3px;
-    border: 1.5px solid var(--bg-card);
-    pointer-events: none;
-    line-height: 1;
-}
-
-.tool-badge.buy { background: var(--accent-buy); }
-
-/* ==================== PANEL HEADER ==================== */
-.panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    transition: border-color 0.25s ease;
-}
-
-.panel-header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: var(--text-base);
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.panel-header-left i { color: var(--accent-info); }
-
-.panel-header-right {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* ── Shared button for panel headers ── */
-.panel-menu-btn,
-.panel-icon-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    background: var(--bg-base);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: var(--text-base);
-    /* ✅ FIX: Removed transition: all */
-}
-
-.panel-menu-btn:hover,
-.panel-icon-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border-light);
-}
-
-.panel-icon-btn.add:hover {
-    background: rgba(var(--accent-buy-rgb), 0.1);
-    border-color: rgba(var(--accent-buy-rgb), 0.3);
-    color: var(--accent-buy);
-}
-
-/* ==================== PANEL FOOTER ==================== */
-.panel-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 7px 12px;
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-    transition: border-color 0.25s ease;
-}
-
-/* ==================== PANEL CONTENT ANIMATION ==================== */
-.panel-content.active { animation: slideInLeft 0.3s ease; }
-
-@keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(10px); }
-    to   { opacity: 1; transform: translateX(0); }
-}
-
-/* ==================== CHILD CONTENT CONTAINERS ==================== */
-.panel-content > * {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    min-width: 0 !important;
-}
-
-.panel-content > div,
-.panel-content > section,
-.panel-content > .analysis-panel,
-.panel-content > .mega-section {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-}
-
-/* ==================== SCROLLBAR ==================== */
-.panel-content::-webkit-scrollbar { width: 4px; }
-.panel-content::-webkit-scrollbar-track { background: var(--bg-base); }
-.panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.panel-content::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-/* ==================== PANEL SECTIONS ==================== */
-.panel-content:not(.trading-panel) .panel-section {
-    margin-bottom: 10px;
-    width: 100%;
-}
-
-.panel-section-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: var(--glass-gradient), var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    transition: background-color 0.25s ease, border-color 0.25s ease;
-}
-
-.panel-section h4 {
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.panel-section h4 i { color: var(--accent-info); }
-
-.panel-section h5 {
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    margin-bottom: 8px;
-}
-
-/* ==================== PANEL CARDS ==================== */
-.panel-card {
-    background: var(--glass-gradient), var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 8px;
-    transition: background-color 0.25s ease, border-color 0.25s ease;
-}
-
-.panel-card:hover { border-color: var(--border-light); }
-
-/* ==================== PANEL ROWS ==================== */
-.panel-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--border-light);
-    font-size: var(--text-base);
-}
-
-.panel-row:last-child { border-bottom: none; }
-.panel-row-label { color: var(--text-muted); }
-
-.panel-row-value {
-    color: var(--text-primary);
-    font-weight: 600;
-    font-family: var(--text-mono);
-}
-
-.panel-row-value.positive { color: var(--accent-buy); }
-.panel-row-value.negative { color: var(--accent-sell); }
-
-/* ==================== ANIMATIONS ==================== */
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-}
-
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1400px) {
-    .panel-content { padding: 0; }
-}
-
-@media (max-width: 768px) {
-    .tools-panel.expanded {
-        position: fixed;
-        height: 100%;
-        z-index: 10000;
-        box-shadow: -5px 0 25px rgba(0, 0, 0, 0.3);
-        width: calc(var(--panel-content-width) + var(--sidebar-right-width)) !important;
+    constructor() {
+        console.log("🔧 Panels Module - Icon Click Toggle Sidebar");
     }
 
-    .panel-content {
-        width: calc(var(--panel-content-width) - 35px) !important;
-        padding: 0;
-    }
-}
+    // ==================== UI INJECTION ====================
 
-/* ==================== REDUCED MOTION ==================== */
-@media (prefers-reduced-motion: reduce) {
-    .tools-panel { transition: none; }
-    .panel-content.active { animation: none; }
-    .tool-icon:hover { transform: none; }
-    .tool-icon.settings:hover i { animation: none; }
+    public setUI(panelUI: IPanelUI): void {
+        this.panelUI = panelUI;
+        console.log('✅ PanelUI injected into PanelsModule');
+    }
+
+    // ==================== INITIALIZATION ====================
+
+    public initialize(): void {
+        if (!this.panelUI) {
+            console.error('❌ PanelUI not set! Call setUI() before initialize()');
+            return;
+        }
+
+        this.cacheElements();
+        this.setupEventListeners();
+        this.applyInitialState();
+
+        console.log("✅ Panel system ready");
+    }
+
+    private cacheElements(): void {
+        this.panel         = document.getElementById('toolsPanel');
+        this.toolIcons     = document.querySelectorAll('.tool-icon');
+        this.panelContents = document.querySelectorAll('.panel-content');
+        this.mainChartArea = document.getElementById('mainChartArea');
+    }
+
+    private setupEventListeners(): void {
+        if (!this.panel) {
+            console.error('❌ Tools panel not found in DOM');
+            return;
+        }
+
+        this.toolIcons?.forEach(icon => {
+            icon.addEventListener('click', (e: Event) => {
+                e.stopPropagation();
+                const tool = (icon as HTMLElement).getAttribute('data-tool');
+                if (!tool) return;
+
+                // ✅ Modal/tab tools — never expand panel
+                if (this.modalTools.includes(tool)) {
+                    this.handleModalTool(tool);
+                    return;
+                }
+
+                if (this.activeTool === tool && this.isPanelExpanded) {
+                    this.collapsePanel();
+                } else {
+                    this.show(tool);
+                }
+            });
+        });
+
+        document.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && this.isPanelExpanded) {
+                this.collapsePanel();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            this.adjustChartSpace();
+        });
+    }
+
+    // ==================== MODAL TOOLS ====================
+
+    private handleModalTool(tool: string): void {
+        switch (tool) {
+            case 'settings':
+                document.dispatchEvent(new CustomEvent('chart-settings-modal-request'));
+                break;
+        }
+    }
+
+    // ==================== VISIBILITY STATES ====================
+
+    private collapsePanel(): void {
+        this.isPanelExpanded = false;
+
+        if (this.panel) {
+            this.panel.classList.remove('expanded');
+            this.panel.classList.add('collapsed');
+        }
+
+        this.adjustChartSpace();
+        console.log("📤 Panel collapsed");
+    }
+
+    private expandPanel(): void {
+        this.isPanelExpanded = true;
+
+        if (this.panel) {
+            this.panel.classList.remove('collapsed');
+            this.panel.classList.add('expanded');
+        }
+
+        this.adjustChartSpace();
+        console.log("📥 Panel expanded");
+    }
+
+    // ==================== TOOL MANAGEMENT ====================
+
+    public show(tool: string): void {
+        if (!this.panelMap[tool]) {
+            console.warn(`⚠️ Unknown panel tool: ${tool}`);
+            return;
+        }
+
+        this.activeTool = tool;
+        this.updateToolIcons();
+        this.updatePanelContent();
+
+        if (!this.isPanelExpanded) {
+            this.expandPanel();
+        }
+
+        console.log(`🔧 Showing panel: ${tool}`);
+    }
+
+    private updateToolIcons(): void {
+        this.toolIcons?.forEach(icon => {
+            const tool = icon.getAttribute('data-tool');
+
+            // ✅ Modal tools never get active class
+            if (this.modalTools.includes(tool || '')) return;
+
+            icon.classList.toggle('active', tool === this.activeTool);
+        });
+    }
+
+    private updatePanelContent(): void {
+        this.panelContents?.forEach(content => {
+            content.classList.remove('active');
+        });
+
+        const targetSelector = this.panelMap[this.activeTool];
+        if (targetSelector) {
+            const targetPanel = document.querySelector(targetSelector);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
+        }
+    }
+
+    // ==================== CHART SPACE ====================
+
+    private adjustChartSpace(): void {
+        if (!this.mainChartArea) return;
+
+        this.mainChartArea.classList.remove('panel-expanded', 'strategies-expanded');
+
+        if (this.isPanelExpanded) {
+            this.mainChartArea.classList.add('panel-expanded');
+        }
+    }
+
+    // ==================== PUBLIC API ====================
+
+    public getState(): PanelState {
+        return {
+            isExpanded: this.isPanelExpanded,
+            isLocked:   false,
+            activeTool: this.activeTool
+        };
+    }
+
+    public hide(): void {
+        this.collapsePanel();
+    }
+
+    public toggle(tool: string | null = null): void {
+        if (this.isPanelExpanded) {
+            this.collapsePanel();
+        } else {
+            if (tool) {
+                this.show(tool);
+            } else {
+                this.expandPanel();
+            }
+        }
+    }
+
+    // ==================== INITIAL STATE ====================
+
+    private applyInitialState(): void {
+        if (this.panel) {
+            this.panel.classList.add('collapsed');
+        }
+        this.activeTool = 'trading';
+        this.updateToolIcons();
+        this.updatePanelContent();
+    }
 }
