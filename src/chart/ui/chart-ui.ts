@@ -158,14 +158,31 @@ export class ChartUI {
     }
 
     // ================================================================
-    // AVAILABLE CONFIG — received from backend via DOM event
+    // AVAILABLE CONFIG — merge incoming into existing config
+    // Two pushes arrive: chart config first, symbols after MT5 connects
     // ================================================================
 
     private handleAvailableConfig(e: Event): void {
-        const config = (e as CustomEvent).detail as AvailableConfig;
-        if (!config) return;
+        const incoming = (e as CustomEvent).detail as AvailableConfig;
+        if (!incoming) return;
 
-        this.config = config;
+        if (!this.config) {
+            this.config = {
+                symbols:            [],
+                timeframes_visible: [],
+                timeframes_more:    [],
+                indicators:         [],
+                strategies:         [],
+                patterns:           []
+            };
+        }
+
+        if (incoming.symbols?.length)            this.config.symbols            = incoming.symbols;
+        if (incoming.timeframes_visible?.length) this.config.timeframes_visible = incoming.timeframes_visible;
+        if (incoming.timeframes_more?.length)    this.config.timeframes_more    = incoming.timeframes_more;
+        if (incoming.indicators?.length)         this.config.indicators         = incoming.indicators;
+        if (incoming.strategies?.length)         this.config.strategies         = incoming.strategies;
+        if (incoming.patterns?.length)           this.config.patterns           = incoming.patterns;
 
         this.renderTimeframes();
         this.renderSymbolRows();
