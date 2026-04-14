@@ -12,6 +12,19 @@
     border-bottom: none;
 }
 
+/* ==================== TRADING PANEL BODY (scrollable) ==================== */
+.trading-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.trading-panel-body::-webkit-scrollbar { width: 4px; }
+.trading-panel-body::-webkit-scrollbar-track { background: transparent; }
+.trading-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
 /* ==================== ELEVATED HELPER ==================== */
 .elevated {
     background: var(--glass-gradient), var(--bg-elevated);
