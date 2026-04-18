@@ -19,7 +19,6 @@ export class ChartLegend {
 
     private collapsed: boolean = false;
 
-    // ✅ AbortController — one abort() removes all listeners
     private abortController: AbortController | null = null;
 
     constructor(chartContainer: HTMLElement) {
@@ -70,7 +69,6 @@ export class ChartLegend {
             pointer-events: auto;
         `;
 
-        // ✅ Recreate after destroy() to reset _destroyed flag
         this.paneManager = new LegendPaneManager();
         this.paneManager.setMainContainer(this.mainItemContainer, this.chartContainer);
 
@@ -91,27 +89,15 @@ export class ChartLegend {
             if (config?.symbols) setConfigSymbols(config.symbols);
         }, { signal });
 
-        document.addEventListener('legend-item-settings', (e: Event) => {
-            const { id, item } = (e as CustomEvent).detail;
-            document.dispatchEvent(new CustomEvent('open-item-settings', {
-                detail: { id, item }
-            }));
-        }, { signal });
-
-        document.addEventListener('legend-item-toggle', (e: Event) => {
-            const { id } = (e as CustomEvent).detail;
-            document.dispatchEvent(new CustomEvent('legend-toggle-item', {
-                detail: { id }
-            }));
-        }, { signal });
-
+        // ── Remove item from legend only
+        // chart-core handles series + backend unsubscribe via its own listener
         document.addEventListener('legend-item-remove', (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             this.removeItem(id);
-            document.dispatchEvent(new CustomEvent('legend-remove-item', {
-                detail: { id }
-            }));
         }, { signal });
+
+        // ── Settings and toggle handled directly by chart-core
+        // No re-dispatch needed here
     }
 
     // ==================== PUBLIC API ====================
