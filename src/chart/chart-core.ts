@@ -204,7 +204,7 @@ export class ChartModule {
         this.initializePriceAlerts();
         this.initializeChartUI();
         this.initializeContextMenu();
-        this.initializeIndicatorManager(); // ── initialized with everything else ──
+        this.initializeIndicatorManager();
         this.setupCrosshairTracking();
 
         ChartSettingsModal.restoreActiveTemplate();
@@ -283,10 +283,6 @@ export class ChartModule {
         this.contextMenu = new ChartContextMenu();
     }
 
-    // ================================================================
-    // INDICATOR MANAGER — initialized at chart ready, no lazy load
-    // Ready before any WebSocket data arrives — no race condition
-    // ================================================================
     private initializeIndicatorManager(): void {
         if (this.indicatorManager) return;
 
@@ -376,6 +372,10 @@ export class ChartModule {
         this._currentTimeframe = timeframe;
         this.mainChart.handleTimeframeChange(timeframe);
         this.visibilityMap.clear();
+
+        // ── Strategies clear series data, legend stays ──
+        // ── Indicators do nothing — backend sends new data with chart data ──
+        this.indicatorManager?.onTimeframeChange();
 
         if (this.chartLegend) {
             this.chartLegend.update({ timeframe });
@@ -597,7 +597,6 @@ export class ChartModule {
             );
         }, { signal });
 
-        // ── Fixed event names to match items-legend.ts ──
         document.addEventListener('legend-item-toggle', (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             if (!id) return;
@@ -632,16 +631,13 @@ export class ChartModule {
         document.addEventListener('add-indicator', async (e: Event) => {
             const { type } = (e as CustomEvent).detail;
             if (!type) return;
-
             if (type === 'VOLUME') {
                 await this.mainChart.toggleVolume();
                 return;
             }
-            // IndicatorManager already initialized in onChartReady
         }, { signal });
 
         document.addEventListener('deploy-strategy', async (e: Event) => {
-            // IndicatorManager already initialized in onChartReady
         }, { signal });
     }
 
