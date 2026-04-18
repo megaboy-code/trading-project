@@ -119,10 +119,6 @@ export class ModuleManager {
             const currentSymbol    = this.connectionManager.getCurrentSymbol();
             const currentTimeframe = this.connectionManager.getCurrentTimeframe();
 
-            console.log(
-                `[CandleData] arrived: ${symbol} ${timeframe} | current: ${currentSymbol} ${currentTimeframe} | candles: ${candles.length}`
-            );
-
             if (symbol !== currentSymbol || timeframe !== currentTimeframe) {
                 console.warn(
                     `[CandleData] DISCARDED — stale data for ${symbol} ${timeframe}`
@@ -201,7 +197,7 @@ export class ModuleManager {
             this.tradingInstance?.handleTradeConfirmation();
         });
 
-        // ── Notification — universal rich toast + journal live append ──
+        // ── Notification ──
         this.connectionManager.onNotification((data: NotificationPayload) => {
             this.handleNotification(data);
 
@@ -220,7 +216,7 @@ export class ModuleManager {
             }
         });
 
-        // ── Journal data — split by scope ──
+        // ── Journal data ──
         this.connectionManager.onJournalData((trades, scope) => {
             const mapped = trades.map((t: any) => ({
                 id:        t.ticket ?? t.id,
@@ -288,13 +284,18 @@ export class ModuleManager {
             ));
         });
 
-        // ── Available config — wire to ChartUI via DOM ──
+        // ── Available config ──
         this.connectionManager.onAvailableConfig((config) => {
             document.dispatchEvent(new CustomEvent(
                 'available-config-received', {
                     detail: config
                 }
             ));
+        });
+
+        // ── Indicator update — direct to IndicatorManager ──
+        this.connectionManager.onIndicatorUpdate((data) => {
+            this.chart?.getIndicatorManager()?.onIndicatorUpdate(data);
         });
 
         // ── Strategy data ──
@@ -535,6 +536,27 @@ export class ModuleManager {
         document.addEventListener('symbol-search-request', (e: Event) => {
             const { query } = (e as CustomEvent).detail;
             if (query) this.connectionManager.searchSymbols(query);
+        });
+
+        // ── Add indicator — subscribe to backend ──
+        document.addEventListener('add-indicator', (e: Event) => {
+            const { type } = (e as CustomEvent).detail;
+            if (!type || type === 'VOLUME') return;
+            this.connectionManager.subscribeIndicator(
+                type,
+                this.connectionManager.getCurrentSymbol(),
+                this.connectionManager.getCurrentTimeframe()
+            );
+        });
+
+        // ── Remove indicator — unsubscribe from backend ──
+        document.addEventListener('indicator-removed', (e: Event) => {
+            const { key, symbol, timeframe } = (e as CustomEvent).detail;
+            if (key && symbol && timeframe) {
+                this.connectionManager.unsubscribeIndicator(
+                    key, symbol, timeframe
+                );
+            }
         });
     }
 
