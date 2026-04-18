@@ -14,6 +14,7 @@ import { ChartContextMenu }   from './ui/context-menu';
 import { ChartSettingsModal } from './ui/chart-settings-modal';
 import { DrawingToolsConfig,
          LegendItem }         from './chart-types';
+import { IndicatorManager }   from './indicator/index';
 
 export class ChartModule {
     private mainChart:        MainChart;
@@ -26,11 +27,8 @@ export class ChartModule {
     private contextMenu:      ChartContextMenu | null = null;
     private resizeObserver:   ResizeObserver | null = null;
 
-    private indicatorManager: any | null = null;
-    public  strategyManager:  any | null = null;
-
+    private indicatorManager: IndicatorManager | null = null;
     private indicatorLoading: boolean = false;
-    private strategyLoading:  boolean = false;
 
     private abortController: AbortController | null = null;
 
@@ -42,7 +40,6 @@ export class ChartModule {
 
     private visibilityMap: Map<string, boolean> = new Map();
 
-    // ── Chart ready callback — registered by ModuleManager ──
     private _onChartReadyCb: (() => void) | null = null;
 
     constructor() {
@@ -65,11 +62,6 @@ export class ChartModule {
             this.handleInitialDataLoaded(detail);
         };
 
-        this.mainChart.onPriceUpdate = () => {
-            const latestOHLC = this.chartDataManager.getLatestOHLC();
-            if (latestOHLC) this.indicatorManager?.updateLatestValues(latestOHLC);
-        };
-
         this.mainChart.onSymbolChange = (symbol) => {
             this._currentSymbol = symbol;
             document.dispatchEvent(new CustomEvent('symbol-changed', {
@@ -82,12 +74,6 @@ export class ChartModule {
             document.dispatchEvent(new CustomEvent('timeframe-changed', {
                 detail: { timeframe }
             }));
-        };
-
-        this.mainChart.onStateChange = (state) => {
-            if (state === 'READY') {
-                this.indicatorManager?.recalculate();
-            }
         };
 
         this.mainChart.onVolumeUpdate = (volume, isBullish) => {
@@ -120,7 +106,7 @@ export class ChartModule {
     }
 
     // ================================================================
-    // CHART READY CALLBACK — registered by ModuleManager
+    // CHART READY CALLBACK
     // ================================================================
 
     public onChartReadyCallback(cb: () => void): void {
@@ -128,7 +114,7 @@ export class ChartModule {
     }
 
     // ================================================================
-    // DIRECT ACCESS — ModuleManager wires hot path directly
+    // DIRECT ACCESS
     // ================================================================
 
     public getSeriesManager(): any {
@@ -137,6 +123,10 @@ export class ChartModule {
 
     public getDataManager(): ChartDataManager {
         return this.chartDataManager;
+    }
+
+    public getIndicatorManager(): IndicatorManager | null {
+        return this.indicatorManager;
     }
 
     public setReady(): void {
@@ -293,7 +283,7 @@ export class ChartModule {
         this.contextMenu = new ChartContextMenu();
     }
 
-    // ==================== LAZY LOADERS ====================
+    // ==================== LAZY LOADER ====================
 
     private async loadIndicatorManager(): Promise<void> {
         if (this.indicatorManager || this.indicatorLoading) return;
@@ -309,7 +299,7 @@ export class ChartModule {
             this.indicatorManager.setMainChart(this.mainChart);
             this.indicatorManager.setChart(chart);
             this.indicatorManager.setSymbol(this._currentSymbol);
-            this.indicatorManager.initialize(this.chartDataManager);
+            this.indicatorManager.initialize();
 
             this.indicatorManager.onPaneCreated = async (pane: any) => {
                 if (this.chartLegend) {
@@ -319,27 +309,6 @@ export class ChartModule {
         } catch (error) {}
         finally {
             this.indicatorLoading = false;
-        }
-    }
-
-    private async loadStrategyManager(): Promise<void> {
-        if (this.strategyManager || this.strategyLoading) return;
-        this.strategyLoading = true;
-
-        try {
-            const chart = this.mainChart.getChart();
-            if (!chart) return;
-
-            const { FrontendStrategyManager } =
-                await import('./strategy-manager');
-
-            this.strategyManager = new FrontendStrategyManager();
-            this.strategyManager.setChart(chart);
-            this.strategyManager.setSymbol(this._currentSymbol);
-            this.strategyManager.initialize();
-        } catch (error) {}
-        finally {
-            this.strategyLoading = false;
         }
     }
 
@@ -386,11 +355,10 @@ export class ChartModule {
         if (this._currentSymbol === symbol) return;
         this._currentSymbol = symbol;
         this.mainChart.handleSymbolChange(symbol);
-        this.strategyManager?.clearAll();
         this.visibilityMap.clear();
 
         this.indicatorManager?.setSymbol(symbol);
-        this.strategyManager?.setSymbol(symbol);
+        this.indicatorManager?.clearAll();
 
         if (this.chartLegend) {
             this.chartLegend.update({
@@ -411,7 +379,6 @@ export class ChartModule {
         if (this._currentTimeframe === timeframe) return;
         this._currentTimeframe = timeframe;
         this.mainChart.handleTimeframeChange(timeframe);
-        this.strategyManager?.clearAll();
         this.visibilityMap.clear();
 
         if (this.chartLegend) {
@@ -425,7 +392,6 @@ export class ChartModule {
     public handleChartTypeChange(newChartType: string): void {
         if (this.mainChart.currentChartType === newChartType) return;
 
-        // ✅ Fix 1 — block onDataReady from importing drawings during switch
         this.drawingModule?.beginChartTypeSwitch();
         this.drawingModule?.saveDrawings();
         this.mainChart.setChartType(newChartType);
@@ -434,7 +400,6 @@ export class ChartModule {
         if (this.drawingModule && newSeries) {
             this.drawingModule.updateSeries(newSeries);
         }
-        // ✅ Fix 1 — unblock onDataReady after updateSeries handles reimport
         this.drawingModule?.endChartTypeSwitch();
 
         this.initializePriceAlerts();
@@ -614,51 +579,32 @@ export class ChartModule {
         }, { signal });
 
         document.addEventListener('indicator-value-update', (e: Event) => {
-            const { id, value, values } = (e as CustomEvent).detail;
+            const { id, values } = (e as CustomEvent).detail;
             if (!this.chartLegend) return;
-            if (values) {
-                this.chartLegend.updateItemValues(id, values);
-            } else if (value) {
-                this.chartLegend.updateItemValue(id, value);
-            }
+            if (values) this.chartLegend.updateItemValues(id, values);
         }, { signal });
 
         document.addEventListener('indicator-name-update', (e: Event) => {
-            const { id, name, settings } = (e as CustomEvent).detail;
+            const { id, name } = (e as CustomEvent).detail;
             if (this.chartLegend) {
                 this.chartLegend.updateItemName(id, name);
-                if (settings)
-                    this.chartLegend.updateItemSettings(id, settings);
             }
         }, { signal });
 
         document.addEventListener('open-item-settings', (e: Event) => {
             const { item } = (e as CustomEvent).detail as { item: LegendItem };
             if (!item) return;
-
-            if (item.icon === 'fa-robot') {
-                import('./ui/strategy-settings-modal').then(
-                    ({ StrategySettingsModal }) => {
-                        new StrategySettingsModal(item).open();
-                    }
-                );
-            } else {
-                import('./ui/indicator-settings-modal').then(
-                    ({ IndicatorSettingsModal }) => {
-                        new IndicatorSettingsModal(item).open();
-                    }
-                );
-            }
+            import('./ui/indicator-settings-modal').then(
+                ({ IndicatorSettingsModal }) => {
+                    new IndicatorSettingsModal(item).open();
+                }
+            );
         }, { signal });
 
         document.addEventListener('legend-toggle-item', (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             if (!id) return;
-            if (this.strategyManager?.hasStrategy(id)) {
-                this.strategyManager.toggleVisibility(id);
-            } else {
-                this.indicatorManager?.toggleVisibility(id);
-            }
+            this.indicatorManager?.toggleVisibility(id);
             const visible = this.toggleVisibilityState(id);
             if (this.chartLegend) {
                 this.chartLegend.setItemVisible(id, visible);
@@ -671,18 +617,13 @@ export class ChartModule {
 
             if (id === 'volume') {
                 await this.mainChart.toggleVolume();
-            } else if (this.strategyManager?.hasStrategy(id)) {
-                this.strategyManager.removeStrategyIndicators(id);
-                document.dispatchEvent(new CustomEvent('remove-strategy', {
-                    detail: { strategyId: id }
-                }));
             } else {
-                await this.indicatorManager?.removeIndicator(id);
+                this.indicatorManager?.removeIndicator(id);
             }
         }, { signal });
 
         document.addEventListener('add-indicator', async (e: Event) => {
-            const { type, config } = (e as CustomEvent).detail;
+            const { type, symbol, timeframe } = (e as CustomEvent).detail;
             if (!type) return;
 
             if (type === 'VOLUME') {
@@ -691,36 +632,10 @@ export class ChartModule {
             }
 
             await this.loadIndicatorManager();
-            if (type === 'RSI') {
-                await this.indicatorManager?.addPaneIndicator(
-                    type, config?.settings
-                );
-            } else {
-                this.indicatorManager?.addIndicator(type, config?.settings);
-            }
         }, { signal });
 
-        document.addEventListener('strategy_initial', async (e: Event) => {
-            await this.loadStrategyManager();
-            this.strategyManager?.addStrategyIndicators(
-                (e as CustomEvent).detail
-            );
-        }, { signal });
-
-        document.addEventListener('strategy_update', async (e: Event) => {
-            await this.loadStrategyManager();
-            this.strategyManager?.updateStrategyIndicators(
-                (e as CustomEvent).detail
-            );
-        }, { signal });
-
-        document.addEventListener('tab-switched', (e: Event) => {
-            const { tabId } = (e as CustomEvent).detail;
-            if (tabId === 'strategy') this.loadStrategyManager();
-        }, { signal });
-
-        document.addEventListener('deploy-strategy', () => {
-            this.loadStrategyManager();
+        document.addEventListener('deploy-strategy', async (e: Event) => {
+            await this.loadIndicatorManager();
         }, { signal });
     }
 
@@ -814,11 +729,6 @@ export class ChartModule {
             await this.indicatorManager.destroy();
             this.indicatorManager = null;
             this.indicatorLoading = false;
-        }
-        if (this.strategyManager) {
-            await this.strategyManager.destroy();
-            this.strategyManager = null;
-            this.strategyLoading = false;
         }
 
         if (this.chartDataManager) this.chartDataManager.clear();

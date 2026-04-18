@@ -1,15 +1,23 @@
 // ================================================================
-// ⚙️ INDICATOR SETTINGS MODAL
+// ⚙️ INDICATOR SETTINGS MODAL - Merged Indicator & Strategy
+// Backend drives config — frontend owns color and line width only
+// One modal for both indicators and strategies
+// Lines built from LegendItem.values — one row per line
 // ================================================================
 
 import { LegendItem } from '../chart-types';
-import { getIndicatorConfig, IndicatorFieldConfig } from '../indicator/indicator-configs';
+
+interface LineSettings {
+    name:      string;
+    color:     string;
+    lineWidth: number;
+}
 
 export class IndicatorSettingsModal {
-    private modal:    HTMLElement | null = null;
-    private item:     LegendItem;
-    private settings: Record<string, any> = {};
-    private color:    string;
+    private modal:        HTMLElement | null = null;
+    private item:         LegendItem;
+    private lineSettings: LineSettings[] = [];
+    private isStrategy:   boolean;
 
     // ==================== DRAGGING ====================
     private isDragging:  boolean = false;
@@ -17,19 +25,32 @@ export class IndicatorSettingsModal {
     private dragOffsetY: number  = 0;
 
     constructor(item: LegendItem) {
-        this.item     = item;
-        this.color    = item.color;
-        this.settings = item.settings ? { ...item.settings } : this.extractSettingsFallback();
+        this.item       = item;
+        this.isStrategy = item.icon === 'fa-robot';
+
+        // ── Build line settings from legend values ──
+        this.lineSettings = (item.values || []).map(v => ({
+            name:      v.label || v.color,
+            color:     v.color || '#00d394',
+            lineWidth: 1
+        }));
+
+        // ── Fallback — at least one line ──
+        if (this.lineSettings.length === 0) {
+            this.lineSettings.push({
+                name:      'Line',
+                color:     item.color || '#00d394',
+                lineWidth: 1
+            });
+        }
     }
 
     public open(): void {
-        if (document.getElementById('indicator-settings-modal')) return;
-
-        const type   = this.item.id.split('_')[0];
-        const config = getIndicatorConfig(type);
+        const modalId = 'indicator-settings-modal';
+        if (document.getElementById(modalId)) return;
 
         this.modal    = document.createElement('div');
-        this.modal.id = 'indicator-settings-modal';
+        this.modal.id = modalId;
         this.modal.style.cssText = `
             position: fixed;
             top: 50%;
@@ -41,26 +62,29 @@ export class IndicatorSettingsModal {
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             padding: 0;
-            width: 320px;
+            width: 300px;
             box-shadow: var(--card-shadow);
             z-index: 10001;
             font-family: var(--text-sans);
             overflow: hidden;
         `;
 
-        this.modal.appendChild(this.createHeader(config?.name || this.item.name));
+        const title = this.isStrategy ? 'Strategy Settings' : 'Indicator Settings';
+        this.modal.appendChild(this.createHeader(title));
 
         const body = document.createElement('div');
         body.style.cssText = `padding: 14px 16px;`;
 
-        body.appendChild(this.createColorRow());
+        // ── Name label ──
+        body.appendChild(this.createNameLabel());
 
-        if (config) {
-            config.fields.forEach(field => {
-                const currentValue = this.settings[field.key] ?? field.defaultValue;
-                body.appendChild(this.createField(field, currentValue));
-            });
-        }
+        // ── One color + line width row per line ──
+        this.lineSettings.forEach((line, index) => {
+            body.appendChild(this.createLineRow(line, index));
+        });
+
+        // ── Display options ──
+        body.appendChild(this.createDisplayOptions());
 
         this.modal.appendChild(body);
         this.modal.appendChild(this.createFooter());
@@ -77,14 +101,169 @@ export class IndicatorSettingsModal {
         this.modal = null;
     }
 
-    // ==================== SETTINGS FALLBACK ====================
+    // ==================== NAME LABEL ====================
 
-    private extractSettingsFallback(): Record<string, any> {
-        const parts    = this.item.id.split('_');
-        const settings: Record<string, any> = {};
-        if (parts.length >= 2) settings.period = parseInt(parts[1]) || 20;
-        if (parts.length >= 3) settings.source = parts[2] || 'close';
-        return settings;
+    private createNameLabel(): HTMLElement {
+        const label = document.createElement('div');
+        label.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 14px;
+            font-size: var(--text-lg);
+            color: var(--text-muted);
+        `;
+
+        if (this.isStrategy) {
+            const icon     = document.createElement('i');
+            icon.className = 'fas fa-robot';
+            icon.style.color = this.lineSettings[0]?.color || '#00d394';
+            label.appendChild(icon);
+        }
+
+        const name       = document.createElement('span');
+        name.textContent = this.item.name;
+        label.appendChild(name);
+
+        return label;
+    }
+
+    // ==================== LINE ROW ====================
+
+    private createLineRow(line: LineSettings, index: number): HTMLElement {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 0;
+            border-bottom: 1px solid var(--border-light);
+            gap: 8px;
+        `;
+
+        const label       = document.createElement('span');
+        label.style.cssText = `
+            font-size: var(--text-lg);
+            color: var(--text-secondary);
+            font-weight: 500;
+            flex: 1;
+        `;
+        label.textContent = line.name;
+
+        // ── Line width input ──
+        const widthInput   = document.createElement('input');
+        widthInput.type    = 'number';
+        widthInput.value   = String(line.lineWidth);
+        widthInput.min     = '1';
+        widthInput.max     = '5';
+        widthInput.step    = '1';
+        widthInput.style.cssText = `
+            width: 48px;
+            padding: 4px 6px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            color: var(--text-primary);
+            font-size: var(--text-lg);
+            font-family: var(--text-mono);
+            text-align: center;
+            outline: none;
+            transition: border-color 0.15s ease;
+        `;
+        widthInput.addEventListener('focus', () => widthInput.style.borderColor = `var(--accent-info)`);
+        widthInput.addEventListener('blur',  () => widthInput.style.borderColor = `var(--border)`);
+        widthInput.addEventListener('change', () => {
+            this.lineSettings[index].lineWidth = parseInt(widthInput.value) || 1;
+        });
+
+        // ── Color swatch ──
+        const preview = document.createElement('div');
+        preview.style.cssText = `
+            width: 32px;
+            height: 24px;
+            border-radius: var(--radius-xs);
+            background-color: ${line.color};
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+            flex-shrink: 0;
+        `;
+        preview.addEventListener('mouseenter', () => preview.style.borderColor = `var(--accent-info)`);
+        preview.addEventListener('mouseleave', () => preview.style.borderColor = `var(--border)`);
+        preview.addEventListener('click', async () => {
+            const { ColorPicker } = await import('../../core/color-picker');
+            const current = this.parseToHexOpacity(line.color);
+            const picker  = new ColorPicker({
+                color:    current.hex,
+                opacity:  current.opacity,
+                onChange: (hex: string, opacity: number) => {
+                    const newColor                = opacity < 1
+                        ? this.hexToRgba(hex, opacity)
+                        : hex;
+                    this.lineSettings[index].color    = newColor;
+                    preview.style.backgroundColor = this.toDisplayColor(newColor);
+                }
+            });
+            picker.open(preview);
+        });
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(widthInput);
+        wrapper.appendChild(preview);
+        return wrapper;
+    }
+
+    // ==================== DISPLAY OPTIONS ====================
+
+    private createDisplayOptions(): HTMLElement {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = `margin-top: 4px;`;
+
+        const options = [
+            { key: 'priceLineVisible',       label: 'Price Line'       },
+            { key: 'lastValueVisible',        label: 'Last Value'       },
+            { key: 'crosshairMarkerVisible',  label: 'Crosshair Marker' }
+        ];
+
+        options.forEach(opt => {
+            const row = document.createElement('div');
+            row.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 7px 0;
+                border-bottom: 1px solid var(--border-light);
+            `;
+
+            const label       = document.createElement('span');
+            label.style.cssText = `
+                font-size: var(--text-lg);
+                color: var(--text-secondary);
+                font-weight: 500;
+            `;
+            label.textContent = opt.label;
+
+            const checkbox     = document.createElement('input');
+            checkbox.type      = 'checkbox';
+            checkbox.checked   = true;
+            checkbox.style.cssText = `
+                width: 16px;
+                height: 16px;
+                cursor: pointer;
+                accent-color: var(--accent-info);
+            `;
+            checkbox.addEventListener('change', () => {
+                this.lineSettings.forEach(line => {
+                    (line as any)[opt.key] = checkbox.checked;
+                });
+            });
+
+            row.appendChild(label);
+            row.appendChild(checkbox);
+            wrapper.appendChild(row);
+        });
+
+        return wrapper;
     }
 
     // ==================== HEADER ====================
@@ -106,7 +285,7 @@ export class IndicatorSettingsModal {
         const left = document.createElement('div');
         left.style.cssText = `display: flex; align-items: center; gap: 8px;`;
 
-        const dragIcon = document.createElement('i');
+        const dragIcon     = document.createElement('i');
         dragIcon.className = 'fas fa-grip-vertical';
         dragIcon.style.cssText = `
             color: var(--text-muted);
@@ -114,7 +293,7 @@ export class IndicatorSettingsModal {
             flex-shrink: 0;
         `;
 
-        const titleEl = document.createElement('span');
+        const titleEl       = document.createElement('span');
         titleEl.style.cssText = `
             font-size: var(--text-xl);
             font-weight: 600;
@@ -143,201 +322,20 @@ export class IndicatorSettingsModal {
         `;
         closeBtn.innerHTML = '&times;';
         closeBtn.addEventListener('mouseenter', () => {
-            closeBtn.style.background   = `rgba(var(--accent-sell-rgb), 0.1)`;
-            closeBtn.style.borderColor  = `var(--accent-sell)`;
-            closeBtn.style.color        = `var(--accent-sell)`;
+            closeBtn.style.background  = `rgba(var(--accent-sell-rgb), 0.1)`;
+            closeBtn.style.borderColor = `var(--accent-sell)`;
+            closeBtn.style.color       = `var(--accent-sell)`;
         });
         closeBtn.addEventListener('mouseleave', () => {
-            closeBtn.style.background   = `var(--bg-base)`;
-            closeBtn.style.borderColor  = `var(--border)`;
-            closeBtn.style.color        = `var(--text-muted)`;
+            closeBtn.style.background  = `var(--bg-base)`;
+            closeBtn.style.borderColor = `var(--border)`;
+            closeBtn.style.color       = `var(--text-muted)`;
         });
         closeBtn.addEventListener('click', () => this.close());
 
         header.appendChild(left);
         header.appendChild(closeBtn);
         return header;
-    }
-
-    // ==================== COLOR ROW ====================
-
-    private createColorRow(): HTMLElement {
-        const row = document.createElement('div');
-        row.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            padding: 7px 0;
-            border-bottom: 1px solid var(--border-light);
-        `;
-
-        const label = document.createElement('span');
-        label.style.cssText = `
-            font-size: var(--text-lg);
-            color: var(--text-secondary);
-            font-weight: 500;
-        `;
-        label.textContent = 'Color';
-
-        // ✅ Color swatch only — no hex label
-        const preview = document.createElement('div');
-        preview.style.cssText = `
-            width: 32px;
-            height: 24px;
-            border-radius: var(--radius-xs);
-            background-color: ${this.color};
-            border: 1px solid var(--border);
-            cursor: pointer;
-            transition: border-color 0.15s ease;
-        `;
-
-        preview.addEventListener('mouseenter', () => {
-            preview.style.borderColor = `var(--accent-info)`;
-        });
-        preview.addEventListener('mouseleave', () => {
-            preview.style.borderColor = `var(--border)`;
-        });
-
-        // ✅ Lazy load color picker on click
-        preview.addEventListener('click', async () => {
-            const { ColorPicker } = await import('../../core/color-picker');
-            const current = this.parseToHexOpacity(this.color);
-
-            const picker = new ColorPicker({
-                color:   current.hex,
-                opacity: current.opacity,
-                onChange: (hex: string, opacity: number) => {
-                    const newVal              = opacity < 1 ? this.hexToRgba(hex, opacity) : hex;
-                    this.color                = newVal;
-                    preview.style.backgroundColor = this.toDisplayColor(newVal);
-                }
-            });
-            picker.open(preview);
-        });
-
-        row.appendChild(label);
-        row.appendChild(preview);
-        return row;
-    }
-
-    // ==================== DYNAMIC FIELDS ====================
-
-    private createField(field: IndicatorFieldConfig, value: any): HTMLElement {
-        const row = document.createElement('div');
-        row.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 7px 0;
-            border-bottom: 1px solid var(--border-light);
-        `;
-
-        const label = document.createElement('span');
-        label.style.cssText = `
-            font-size: var(--text-lg);
-            color: var(--text-secondary);
-            font-weight: 500;
-        `;
-        label.textContent = field.label;
-
-        let input: HTMLElement;
-
-        if (field.type === 'select' && Array.isArray(field.options)) {
-            input = this.createSelect(field, value);
-        } else if (field.type === 'checkbox') {
-            input = this.createCheckbox(field, value);
-        } else {
-            input = this.createNumberInput(field, value);
-        }
-
-        row.appendChild(label);
-        row.appendChild(input);
-        return row;
-    }
-
-    private createNumberInput(field: IndicatorFieldConfig, value: any): HTMLElement {
-        const input   = document.createElement('input');
-        input.type    = 'number';
-        input.value   = value?.toString() || '';
-        input.style.cssText = `
-            width: 80px;
-            padding: 4px 8px;
-            background: var(--bg-base);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-xs);
-            color: var(--text-primary);
-            font-size: var(--text-lg);
-            font-family: var(--text-mono);
-            text-align: right;
-            outline: none;
-            transition: border-color 0.15s ease;
-        `;
-
-        input.addEventListener('focus', () => input.style.borderColor = `var(--accent-info)`);
-        input.addEventListener('blur',  () => input.style.borderColor = `var(--border)`);
-
-        if (field.options && !Array.isArray(field.options)) {
-            const opts  = field.options as { min: number; max: number; step: number };
-            input.min   = opts.min.toString();
-            input.max   = opts.max.toString();
-            input.step  = opts.step.toString();
-        }
-
-        input.addEventListener('change', () => {
-            this.settings[field.key] = parseFloat(input.value);
-        });
-
-        return input;
-    }
-
-    private createSelect(field: IndicatorFieldConfig, value: any): HTMLElement {
-        const select = document.createElement('select');
-        select.style.cssText = `
-            padding: 4px 8px;
-            background: var(--bg-base);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-xs);
-            color: var(--text-primary);
-            font-size: var(--text-lg);
-            font-family: var(--text-sans);
-            cursor: pointer;
-            outline: none;
-            transition: border-color 0.15s ease;
-        `;
-
-        select.addEventListener('focus', () => select.style.borderColor = `var(--accent-info)`);
-        select.addEventListener('blur',  () => select.style.borderColor = `var(--border)`);
-
-        (field.options as string[]).forEach(opt => {
-            const option       = document.createElement('option');
-            option.value       = opt;
-            option.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
-            if (opt === value) option.selected = true;
-            select.appendChild(option);
-        });
-
-        select.addEventListener('change', () => {
-            this.settings[field.key] = select.value;
-        });
-
-        return select;
-    }
-
-    private createCheckbox(field: IndicatorFieldConfig, value: any): HTMLElement {
-        const input     = document.createElement('input');
-        input.type      = 'checkbox';
-        input.checked   = value === true;
-        input.style.cssText = `
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            accent-color: var(--accent-info);
-        `;
-        input.addEventListener('change', () => {
-            this.settings[field.key] = input.checked;
-        });
-        return input;
     }
 
     // ==================== FOOTER ====================
@@ -393,12 +391,12 @@ export class IndicatorSettingsModal {
             transition: all 0.15s ease;
         `;
         applyBtn.addEventListener('mouseenter', () => {
-            applyBtn.style.background   = `rgba(var(--accent-info-rgb), 0.2)`;
-            applyBtn.style.borderColor  = `var(--accent-info)`;
+            applyBtn.style.background  = `rgba(var(--accent-info-rgb), 0.2)`;
+            applyBtn.style.borderColor = `var(--accent-info)`;
         });
         applyBtn.addEventListener('mouseleave', () => {
-            applyBtn.style.background   = `rgba(var(--accent-info-rgb), 0.1)`;
-            applyBtn.style.borderColor  = `rgba(var(--accent-info-rgb), 0.3)`;
+            applyBtn.style.background  = `rgba(var(--accent-info-rgb), 0.1)`;
+            applyBtn.style.borderColor = `rgba(var(--accent-info-rgb), 0.3)`;
         });
         applyBtn.addEventListener('click', () => {
             this.applySettings();
@@ -413,19 +411,20 @@ export class IndicatorSettingsModal {
     // ==================== APPLY ====================
 
     private applySettings(): void {
-        const detail: Record<string, any> = {
-            indicatorId: this.item.id
-        };
+        const lines: Record<string, { color: string; lineWidth: number }> = {};
+        this.lineSettings.forEach(line => {
+            lines[line.name] = {
+                color:     line.color,
+                lineWidth: line.lineWidth
+            };
+        });
 
-        if (this.color !== this.item.color) {
-            detail.color = this.color;
-        }
-
-        if (Object.keys(this.settings).length > 0) {
-            detail.settings = { ...this.settings };
-        }
-
-        document.dispatchEvent(new CustomEvent('indicator-settings-changed', { detail }));
+        document.dispatchEvent(new CustomEvent('indicator-settings-changed', {
+            detail: {
+                indicatorId: this.item.id,
+                lines
+            }
+        }));
     }
 
     // ==================== DRAGGING ====================
@@ -440,8 +439,8 @@ export class IndicatorSettingsModal {
             const rect       = this.modal!.getBoundingClientRect();
             this.dragOffsetX = e.clientX - rect.left;
             this.dragOffsetY = e.clientY - rect.top;
-            this.modal!.style.transform = 'none';
-            this.modal!.style.cursor    = 'grabbing';
+            this.modal!.style.transform    = 'none';
+            this.modal!.style.cursor       = 'grabbing';
             document.body.style.userSelect = 'none';
         });
 
@@ -451,16 +450,14 @@ export class IndicatorSettingsModal {
             const y      = e.clientY - this.dragOffsetY;
             const maxX   = window.innerWidth  - this.modal.offsetWidth;
             const maxY   = window.innerHeight - this.modal.offsetHeight;
-            const boundX = Math.max(0, Math.min(x, maxX));
-            const boundY = Math.max(0, Math.min(y, maxY));
-            this.modal.style.left = `${boundX}px`;
-            this.modal.style.top  = `${boundY}px`;
+            this.modal.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
+            this.modal.style.top  = `${Math.max(0, Math.min(y, maxY))}px`;
         });
 
         document.addEventListener('mouseup', () => {
             if (this.isDragging) {
-                this.isDragging             = false;
-                this.modal!.style.cursor    = '';
+                this.isDragging                = false;
+                this.modal!.style.cursor       = '';
                 document.body.style.userSelect = '';
             }
         });
@@ -483,8 +480,8 @@ export class IndicatorSettingsModal {
 
     // ==================== COLOR HELPERS ====================
 
-    private parseToHexOpacity(value: any): { hex: string; opacity: number } {
-        if (!value || typeof value !== 'string') return { hex: '#3b82f6', opacity: 1 };
+    private parseToHexOpacity(value: string): { hex: string; opacity: number } {
+        if (!value) return { hex: '#3b82f6', opacity: 1 };
         const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
         if (match) {
             const r   = parseInt(match[1]);
@@ -505,8 +502,7 @@ export class IndicatorSettingsModal {
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     }
 
-    private toDisplayColor(value: any): string {
-        if (!value) return '#3b82f6';
+    private toDisplayColor(value: string): string {
         return this.parseToHexOpacity(value).hex;
     }
 }
