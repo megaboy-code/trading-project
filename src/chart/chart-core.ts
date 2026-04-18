@@ -28,7 +28,6 @@ export class ChartModule {
     private resizeObserver:   ResizeObserver | null = null;
 
     private indicatorManager: IndicatorManager | null = null;
-    private indicatorLoading: boolean = false;
 
     private abortController: AbortController | null = null;
 
@@ -205,6 +204,7 @@ export class ChartModule {
         this.initializePriceAlerts();
         this.initializeChartUI();
         this.initializeContextMenu();
+        this.initializeIndicatorManager(); // ── initialized with everything else ──
         this.setupCrosshairTracking();
 
         ChartSettingsModal.restoreActiveTemplate();
@@ -283,17 +283,16 @@ export class ChartModule {
         this.contextMenu = new ChartContextMenu();
     }
 
-    // ==================== LAZY LOADER ====================
-
-    private async loadIndicatorManager(): Promise<void> {
-        if (this.indicatorManager || this.indicatorLoading) return;
-        this.indicatorLoading = true;
+    // ================================================================
+    // INDICATOR MANAGER — initialized at chart ready, no lazy load
+    // Ready before any WebSocket data arrives — no race condition
+    // ================================================================
+    private initializeIndicatorManager(): void {
+        if (this.indicatorManager) return;
 
         try {
             const chart = this.mainChart.getChart();
             if (!chart) return;
-
-            const { IndicatorManager } = await import('./indicator/index');
 
             this.indicatorManager = new IndicatorManager();
             this.indicatorManager.setMainChart(this.mainChart);
@@ -307,9 +306,6 @@ export class ChartModule {
                 }
             };
         } catch (error) {}
-        finally {
-            this.indicatorLoading = false;
-        }
     }
 
     // ==================== CROSSHAIR ====================
@@ -601,7 +597,8 @@ export class ChartModule {
             );
         }, { signal });
 
-        document.addEventListener('legend-toggle-item', (e: Event) => {
+        // ── Fixed event names to match items-legend.ts ──
+        document.addEventListener('legend-item-toggle', (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             if (!id) return;
             this.indicatorManager?.toggleVisibility(id);
@@ -611,7 +608,7 @@ export class ChartModule {
             }
         }, { signal });
 
-        document.addEventListener('legend-remove-item', async (e: Event) => {
+        document.addEventListener('legend-item-remove', async (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             if (!id) return;
 
@@ -622,20 +619,29 @@ export class ChartModule {
             }
         }, { signal });
 
+        document.addEventListener('legend-item-settings', (e: Event) => {
+            const { id, item } = (e as CustomEvent).detail as { id: string; item: LegendItem };
+            if (!item) return;
+            import('./ui/indicator-settings-modal').then(
+                ({ IndicatorSettingsModal }) => {
+                    new IndicatorSettingsModal(item).open();
+                }
+            );
+        }, { signal });
+
         document.addEventListener('add-indicator', async (e: Event) => {
-            const { type, symbol, timeframe } = (e as CustomEvent).detail;
+            const { type } = (e as CustomEvent).detail;
             if (!type) return;
 
             if (type === 'VOLUME') {
                 await this.mainChart.toggleVolume();
                 return;
             }
-
-            await this.loadIndicatorManager();
+            // IndicatorManager already initialized in onChartReady
         }, { signal });
 
         document.addEventListener('deploy-strategy', async (e: Event) => {
-            await this.loadIndicatorManager();
+            // IndicatorManager already initialized in onChartReady
         }, { signal });
     }
 
@@ -728,7 +734,6 @@ export class ChartModule {
         if (this.indicatorManager) {
             await this.indicatorManager.destroy();
             this.indicatorManager = null;
-            this.indicatorLoading = false;
         }
 
         if (this.chartDataManager) this.chartDataManager.clear();
