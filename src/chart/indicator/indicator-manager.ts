@@ -190,7 +190,6 @@ export class IndicatorManager {
 
     // ================================================================
     // UPDATE — handles both initial burst and live single point
-    // Also handles strategy wake — series gets new data directly
     // ================================================================
     private updateIndicator(
         indicator: ActiveIndicator,
@@ -216,8 +215,6 @@ export class IndicatorManager {
                         .filter(p => !isNaN(p.value));
                     if (chartData.length > 0) {
                         activeLine.series.setData(chartData as any);
-                        activeLine.series.applyOptions({ visible: true });
-                        activeLine.visible = true;
                     }
                 } else {
                     const t = line.timestamps[0];
@@ -246,8 +243,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // CLEAR SERIES DATA — used for strategy TF switch
-    // Clears data but keeps series in pool, legend stays
+    // CLEAR SERIES DATA — setData([]) only, no hide, no remove
     // ================================================================
     private clearSeriesData(indicator: ActiveIndicator): void {
         indicator.lines.forEach(line => {
@@ -259,22 +255,31 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // ON STRATEGY TF CHANGE
-    // Strategies — clear series data, legend stays
-    // Indicators — nothing, backend sends new data with chart data
+    // ON TIMEFRAME CHANGE
+    // Indicators — clear data, delete from pool, remove legend item
+    //              backend sends fresh data with new TF id
+    // Strategies  — clear data only, pool entry stays
+    //              backend sends cached history on TF return
     // ================================================================
     public onTimeframeChange(): void {
-        this.pool.forEach(indicator => {
-            if (!indicator.isStrategy) return;
-            this.clearSeriesData(indicator);
+        const toDelete: string[] = [];
 
-            document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
-                detail: {
-                    id:         indicator.id,
-                    deployedTF: indicator.timeframe
-                }
-            }));
+        this.pool.forEach((indicator, id) => {
+            if (indicator.isStrategy) {
+                this.clearSeriesData(indicator);
+                document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
+                    detail: { id, deployedTF: indicator.timeframe }
+                }));
+            } else {
+                this.clearSeriesData(indicator);
+                toDelete.push(id);
+                document.dispatchEvent(new CustomEvent('legend-item-remove', {
+                    detail: { id }
+                }));
+            }
         });
+
+        toDelete.forEach(id => this.pool.delete(id));
     }
 
     // ================================================================
@@ -354,7 +359,8 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // DESTROY
+    // DESTROY — called on page reload / logout
+    // Removes all series from chart, clears pool
     // ================================================================
     public async destroy(): Promise<void> {
         this.abortController?.abort();
