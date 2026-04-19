@@ -123,6 +123,15 @@ export class IndicatorManager {
 
             if (period === 0) return;
 
+            // ── Unsub old first ──
+            document.dispatchEvent(new CustomEvent('indicator-removed', {
+                detail: {
+                    key:       indicator.key,
+                    symbol:    indicator.symbol,
+                    timeframe: indicator.timeframe
+                }
+            }));
+
             document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
                 detail: {
                     key:       indicator.key,
@@ -195,7 +204,6 @@ export class IndicatorManager {
         const precision  = getDecimalPrecision(data.symbol);
         const minMove    = 1 / Math.pow(10, precision);
 
-        // ── Use is_strategy from params — lines count is unreliable ──
         const params     = this.paramsMap.get(data.key) ?? null;
         const isStrategy = params?.is_strategy ?? data.lines.length > 1;
 
@@ -346,15 +354,14 @@ export class IndicatorManager {
 
     // ================================================================
     // ON TIMEFRAME CHANGE
-    // Indicators — clear data, delete from pool, delete from legendIds
-    //              legend stays — no X was clicked
-    //              legendIds cleared so createIndicator fires indicator-added
+    // Indicators — unsub old TF from backend, delete from pool
+    //              delete from legendIds so createIndicator fires indicator-added
+    //              resubscribe on new TF
     // Strategies  — clear data only, pool entry stays
-    //              legend stays showing deployed TF
     // ================================================================
-    public onTimeframeChange(): void {
+    public onTimeframeChange(newTimeframe: string): void {
         const toDelete:      string[] = [];
-        const toResubscribe: Array<{ key: string; symbol: string }> = [];
+        const toResubscribe: Array<{ key: string; symbol: string; timeframe: string }> = [];
 
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
@@ -363,23 +370,31 @@ export class IndicatorManager {
                     detail: { id, deployedTF: indicator.timeframe }
                 }));
             } else {
+                // ── Unsub old TF from backend ──
+                document.dispatchEvent(new CustomEvent('indicator-removed', {
+                    detail: {
+                        key:       indicator.key,
+                        symbol:    indicator.symbol,
+                        timeframe: indicator.timeframe
+                    }
+                }));
+
                 this.clearSeriesData(indicator);
                 toResubscribe.push({
-                    key:    indicator.key,
-                    symbol: indicator.symbol
+                    key:       indicator.key,
+                    symbol:    indicator.symbol,
+                    timeframe: newTimeframe
                 });
                 toDelete.push(id);
-                // ── Remove from legendIds so createIndicator
-                //    dispatches indicator-added on new TF data ──
                 this.legendIds.delete(indicator.key);
             }
         });
 
         toDelete.forEach(id => this.pool.delete(id));
 
-        toResubscribe.forEach(({ key, symbol }) => {
+        toResubscribe.forEach(({ key, symbol, timeframe }) => {
             document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
-                detail: { key, symbol }
+                detail: { key, symbol, timeframe }
             }));
         });
     }
@@ -401,8 +416,6 @@ export class IndicatorManager {
 
     // ================================================================
     // REMOVE — user clicks X on legend
-    // Clears series data, removes from pool and legend tracker
-    // Dispatches indicator-removed so backend unsubscribes
     // ================================================================
     public removeIndicator(id: string): void {
         const indicator = this.pool.get(id);

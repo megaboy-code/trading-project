@@ -373,10 +373,6 @@ export class ChartModule {
         this.mainChart.handleTimeframeChange(timeframe);
         this.visibilityMap.clear();
 
-        // ── Strategies clear series data, legend stays ──
-        // ── Indicators do nothing — backend sends new data with chart data ──
-        this.indicatorManager?.onTimeframeChange();
-
         if (this.chartLegend) {
             this.chartLegend.update({ timeframe });
         }
@@ -587,8 +583,12 @@ export class ChartModule {
             }
         }, { signal });
 
-        document.addEventListener('open-item-settings', (e: Event) => {
-            const { item } = (e as CustomEvent).detail as { item: LegendItem };
+        // ── Settings — fetch live item from legend store ──
+        // item in event detail may be stale — legend store has latest settings
+        document.addEventListener('legend-item-settings', (e: Event) => {
+            const { id } = (e as CustomEvent).detail;
+            if (!id) return;
+            const item = this.chartLegend?.getItem(id);
             if (!item) return;
             import('./ui/indicator-settings-modal').then(
                 ({ IndicatorSettingsModal }) => {
@@ -616,16 +616,6 @@ export class ChartModule {
             } else {
                 this.indicatorManager?.removeIndicator(id);
             }
-        }, { signal });
-
-        document.addEventListener('legend-item-settings', (e: Event) => {
-            const { id, item } = (e as CustomEvent).detail as { id: string; item: LegendItem };
-            if (!item) return;
-            import('./ui/indicator-settings-modal').then(
-                ({ IndicatorSettingsModal }) => {
-                    new IndicatorSettingsModal(item).open();
-                }
-            );
         }, { signal });
 
         document.addEventListener('add-indicator', async (e: Event) => {

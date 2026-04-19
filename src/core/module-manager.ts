@@ -361,19 +361,21 @@ export class ModuleManager {
         document.addEventListener('timeframe-changed', (e: Event) => {
             const { timeframe } = (e as CustomEvent).detail;
             if (!timeframe) return;
-            this.chart?.getIndicatorManager()?.onTimeframeChange();
+            // ── Pass new timeframe to indicator manager before setTimeframe ──
+            this.chart?.getIndicatorManager()?.onTimeframeChange(timeframe);
             this.connectionManager.setTimeframe(timeframe);
             this.chart?.handleTimeframeChange(timeframe);
         });
 
-        // ── Resubscribe indicator on TF change or period override ──
+        // ── Resubscribe indicator — timeframe comes from event detail ──
         document.addEventListener('resubscribe-indicator', (e: Event) => {
-            const { key, symbol, period } = (e as CustomEvent).detail;
+            const { key, symbol, timeframe, period } = (e as CustomEvent).detail;
             if (!key || !symbol) return;
+            const tf = timeframe || this.connectionManager.getCurrentTimeframe();
             this.connectionManager.subscribeIndicator(
                 key,
                 symbol,
-                this.connectionManager.getCurrentTimeframe(),
+                tf,
                 period ?? 0
             );
         });
