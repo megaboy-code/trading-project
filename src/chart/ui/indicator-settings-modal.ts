@@ -4,6 +4,7 @@
 // One modal for both indicators and strategies
 // Lines built from LegendItem.values — one row per line
 // Period override — dispatches resubscribe with new period
+// Position — top-left under legend
 // ================================================================
 
 import { LegendItem } from '../chart-types';
@@ -44,8 +45,10 @@ export class IndicatorSettingsModal {
         this.isStrategy = item.icon === 'fa-robot';
 
         // ── Build line settings from legend values ──
+        // Use line.name from pool via item.values label
+        // For non-strategy label is '' — show 'Line' as fallback
         this.lineSettings = (item.values || []).map(v => ({
-            name:      v.label || v.color,
+            name:      v.label || 'Line',
             color:     v.color || '#00d394',
             lineWidth: 1
         }));
@@ -66,11 +69,13 @@ export class IndicatorSettingsModal {
 
         this.modal    = document.createElement('div');
         this.modal.id = modalId;
+
+        // ── Position top-left under legend ──
         this.modal.style.cssText = `
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            top: 60px;
+            left: 12px;
+            transform: none;
             background: var(--bg-elevated);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -283,7 +288,7 @@ export class IndicatorSettingsModal {
                 color:    current.hex,
                 opacity:  current.opacity,
                 onChange: (hex: string, opacity: number) => {
-                    const newColor                = opacity < 1
+                    const newColor             = opacity < 1
                         ? this.hexToRgba(hex, opacity)
                         : hex;
                     this.lineSettings[index].color    = newColor;
@@ -547,17 +552,16 @@ export class IndicatorSettingsModal {
             const rect       = this.modal!.getBoundingClientRect();
             this.dragOffsetX = e.clientX - rect.left;
             this.dragOffsetY = e.clientY - rect.top;
-            this.modal!.style.transform    = 'none';
             this.modal!.style.cursor       = 'grabbing';
             document.body.style.userSelect = 'none';
         });
 
         document.addEventListener('mousemove', (e: MouseEvent) => {
             if (!this.isDragging || !this.modal) return;
-            const x      = e.clientX - this.dragOffsetX;
-            const y      = e.clientY - this.dragOffsetY;
-            const maxX   = window.innerWidth  - this.modal.offsetWidth;
-            const maxY   = window.innerHeight - this.modal.offsetHeight;
+            const x    = e.clientX - this.dragOffsetX;
+            const y    = e.clientY - this.dragOffsetY;
+            const maxX = window.innerWidth  - this.modal.offsetWidth;
+            const maxY = window.innerHeight - this.modal.offsetHeight;
             this.modal.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
             this.modal.style.top  = `${Math.max(0, Math.min(y, maxY))}px`;
         });
