@@ -22,18 +22,16 @@ declare global {
 }
 
 export class ModuleManager {
-    private chart:            ChartModuleImpl | null = null;
-    private tradingInstance:  InstanceType<typeof TradingModuleClass> | null = null;
-    private journalInstance:  any | null = null;
-    private strategyInstance: any | null = null;
+    private chart:           ChartModuleImpl | null = null;
+    private tradingInstance: InstanceType<typeof TradingModuleClass> | null = null;
+    private journalInstance: any | null = null;
 
-    private watchlistInstance:    WatchlistModule | null = null;
-    private calendarInstance:     EconomicCalendarModule | null = null;
-    private alertsInstance:       AlertsModule | null = null;
-    private journalMiniInstance:  JournalMiniModule | null = null;
+    private watchlistInstance:   WatchlistModule | null = null;
+    private calendarInstance:    EconomicCalendarModule | null = null;
+    private alertsInstance:      AlertsModule | null = null;
+    private journalMiniInstance: JournalMiniModule | null = null;
 
-    private journalLoading:  boolean = false;
-    private strategyLoading: boolean = false;
+    private journalLoading: boolean = false;
 
     private notifications = Notification;
     private panels        = Panels;
@@ -65,7 +63,6 @@ export class ModuleManager {
         this.tradingInstance?.destroy();
         this.journalInstance?.destroy();
         this.journalMiniInstance?.destroy();
-        this.strategyInstance?.destroy();
         this.watchlistInstance?.destroy();
         this.calendarInstance?.destroy();
         this.alertsInstance?.destroy();
@@ -158,7 +155,12 @@ export class ModuleManager {
             this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
         });
 
-        // ── Watchlist — direct callback ──
+        // ── Indicator update — direct to IndicatorManager ──
+        this.connectionManager.onIndicatorUpdate((data) => {
+            this.chart?.getIndicatorManager()?.onIndicatorUpdate(data);
+        });
+
+        // ── Watchlist ──
         this.connectionManager.onWatchlistUpdate((
             symbol, bid, ask, spread, time, change) =>
         {
@@ -168,12 +170,12 @@ export class ModuleManager {
             }
         });
 
-        // ── Positions — direct to TradingModule ──
+        // ── Positions ──
         this.connectionManager.onPositionsUpdate((positions) => {
             this.tradingInstance?.updatePositions(positions);
         });
 
-        // ── Account — direct to TradingModule ──
+        // ── Account ──
         this.connectionManager.onAccountUpdate((account) => {
             this.tradingInstance?.updateAccountInfo(account);
         });
@@ -251,9 +253,7 @@ export class ModuleManager {
         });
 
         // ── MT5 status ──
-        this.connectionManager.onMT5Status((
-            connected, statusText) =>
-        {
+        this.connectionManager.onMT5Status((connected, statusText) => {
             document.dispatchEvent(new CustomEvent(
                 'mt5-status-changed', {
                     detail: { connected, statusText }
@@ -292,31 +292,6 @@ export class ModuleManager {
                 }
             ));
         });
-
-        // ── Indicator update — direct to IndicatorManager ──
-        this.connectionManager.onIndicatorUpdate((data) => {
-            this.chart?.getIndicatorManager()?.onIndicatorUpdate(data);
-        });
-
-        // ── Strategy data ──
-        this.connectionManager.onStrategyData((type, data) => {
-            switch (type) {
-                case 'strategy_initial':
-                case 'strategy_update':
-                case 'strategy_deployed':
-                case 'strategy_removed':
-                case 'strategy_updated':
-                case 'strategy_signal':
-                case 'auto_trading_status':
-                    document.dispatchEvent(
-                        new CustomEvent(type, { detail: data })
-                    );
-                    break;
-                case 'backtest_results':
-                    this.strategyInstance?.handleBacktestResults(data);
-                    break;
-            }
-        });
     }
 
     // ==================== NOTIFICATION HANDLER ====================
@@ -330,9 +305,7 @@ export class ModuleManager {
             parts.push(data.symbol);
         }
 
-        if (data.price) {
-            parts.push(`@ ${data.price}`);
-        }
+        if (data.price) parts.push(`@ ${data.price}`);
 
         if (data.open_price && data.price && data.open_price !== data.price) {
             parts.push(`(open ${data.open_price})`);
@@ -348,18 +321,14 @@ export class ModuleManager {
 
         switch (data.severity) {
             case Severity.Success:
-                this.notifications.success(message, { title });
-                break;
+                this.notifications.success(message, { title }); break;
             case Severity.Warning:
-                this.notifications.warning(message, { title });
-                break;
+                this.notifications.warning(message, { title }); break;
             case Severity.Error:
-                this.notifications.error(message, { title });
-                break;
+                this.notifications.error(message, { title });   break;
             case Severity.Info:
             default:
-                this.notifications.info(message, { title });
-                break;
+                this.notifications.info(message, { title });    break;
         }
     }
 
@@ -384,6 +353,7 @@ export class ModuleManager {
         document.addEventListener('symbol-changed', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
             if (!symbol) return;
+            this.chart?.getIndicatorManager()?.onSymbolChange();
             this.connectionManager.setSymbol(symbol);
             this.chart?.handleSymbolChange(symbol);
         });
@@ -391,8 +361,20 @@ export class ModuleManager {
         document.addEventListener('timeframe-changed', (e: Event) => {
             const { timeframe } = (e as CustomEvent).detail;
             if (!timeframe) return;
+            this.chart?.getIndicatorManager()?.onTimeframeChange();
             this.connectionManager.setTimeframe(timeframe);
             this.chart?.handleTimeframeChange(timeframe);
+        });
+
+        // ── Resubscribe indicator on TF change ──
+        document.addEventListener('resubscribe-indicator', (e: Event) => {
+            const { key, symbol } = (e as CustomEvent).detail;
+            if (!key || !symbol) return;
+            this.connectionManager.subscribeIndicator(
+                key,
+                symbol,
+                this.connectionManager.getCurrentTimeframe()
+            );
         });
 
         document.addEventListener('auto-trade-toggled', (e: Event) => {
@@ -445,20 +427,45 @@ export class ModuleManager {
             );
         });
 
+        // ── Add indicator — subscribe to backend ──
+        document.addEventListener('add-indicator', (e: Event) => {
+            const { type } = (e as CustomEvent).detail;
+            if (!type || type === 'VOLUME') return;
+            this.connectionManager.subscribeIndicator(
+                type,
+                this.connectionManager.getCurrentSymbol(),
+                this.connectionManager.getCurrentTimeframe()
+            );
+        });
+
+        // ── Deploy strategy — send to backend ──
         document.addEventListener('deploy-strategy', (e: Event) => {
             const { strategyType, symbol, timeframe, params } =
                 (e as CustomEvent).detail;
-            if (strategyType && symbol && timeframe) {
-                this.connectionManager.deployStrategy(
-                    strategyType, symbol, timeframe, params || {}
-                );
-            }
-            this.loadStrategyModule();
+            if (!strategyType) return;
+            const sym = symbol    || this.connectionManager.getCurrentSymbol();
+            const tf  = timeframe || this.connectionManager.getCurrentTimeframe();
+            this.connectionManager.deployStrategy(
+                strategyType, sym, tf, params || {}
+            );
         });
 
+        // ── Remove strategy ──
         document.addEventListener('remove-strategy', (e: Event) => {
             const { strategyId } = (e as CustomEvent).detail;
-            if (strategyId) this.connectionManager.removeStrategy(strategyId);
+            if (!strategyId) return;
+            this.connectionManager.removeStrategy(strategyId);
+            this.chart?.getIndicatorManager()?.removeIndicator(strategyId);
+        });
+
+        // ── Remove indicator — backend unsubscribe ──
+        document.addEventListener('indicator-removed', (e: Event) => {
+            const { key, symbol, timeframe } = (e as CustomEvent).detail;
+            if (key && symbol && timeframe) {
+                this.connectionManager.unsubscribeIndicator(
+                    key, symbol, timeframe
+                );
+            }
         });
 
         document.addEventListener('update-strategy', (e: Event) => {
@@ -469,7 +476,6 @@ export class ModuleManager {
 
         document.addEventListener('get-active-strategies', () => {
             this.connectionManager.getActiveStrategies();
-            this.loadStrategyModule();
         });
 
         document.addEventListener('backtest-strategy', (e: Event) => {
@@ -480,7 +486,6 @@ export class ModuleManager {
                     strategyType, symbol, timeframe, days, params || {}
                 );
             }
-            this.loadStrategyModule();
         });
 
         document.addEventListener('hotkey-modal-toggle', (e: Event) => {
@@ -496,8 +501,7 @@ export class ModuleManager {
 
         document.addEventListener('tab-switched', (e: Event) => {
             const { tabId } = (e as CustomEvent).detail;
-            if (tabId === 'strategy') this.loadStrategyModule();
-            if (tabId === 'journal')  this.loadJournalModule();
+            if (tabId === 'journal') this.loadJournalModule();
         });
 
         document.addEventListener('hotkey-panel-switch', (e: Event) => {
@@ -529,34 +533,9 @@ export class ModuleManager {
             }
         });
 
-        document.addEventListener('journal-refresh', () => {
-            // 🐛 Refresh temporarily disabled — scope mismatch under investigation
-        });
-
         document.addEventListener('symbol-search-request', (e: Event) => {
             const { query } = (e as CustomEvent).detail;
             if (query) this.connectionManager.searchSymbols(query);
-        });
-
-        // ── Add indicator — subscribe to backend ──
-        document.addEventListener('add-indicator', (e: Event) => {
-            const { type } = (e as CustomEvent).detail;
-            if (!type || type === 'VOLUME') return;
-            this.connectionManager.subscribeIndicator(
-                type,
-                this.connectionManager.getCurrentSymbol(),
-                this.connectionManager.getCurrentTimeframe()
-            );
-        });
-
-        // ── Remove indicator — unsubscribe from backend ──
-        document.addEventListener('indicator-removed', (e: Event) => {
-            const { key, symbol, timeframe } = (e as CustomEvent).detail;
-            if (key && symbol && timeframe) {
-                this.connectionManager.unsubscribeIndicator(
-                    key, symbol, timeframe
-                );
-            }
         });
     }
 
@@ -592,25 +571,6 @@ export class ModuleManager {
             );
         } finally {
             this.journalLoading = false;
-        }
-    }
-
-    private async loadStrategyModule(): Promise<void> {
-        if (this.strategyInstance || this.strategyLoading) return;
-        this.strategyLoading = true;
-        try {
-            const { StrategyModule } = await import('../strategy/strategy');
-            this.strategyInstance = new StrategyModule(
-                () => this.connectionManager.getCurrentSymbol(),
-                () => this.connectionManager.getCurrentTimeframe()
-            );
-        } catch (error) {
-            this.notifications.error(
-                'Failed to load strategy module',
-                { title: 'Module Error' }
-            );
-        } finally {
-            this.strategyLoading = false;
         }
     }
 
@@ -700,7 +660,6 @@ export class ModuleManager {
     public getTradingModule()                                 { return this.tradingInstance; }
     public getJournalModule()                                 { return this.journalInstance; }
     public getJournalMiniModule(): JournalMiniModule | null   { return this.journalMiniInstance; }
-    public getStrategyModule()                                { return this.strategyInstance; }
     public getWatchlistModule(): WatchlistModule | null       { return this.watchlistInstance; }
     public getCalendarModule(): EconomicCalendarModule | null { return this.calendarInstance; }
     public getAlertsModule(): AlertsModule | null             { return this.alertsInstance; }
