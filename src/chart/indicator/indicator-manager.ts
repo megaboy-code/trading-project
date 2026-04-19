@@ -224,7 +224,7 @@ export class IndicatorManager {
 
                 const lastVal = line.values[line.values.length - 1] ?? 0;
                 legendValues.push({
-                    label: line.name,
+                    label: isStrategy ? line.name : '',
                     value: lastVal.toFixed(precision),
                     color
                 });
