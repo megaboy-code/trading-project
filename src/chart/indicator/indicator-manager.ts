@@ -118,7 +118,6 @@ export class IndicatorManager {
             const indicator = this.pool.get(indicatorId);
             if (!indicator) return;
 
-            // ── Use first non-zero period override value ──
             const period = Object.values(periodOverrides as Record<string, number>)
                 .find(v => v > 0) ?? 0;
 
@@ -318,7 +317,7 @@ export class IndicatorManager {
 
             const lastVal = line.values[line.values.length - 1] ?? 0;
             legendValues.push({
-                label: line.name,
+                label: indicator.isStrategy ? line.name : '',
                 value: lastVal.toFixed(precision),
                 color: activeLine.color
             });
@@ -347,8 +346,9 @@ export class IndicatorManager {
 
     // ================================================================
     // ON TIMEFRAME CHANGE
-    // Indicators — clear data, delete from pool, dispatch resubscribe
+    // Indicators — clear data, delete from pool, delete from legendIds
     //              legend stays — no X was clicked
+    //              legendIds cleared so createIndicator fires indicator-added
     // Strategies  — clear data only, pool entry stays
     //              legend stays showing deployed TF
     // ================================================================
@@ -369,7 +369,9 @@ export class IndicatorManager {
                     symbol: indicator.symbol
                 });
                 toDelete.push(id);
-                // ── No legend remove — user did not click X ──
+                // ── Remove from legendIds so createIndicator
+                //    dispatches indicator-added on new TF data ──
+                this.legendIds.delete(indicator.key);
             }
         });
 
