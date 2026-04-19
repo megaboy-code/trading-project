@@ -591,9 +591,9 @@ export class ChartModule {
             const item = this.chartLegend?.getItem(id);
             if (!item) return;
 
-            // ── Get fresh config from chart-ui by key ──
             const key    = id.split('_')[0];
             const config = this.chartUI?.getConfigByKey(key);
+            console.log('id:', id, 'key:', key, 'config:', config, 'item.settings:', item.settings);
             if (config) item.settings = config;
 
             import('./ui/indicator-settings-modal').then(
