@@ -150,7 +150,7 @@ export class IndicatorManager {
 
                 const chartData = line.timestamps
                     .map((t, i) => ({ time: t, value: line.values[i] }))
-                    .filter(p => !isNaN(p.value));
+                    .filter(p => !isNaN(p.value) && p.value !== 0);
 
                 if (chartData.length > 0) {
                     series.setData(chartData as any);
@@ -212,14 +212,14 @@ export class IndicatorManager {
                 if (isInitial) {
                     const chartData = line.timestamps
                         .map((t, i) => ({ time: t, value: line.values[i] }))
-                        .filter(p => !isNaN(p.value));
+                        .filter(p => !isNaN(p.value) && p.value !== 0);
                     if (chartData.length > 0) {
                         activeLine.series.setData(chartData as any);
                     }
                 } else {
                     const t = line.timestamps[0];
                     const v = line.values[0];
-                    if (!isNaN(v)) {
+                    if (!isNaN(v) && v !== 0) {
                         activeLine.series.update({ time: t, value: v } as any);
                     }
                 }
@@ -256,13 +256,14 @@ export class IndicatorManager {
 
     // ================================================================
     // ON TIMEFRAME CHANGE
-    // Indicators — clear data, delete from pool, remove legend item
-    //              backend sends fresh data with new TF id
+    // Indicators — clear data, collect keys, delete from pool,
+    //              remove legend, dispatch resubscribe for new TF
     // Strategies  — clear data only, pool entry stays
-    //              backend sends cached history on TF return
+    //              legend stays showing deployed TF
     // ================================================================
     public onTimeframeChange(): void {
-        const toDelete: string[] = [];
+        const toDelete:      string[] = [];
+        const toResubscribe: Array<{ key: string; symbol: string }> = [];
 
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
@@ -272,6 +273,10 @@ export class IndicatorManager {
                 }));
             } else {
                 this.clearSeriesData(indicator);
+                toResubscribe.push({
+                    key:    indicator.key,
+                    symbol: indicator.symbol
+                });
                 toDelete.push(id);
                 document.dispatchEvent(new CustomEvent('legend-item-remove', {
                     detail: { id }
@@ -280,6 +285,13 @@ export class IndicatorManager {
         });
 
         toDelete.forEach(id => this.pool.delete(id));
+
+        // ── After cleanup — dispatch resubscribe for each indicator ──
+        toResubscribe.forEach(({ key, symbol }) => {
+            document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
+                detail: { key, symbol }
+            }));
+        });
     }
 
     // ================================================================
@@ -306,6 +318,7 @@ export class IndicatorManager {
         if (!indicator) return;
 
         this.clearSeriesData(indicator);
+        this.pool.delete(id);
 
         document.dispatchEvent(new CustomEvent('indicator-removed', {
             detail: {
@@ -359,8 +372,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // DESTROY — called on page reload / logout
-    // Removes all series from chart, clears pool
+    // DESTROY
     // ================================================================
     public async destroy(): Promise<void> {
         this.abortController?.abort();
