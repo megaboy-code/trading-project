@@ -185,11 +185,26 @@ export interface AvailableSymbolData {
     description: string;
 }
 
+// ── Full params — frontend builds settings UI from these ──
 export interface AvailableItemData {
-    key:         string;
-    label:       string;
-    description: string;
-    badge:       string;
+    key:           string;
+    label:         string;
+    description:   string;
+    badge:         string;
+    type:          string;
+    is_strategy:   boolean;
+    period:        number;
+    fast_period:   number;
+    slow_period:   number;
+    signal_period: number;
+    k_period:      number;
+    d_period:      number;
+    slowing:       number;
+    deviation:     number;
+    overbought:    number;
+    oversold:      number;
+    volume:        number;
+    price_type:    string;
 }
 
 export interface AvailableConfigPayload {
@@ -276,6 +291,33 @@ function extractCandle(c: any): CandleData {
         low:    c.low(),
         close:  c.close(),
         volume: parseInt(c.volume().toString(), 10)
+    };
+}
+
+// ================================================================
+// AVAILABLE ITEM EXTRACTOR — all params
+// ================================================================
+
+function extractAvailableItem(item: AvailableItem): AvailableItemData {
+    return {
+        key:           item.key()         ?? '',
+        label:         item.label()       ?? '',
+        description:   item.description() ?? '',
+        badge:         item.badge()       ?? '',
+        type:          item.type()        ?? '',
+        is_strategy:   item.isStrategy(),
+        period:        item.period(),
+        fast_period:   item.fastPeriod(),
+        slow_period:   item.slowPeriod(),
+        signal_period: item.signalPeriod(),
+        k_period:      item.kPeriod(),
+        d_period:      item.dPeriod(),
+        slowing:       item.slowing(),
+        deviation:     item.deviation(),
+        overbought:    item.overbought(),
+        oversold:      item.oversold(),
+        volume:        item.volume(),
+        price_type:    item.priceType()   ?? 'close'
     };
 }
 
@@ -610,36 +652,21 @@ export class MegaFlowzDecoder {
                     for (let i = 0; i < p.indicatorsLength(); i++) {
                         const item = p.indicators(i);
                         if (!item) continue;
-                        indicators.push({
-                            key:         item.key()         ?? '',
-                            label:       item.label()       ?? '',
-                            description: item.description() ?? '',
-                            badge:       item.badge()       ?? ''
-                        });
+                        indicators.push(extractAvailableItem(item));
                     }
 
                     const strategies: AvailableItemData[] = [];
                     for (let i = 0; i < p.strategiesLength(); i++) {
                         const item = p.strategies(i);
                         if (!item) continue;
-                        strategies.push({
-                            key:         item.key()         ?? '',
-                            label:       item.label()       ?? '',
-                            description: item.description() ?? '',
-                            badge:       item.badge()       ?? ''
-                        });
+                        strategies.push(extractAvailableItem(item));
                     }
 
                     const patterns: AvailableItemData[] = [];
                     for (let i = 0; i < p.patternsLength(); i++) {
                         const item = p.patterns(i);
                         if (!item) continue;
-                        patterns.push({
-                            key:         item.key()         ?? '',
-                            label:       item.label()       ?? '',
-                            description: item.description() ?? '',
-                            badge:       item.badge()       ?? ''
-                        });
+                        patterns.push(extractAvailableItem(item));
                     }
 
                     return {
