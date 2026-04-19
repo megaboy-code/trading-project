@@ -110,6 +110,30 @@ export class IndicatorManager {
             if (indicatorId && lines) this.updateLines(indicatorId, lines);
         }, { signal });
 
+        // ── Listen for period change — resubscribe with new period ──
+        document.addEventListener('indicator-period-changed', (e: Event) => {
+            const { indicatorId, periodOverrides } = (e as CustomEvent).detail;
+            if (!indicatorId || !periodOverrides) return;
+
+            const indicator = this.pool.get(indicatorId);
+            if (!indicator) return;
+
+            // ── Use first non-zero period override value ──
+            const period = Object.values(periodOverrides as Record<string, number>)
+                .find(v => v > 0) ?? 0;
+
+            if (period === 0) return;
+
+            document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
+                detail: {
+                    key:       indicator.key,
+                    symbol:    indicator.symbol,
+                    timeframe: indicator.timeframe,
+                    period
+                }
+            }));
+        }, { signal });
+
         // ── Listen for available config — store params map ──
         document.addEventListener('available-config-received', (e: Event) => {
             const config = (e as CustomEvent).detail;
