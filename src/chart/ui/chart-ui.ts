@@ -188,27 +188,29 @@ export class ChartUI {
         if (incoming.timeframes_more?.length)    this.config.timeframes_more    = incoming.timeframes_more;
 
         if (incoming.indicators?.length) {
-            this.config.indicators = incoming.indicators.map(i => ({
-                key:           i.key,
-                label:         i.label,
-                description:   i.description,
-                badge:         i.badge,
-                type:          i.type          ?? '',
-                is_strategy:   i.is_strategy   ?? false,
-                period:        i.period        ?? 0,
-                fast_period:   i.fast_period   ?? 0,
-                slow_period:   i.slow_period   ?? 0,
-                signal_period: i.signal_period ?? 0,
-                k_period:      i.k_period      ?? 0,
-                d_period:      i.d_period      ?? 0,
-                slowing:       i.slowing       ?? 0,
-                deviation:     i.deviation     ?? 0.0,
-                overbought:    i.overbought    ?? 0,
-                oversold:      i.oversold      ?? 0,
-                volume:        i.volume        ?? 0.0,
-                price_type:    i.price_type    ?? 'close'
-            }));
-        }
+    this.config.indicators = incoming.indicators.map(i => ({
+        key:           i.key,
+        label:         i.label,
+        description:   i.description,
+        badge:         i.badge,
+        type:          i.type          ?? '',
+        is_strategy:   i.is_strategy   ?? false,
+        period:        i.period        ?? 0,
+        fast_period:   i.fast_period   ?? 0,
+        slow_period:   i.slow_period   ?? 0,
+        signal_period: i.signal_period ?? 0,
+        k_period:      i.k_period      ?? 0,
+        d_period:      i.d_period      ?? 0,
+        slowing:       i.slowing       ?? 0,
+        deviation:     i.deviation     ?? 0.0,
+        overbought:    i.overbought    ?? 0,
+        oversold:      i.oversold      ?? 0,
+        volume:        i.volume        ?? 0.0,
+        price_type:    i.price_type    ?? 'close'
+    }));
+    console.log('first indicator period:', this.config.indicators[0]?.period, 'incoming period:', incoming.indicators[0]?.period);
+}
+
 
         if (incoming.strategies?.length) {
             this.config.strategies = incoming.strategies.map(i => ({
