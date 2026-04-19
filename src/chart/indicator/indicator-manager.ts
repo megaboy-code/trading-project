@@ -46,6 +46,23 @@ interface ActiveIndicator {
     active:     boolean;
 }
 
+// ── Indicator params from AvailableConfig ──
+interface IndicatorParams {
+    period:        number;
+    fast_period:   number;
+    slow_period:   number;
+    signal_period: number;
+    k_period:      number;
+    d_period:      number;
+    slowing:       number;
+    deviation:     number;
+    overbought:    number;
+    oversold:      number;
+    volume:        number;
+    price_type:    string;
+    is_strategy:   boolean;
+}
+
 export interface IndicatorUpdatePayload {
     key:       string;
     label:     string;
@@ -69,6 +86,10 @@ export class IndicatorManager {
     private pool:      Map<string, ActiveIndicator> = new Map();
     private legendIds: Set<string>                  = new Set();
 
+    // ── Params map — keyed by indicator key e.g. "EMA" ──
+    // Populated from available-config-received DOM event
+    private paramsMap: Map<string, IndicatorParams> = new Map();
+
     private abortController: AbortController | null = null;
 
     public onPaneCreated: ((pane: any) => Promise<void>) | null = null;
@@ -83,9 +104,41 @@ export class IndicatorManager {
         this.abortController = new AbortController();
         const { signal } = this.abortController;
 
+        // ── Listen for indicator settings changes ──
         document.addEventListener('indicator-settings-changed', (e: Event) => {
             const { indicatorId, lines } = (e as CustomEvent).detail;
             if (indicatorId && lines) this.updateLines(indicatorId, lines);
+        }, { signal });
+
+        // ── Listen for available config — store params map ──
+        document.addEventListener('available-config-received', (e: Event) => {
+            const config = (e as CustomEvent).detail;
+            if (!config) return;
+
+            const allItems = [
+                ...(config.indicators || []),
+                ...(config.strategies || []),
+                ...(config.patterns   || [])
+            ];
+
+            allItems.forEach((item: any) => {
+                if (!item.key) return;
+                this.paramsMap.set(item.key, {
+                    period:        item.period        ?? 0,
+                    fast_period:   item.fast_period   ?? 0,
+                    slow_period:   item.slow_period   ?? 0,
+                    signal_period: item.signal_period ?? 0,
+                    k_period:      item.k_period      ?? 0,
+                    d_period:      item.d_period      ?? 0,
+                    slowing:       item.slowing       ?? 0,
+                    deviation:     item.deviation     ?? 0.0,
+                    overbought:    item.overbought    ?? 0,
+                    oversold:      item.oversold      ?? 0,
+                    volume:        item.volume        ?? 0.0,
+                    price_type:    item.price_type    ?? 'close',
+                    is_strategy:   item.is_strategy   ?? false
+                });
+            });
         }, { signal });
     }
 
@@ -118,7 +171,10 @@ export class IndicatorManager {
     ): void {
         const precision  = getDecimalPrecision(data.symbol);
         const minMove    = 1 / Math.pow(10, precision);
-        const isStrategy = data.lines.length > 1;
+
+        // ── Use is_strategy from params — lines count is unreliable ──
+        const params     = this.paramsMap.get(data.key) ?? null;
+        const isStrategy = params?.is_strategy ?? data.lines.length > 1;
 
         const indicator: ActiveIndicator = {
             id,
@@ -188,11 +244,12 @@ export class IndicatorManager {
             document.dispatchEvent(new CustomEvent('indicator-added', {
                 detail: {
                     id,
-                    name:   data.label,
-                    color:  legendValues[0]?.color ?? LINE_COLORS[0],
-                    icon:   isStrategy ? 'fa-robot' : undefined,
-                    pane:   null,
-                    values: legendValues
+                    name:     data.label,
+                    color:    legendValues[0]?.color ?? LINE_COLORS[0],
+                    icon:     isStrategy ? 'fa-robot' : undefined,
+                    pane:     null,
+                    values:   legendValues,
+                    settings: params ? { ...params } : {}
                 }
             }));
         }
@@ -397,6 +454,7 @@ export class IndicatorManager {
 
         this.pool.clear();
         this.legendIds.clear();
+        this.paramsMap.clear();
         this.chart     = null;
         this.mainChart = null;
     }
