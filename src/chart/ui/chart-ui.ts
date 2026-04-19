@@ -76,10 +76,24 @@ interface ConfigSymbol {
 }
 
 interface ConfigItem {
-    key:         string;
-    label:       string;
-    description: string;
-    badge:       string;
+    key:           string;
+    label:         string;
+    description:   string;
+    badge:         string;
+    type:          string;
+    is_strategy:   boolean;
+    period:        number;
+    fast_period:   number;
+    slow_period:   number;
+    signal_period: number;
+    k_period:      number;
+    d_period:      number;
+    slowing:       number;
+    deviation:     number;
+    overbought:    number;
+    oversold:      number;
+    volume:        number;
+    price_type:    string;
 }
 
 interface AvailableConfig {
@@ -180,9 +194,75 @@ export class ChartUI {
         if (incoming.symbols?.length)            this.config.symbols            = incoming.symbols;
         if (incoming.timeframes_visible?.length) this.config.timeframes_visible = incoming.timeframes_visible;
         if (incoming.timeframes_more?.length)    this.config.timeframes_more    = incoming.timeframes_more;
-        if (incoming.indicators?.length)         this.config.indicators         = incoming.indicators;
-        if (incoming.strategies?.length)         this.config.strategies         = incoming.strategies;
-        if (incoming.patterns?.length)           this.config.patterns           = incoming.patterns;
+        
+        if (incoming.indicators?.length) {
+            this.config.indicators = incoming.indicators.map(i => ({
+                key:           i.key,
+                label:         i.label,
+                description:   i.description,
+                badge:         i.badge,
+                type:          i.type          ?? '',
+                is_strategy:   i.is_strategy   ?? false,
+                period:        i.period        ?? 0,
+                fast_period:   i.fast_period   ?? 0,
+                slow_period:   i.slow_period   ?? 0,
+                signal_period: i.signal_period ?? 0,
+                k_period:      i.k_period      ?? 0,
+                d_period:      i.d_period      ?? 0,
+                slowing:       i.slowing       ?? 0,
+                deviation:     i.deviation     ?? 0.0,
+                overbought:    i.overbought    ?? 0,
+                oversold:      i.oversold      ?? 0,
+                volume:        i.volume        ?? 0.0,
+                price_type:    i.price_type    ?? 'close'
+            }));
+        }
+        
+        if (incoming.strategies?.length) {
+            this.config.strategies = incoming.strategies.map(i => ({
+                key:           i.key,
+                label:         i.label,
+                description:   i.description,
+                badge:         i.badge,
+                type:          i.type          ?? '',
+                is_strategy:   i.is_strategy   ?? false,
+                period:        i.period        ?? 0,
+                fast_period:   i.fast_period   ?? 0,
+                slow_period:   i.slow_period   ?? 0,
+                signal_period: i.signal_period ?? 0,
+                k_period:      i.k_period      ?? 0,
+                d_period:      i.d_period      ?? 0,
+                slowing:       i.slowing       ?? 0,
+                deviation:     i.deviation     ?? 0.0,
+                overbought:    i.overbought    ?? 0,
+                oversold:      i.oversold      ?? 0,
+                volume:        i.volume        ?? 0.0,
+                price_type:    i.price_type    ?? 'close'
+            }));
+        }
+        
+        if (incoming.patterns?.length) {
+            this.config.patterns = incoming.patterns.map(i => ({
+                key:           i.key,
+                label:         i.label,
+                description:   i.description,
+                badge:         i.badge,
+                type:          i.type          ?? '',
+                is_strategy:   i.is_strategy   ?? false,
+                period:        i.period        ?? 0,
+                fast_period:   i.fast_period   ?? 0,
+                slow_period:   i.slow_period   ?? 0,
+                signal_period: i.signal_period ?? 0,
+                k_period:      i.k_period      ?? 0,
+                d_period:      i.d_period      ?? 0,
+                slowing:       i.slowing       ?? 0,
+                deviation:     i.deviation     ?? 0.0,
+                overbought:    i.overbought    ?? 0,
+                oversold:      i.oversold      ?? 0,
+                volume:        i.volume        ?? 0.0,
+                price_type:    i.price_type    ?? 'close'
+            }));
+        }
 
         this.renderTimeframes();
         this.renderSymbolRows();
