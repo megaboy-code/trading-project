@@ -366,14 +366,15 @@ export class ModuleManager {
             this.chart?.handleTimeframeChange(timeframe);
         });
 
-        // ── Resubscribe indicator on TF change ──
+        // ── Resubscribe indicator on TF change or period override ──
         document.addEventListener('resubscribe-indicator', (e: Event) => {
-            const { key, symbol } = (e as CustomEvent).detail;
+            const { key, symbol, period } = (e as CustomEvent).detail;
             if (!key || !symbol) return;
             this.connectionManager.subscribeIndicator(
                 key,
                 symbol,
-                this.connectionManager.getCurrentTimeframe()
+                this.connectionManager.getCurrentTimeframe(),
+                period ?? 0
             );
         });
 
