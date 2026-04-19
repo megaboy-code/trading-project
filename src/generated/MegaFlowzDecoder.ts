@@ -185,7 +185,6 @@ export interface AvailableSymbolData {
     description: string;
 }
 
-// ── Full params — frontend builds settings UI from these ──
 export interface AvailableItemData {
     key:           string;
     label:         string;
@@ -216,14 +215,12 @@ export interface AvailableConfigPayload {
     patterns:           AvailableItemData[];
 }
 
-// ── Indicator line — parallel arrays ──
 export interface IndicatorLineData {
     name:       string;
     timestamps: number[];
     values:     number[];
 }
 
-// ── Indicator update payload ──
 export interface IndicatorUpdatePayload {
     key:       string;
     label:     string;
@@ -695,14 +692,14 @@ export class MegaFlowzDecoder {
 
                         const timestamps: number[] = [];
                         for (let j = 0; j < line.timestampsLength(); j++) {
-                            timestamps.push(
-                                parseInt(line.timestamps(j).toString(), 10)
-                            );
+                            const ts = line.timestamps(j);
+                            if (ts !== null) timestamps.push(Number(ts));
                         }
 
                         const values: number[] = [];
                         for (let j = 0; j < line.valuesLength(); j++) {
-                            values.push(line.values(j));
+                            const v = line.values(j);
+                            if (v !== null) values.push(v);
                         }
 
                         lines.push({
