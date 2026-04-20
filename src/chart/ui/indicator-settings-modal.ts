@@ -10,15 +10,14 @@
 import { LegendItem } from '../chart-types';
 
 interface LineSettings {
-    name:      string; // backend key — 'ema' | 'fast' | 'slow'
-    color:     string;
-    lineWidth: number;
-    priceLineVisible:      boolean;
-    lastValueVisible:      boolean;
+    name:                   string;
+    color:                  string;
+    lineWidth:              number;
+    priceLineVisible:       boolean;
+    lastValueVisible:       boolean;
     crosshairMarkerVisible: boolean;
 }
 
-// ── Display name map — backend key → UI label ──
 const LINE_DISPLAY_NAMES: Record<string, string> = {
     'ema':  'Line',
     'fast': 'Fast Line',
@@ -26,7 +25,6 @@ const LINE_DISPLAY_NAMES: Record<string, string> = {
     'line': 'Line',
 };
 
-// ── Period field labels ──
 const PERIOD_LABELS: Record<string, string> = {
     period:        'Period',
     fast_period:   'Fast Period',
@@ -59,23 +57,23 @@ export class IndicatorSettingsModal {
         // ── savedLines attached by chart-core before opening modal ──
         const savedLines = (item.settings as any)?.savedLines as
             Record<string, {
-                color:                 string;
-                width:                 number;
-                priceLineVisible:      boolean;
-                lastValueVisible:      boolean;
+                color:                  string;
+                width:                  number;
+                priceLineVisible:       boolean;
+                lastValueVisible:       boolean;
                 crosshairMarkerVisible: boolean;
             }> | undefined;
 
-        // ── Build line settings — use v.key as backend name, seed from savedLines ──
+        // ── Build line settings — v.key is backend name, seed from savedLines ──
         this.lineSettings = (item.values || []).map(v => {
             const name  = (v as any).key || v.label || 'ema';
             const saved = savedLines?.[name];
             return {
                 name,
-                color:                 saved?.color                 ?? v.color ?? '#00d394',
-                lineWidth:             saved?.width                 ?? 1,
-                priceLineVisible:      saved?.priceLineVisible      ?? false,
-                lastValueVisible:      saved?.lastValueVisible      ?? true,
+                color:                  saved?.color                  ?? v.color ?? '#00d394',
+                lineWidth:              saved?.width                  ?? 1,
+                priceLineVisible:       saved?.priceLineVisible       ?? false,
+                lastValueVisible:       saved?.lastValueVisible       ?? true,
                 crosshairMarkerVisible: saved?.crosshairMarkerVisible ?? true
             };
         });
@@ -83,11 +81,11 @@ export class IndicatorSettingsModal {
         if (this.lineSettings.length === 0) {
             const saved = savedLines?.['ema'];
             this.lineSettings.push({
-                name:                  'ema',
-                color:                 saved?.color                 ?? item.color ?? '#00d394',
-                lineWidth:             saved?.width                 ?? 1,
-                priceLineVisible:      saved?.priceLineVisible      ?? false,
-                lastValueVisible:      saved?.lastValueVisible      ?? true,
+                name:                   'ema',
+                color:                  saved?.color                  ?? item.color ?? '#00d394',
+                lineWidth:              saved?.width                  ?? 1,
+                priceLineVisible:       saved?.priceLineVisible       ?? false,
+                lastValueVisible:       saved?.lastValueVisible       ?? true,
                 crosshairMarkerVisible: saved?.crosshairMarkerVisible ?? true
             });
         }
@@ -211,7 +209,7 @@ export class IndicatorSettingsModal {
         const titleBlock = document.createElement('div');
         titleBlock.style.cssText = `display: flex; flex-direction: column; gap: 1px;`;
 
-        const titleEl       = document.createElement('span');
+        const titleEl = document.createElement('span');
         titleEl.style.cssText = `
             font-size: var(--text-xl);
             font-weight: 600;
@@ -220,7 +218,7 @@ export class IndicatorSettingsModal {
         `;
         titleEl.textContent = this.item.name;
 
-        const subtitleEl       = document.createElement('span');
+        const subtitleEl = document.createElement('span');
         subtitleEl.style.cssText = `
             font-size: var(--text-base);
             color: var(--text-muted);
@@ -296,7 +294,7 @@ export class IndicatorSettingsModal {
                 gap: 8px;
             `;
 
-            const label       = document.createElement('span');
+            const label = document.createElement('span');
             label.style.cssText = `
                 font-size: var(--text-lg);
                 color: var(--text-secondary);
@@ -351,7 +349,7 @@ export class IndicatorSettingsModal {
             gap: 8px;
         `;
 
-        const label       = document.createElement('span');
+        const label = document.createElement('span');
         label.style.cssText = `
             font-size: var(--text-lg);
             color: var(--text-secondary);
@@ -405,11 +403,11 @@ export class IndicatorSettingsModal {
                 color:    current.hex,
                 opacity:  current.opacity,
                 onChange: (hex: string, opacity: number) => {
-                    const newColor                    = opacity < 1
+                    const newColor                 = opacity < 1
                         ? this.hexToRgba(hex, opacity)
                         : hex;
-                    this.lineSettings[index].color    = newColor;
-                    preview.style.backgroundColor     = this.toDisplayColor(newColor);
+                    this.lineSettings[index].color = newColor;
+                    preview.style.backgroundColor  = this.toDisplayColor(newColor);
                 }
             });
             picker.open(preview);
@@ -446,7 +444,7 @@ export class IndicatorSettingsModal {
                 border-bottom: 1px solid var(--border-light);
             `;
 
-            const label       = document.createElement('span');
+            const label = document.createElement('span');
             label.style.cssText = `
                 font-size: var(--text-lg);
                 color: var(--text-secondary);
@@ -454,10 +452,10 @@ export class IndicatorSettingsModal {
             `;
             label.textContent = opt.label;
 
-            const checkbox     = document.createElement('input');
-            checkbox.type      = 'checkbox';
+            const checkbox   = document.createElement('input');
+            checkbox.type    = 'checkbox';
             // ── Seed from saved settings ──
-            checkbox.checked   = (first?.[opt.key] as boolean) ?? true;
+            checkbox.checked = (first?.[opt.key] as boolean) ?? true;
             checkbox.style.cssText = `
                 width: 16px;
                 height: 16px;
@@ -554,28 +552,25 @@ export class IndicatorSettingsModal {
     // ================================================================
     private applySettings(): void {
         const lines: Record<string, {
-            color:                 string;
-            lineWidth:             number;
-            priceLineVisible:      boolean;
-            lastValueVisible:      boolean;
+            color:                  string;
+            lineWidth:              number;
+            priceLineVisible:       boolean;
+            lastValueVisible:       boolean;
             crosshairMarkerVisible: boolean;
         }> = {};
 
         this.lineSettings.forEach(line => {
             lines[line.name] = {
-                color:                 line.color,
-                lineWidth:             line.lineWidth,
-                priceLineVisible:      line.priceLineVisible,
-                lastValueVisible:      line.lastValueVisible,
+                color:                  line.color,
+                lineWidth:              line.lineWidth,
+                priceLineVisible:       line.priceLineVisible,
+                lastValueVisible:       line.lastValueVisible,
                 crosshairMarkerVisible: line.crosshairMarkerVisible
             };
         });
 
         document.dispatchEvent(new CustomEvent('indicator-settings-changed', {
-            detail: {
-                indicatorId: this.item.id,
-                lines
-            }
+            detail: { indicatorId: this.item.id, lines }
         }));
 
         const periodOverrides: Record<string, number> = {};
@@ -591,10 +586,7 @@ export class IndicatorSettingsModal {
 
         if (hasPeriodChange) {
             document.dispatchEvent(new CustomEvent('indicator-period-changed', {
-                detail: {
-                    indicatorId:     this.item.id,
-                    periodOverrides
-                }
+                detail: { indicatorId: this.item.id, periodOverrides }
             }));
         }
     }
