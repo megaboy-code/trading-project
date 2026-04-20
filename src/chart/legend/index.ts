@@ -173,9 +173,13 @@ export class ChartLegend {
         return this.itemsLegend.hasItem(id);
     }
 
-    // ── Returns live item from store — used by settings modal ──
     public getItem(id: string): LegendItem | undefined {
         return this.itemsLegend.getItem(id);
+    }
+
+    // ── Remap legend item id — called after TF change ──
+    public updateItemId(oldId: string, newId: string): void {
+        this.itemsLegend.updateItemId(oldId, newId);
     }
 
     public async createPaneLegend(pane: any): Promise<void> {
