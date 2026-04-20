@@ -74,6 +74,7 @@ export class ChartLegend {
             pointer-events: auto;
             height: 12px;
             user-select: none;
+            align-self: flex-start;
         `;
 
         const caretSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -109,7 +110,6 @@ export class ChartLegend {
                 this.mainItemContainer.style.display = this.collapsed ? 'none' : 'flex';
             }
             caretSvg.style.transform = this.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-            // show count when collapsed
             const count = this.itemsLegend.getAll().length;
             caretCount.style.display = this.collapsed ? 'inline' : 'none';
             caretCount.textContent   = String(count);
@@ -134,7 +134,7 @@ export class ChartLegend {
             this.collapsed = false;
             if (this.mainItemContainer) this.mainItemContainer.style.display = 'flex';
             const svg = this.caretEl.querySelector('svg') as SVGElement;
-            if (svg) svg.style.transform = 'rotate(0deg)';
+            if (svg) (svg as HTMLElement).style.transform = 'rotate(0deg)';
             const count = this.caretEl.querySelector('[data-role="caret-count"]') as HTMLElement;
             if (count) count.style.display = 'none';
         }
@@ -154,6 +154,12 @@ export class ChartLegend {
         document.addEventListener('legend-item-remove', (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             this.removeItem(id);
+        }, { signal });
+
+        // ✅ Sync dot color from indicator-manager after settings change
+        document.addEventListener('legend-item-color-update', (e: Event) => {
+            const { id, color } = (e as CustomEvent).detail;
+            this.itemsLegend.updateColor(id, color);
         }, { signal });
     }
 
