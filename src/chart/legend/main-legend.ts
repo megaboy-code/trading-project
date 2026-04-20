@@ -13,13 +13,12 @@ const STATUS_COLORS: Record<ConnectionStatus, string> = {
 };
 
 export class MainLegend {
-    private container:    HTMLElement | null = null;
-    private nameEl:       HTMLElement | null = null;
-    private timeframeEl:  HTMLElement | null = null;
-    private dotInnerEl:   HTMLElement | null = null;
-    private dotOuterEl:   HTMLElement | null = null;
-    private caretEl:      HTMLElement | null = null;
-    private precision:    number = 5;
+    private container:   HTMLElement | null = null;
+    private nameEl:      HTMLElement | null = null;
+    private timeframeEl: HTMLElement | null = null;
+    private dotOuterEl:  HTMLElement | null = null;
+    private dotInnerEl:  HTMLElement | null = null;
+    private precision:   number = 5;
 
     private ohlcEls: {
         o: HTMLElement | null;
@@ -34,22 +33,14 @@ export class MainLegend {
         this.container = document.createElement('div');
         this.container.style.cssText = `
             display: flex;
-            flex-direction: column;
-            gap: 4px;
-            pointer-events: none;
-            user-select: none;
-            font-family: 'Inter', sans-serif;
-        `;
-
-        // ── Main row ──
-        const row = document.createElement('div');
-        row.style.cssText = `
-            display: flex;
             align-items: center;
             gap: 5px;
+            font-family: 'Inter', sans-serif;
             font-size: 11px;
             line-height: 16px;
             height: 16px;
+            pointer-events: none;
+            user-select: none;
         `;
 
         // ── Full symbol name ──
@@ -72,7 +63,7 @@ export class MainLegend {
 
         const sep2 = this.makeSep();
 
-        // ── Connection dot — TV style: outer ring + inner circle ──
+        // ── Connection dot — outer solid + inner solid layered ──
         const dotWrapper = document.createElement('div');
         dotWrapper.style.cssText = `
             position: relative;
@@ -90,17 +81,17 @@ export class MainLegend {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            border: 1.5px solid #ef4444;
-            opacity: 0.4;
+            background: #ef4444;
+            opacity: 0.35;
         `;
 
         this.dotInnerEl = document.createElement('div');
         this.dotInnerEl.style.cssText = `
+            position: relative;
             width: 5px;
             height: 5px;
             border-radius: 50%;
             background: #ef4444;
-            flex-shrink: 0;
         `;
 
         dotWrapper.appendChild(this.dotOuterEl);
@@ -119,39 +110,14 @@ export class MainLegend {
         this.ohlcEls.l = ohlcL.val;
         this.ohlcEls.c = ohlcC.val;
 
-        // ── Assemble row: symbol · tf · dot · O H L C ──
-        row.appendChild(this.nameEl);
-        row.appendChild(sep1);
-        row.appendChild(this.timeframeEl);
-        row.appendChild(sep2);
-        row.appendChild(dotWrapper);
-        row.appendChild(sep3);
-        [ohlcO, ohlcH, ohlcL, ohlcC].forEach(({ cell }) => row.appendChild(cell));
-
-        // ── Caret — below items, hidden by default ──
-        this.caretEl = document.createElement('div');
-        this.caretEl.style.cssText = `
-            display: none;
-            align-items: center;
-            justify-content: flex-start;
-            padding-left: 4px;
-            cursor: pointer;
-            pointer-events: auto;
-            height: 12px;
-        `;
-        this.caretEl.innerHTML = `
-            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-                <path d="M1 1L6 7L11 1" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        `;
-        this.caretEl.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (this.onToggleCollapse) this.onToggleCollapse();
-        });
-
-        this.container.appendChild(row);
-        this.container.appendChild(this.caretEl);
+        // ── Assemble: symbol · tf · dot · O H L C ──
+        this.container.appendChild(this.nameEl);
+        this.container.appendChild(sep1);
+        this.container.appendChild(this.timeframeEl);
+        this.container.appendChild(sep2);
+        this.container.appendChild(dotWrapper);
+        this.container.appendChild(sep3);
+        [ohlcO, ohlcH, ohlcL, ohlcC].forEach(({ cell }) => this.container!.appendChild(cell));
 
         return this.container;
     }
@@ -235,31 +201,19 @@ export class MainLegend {
     public updateStatus(status: ConnectionStatus): void {
         if (!this.dotInnerEl || !this.dotOuterEl) return;
         const color = STATUS_COLORS[status] || '#ef4444';
-        this.dotInnerEl.style.background     = color;
-        this.dotOuterEl.style.borderColor    = color;
-    }
-
-    public setCollapsed(collapsed: boolean): void {
-        if (!this.caretEl) return;
-        const svg = this.caretEl.querySelector('svg');
-        if (svg) svg.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    }
-
-    public setCaretVisible(visible: boolean): void {
-        if (!this.caretEl) return;
-        this.caretEl.style.display = visible ? 'flex' : 'none';
+        this.dotOuterEl.style.background = color;
+        this.dotInnerEl.style.background = color;
     }
 
     // ==================== DESTROY ====================
 
     public destroy(): void {
-        this.container    = null;
-        this.nameEl       = null;
-        this.timeframeEl  = null;
-        this.dotInnerEl   = null;
-        this.dotOuterEl   = null;
-        this.caretEl      = null;
-        this.ohlcEls      = { o: null, h: null, l: null, c: null };
+        this.container   = null;
+        this.nameEl      = null;
+        this.timeframeEl = null;
+        this.dotOuterEl  = null;
+        this.dotInnerEl  = null;
+        this.ohlcEls     = { o: null, h: null, l: null, c: null };
         this.onToggleCollapse = null;
     }
 }
