@@ -175,7 +175,7 @@ export class IndicatorManager {
                     d_period:      item.d_period      ?? 0,
                     slowing:       item.slowing       ?? 0,
                     deviation:     item.deviation     ?? 0.0,
-                    overbought:    item.overbought    ?? 0,
+                    overbought:    item.overbought     ?? 0,
                     oversold:      item.oversold      ?? 0,
                     volume:        item.volume        ?? 0.0,
                     price_type:    item.price_type    ?? 'close',
@@ -224,8 +224,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // CREATE — first time this id is seen
-    // Saves defaults into savedSettings so modal always has values
+    // CREATE
     // ================================================================
     private createIndicator(
         id:   string,
@@ -248,7 +247,6 @@ export class IndicatorManager {
             active:    true
         };
 
-        // ── Ensure savedSettings map exists for this key ──
         if (!this.savedSettings.has(data.key)) {
             this.savedSettings.set(data.key, new Map());
         }
@@ -269,7 +267,6 @@ export class IndicatorManager {
             const lastValueVisible       = saved?.lastValueVisible       ?? true;
             const crosshairMarkerVisible = saved?.crosshairMarkerVisible ?? true;
 
-            // ── Persist defaults if no saved entry exists yet ──
             if (!saved) {
                 keySaved.set(line.name, {
                     color,
@@ -452,7 +449,6 @@ export class IndicatorManager {
             indicator.active    = false;
             this.pool.set(newId, indicator);
 
-            // ── Update legend item id immediately ──
             document.dispatchEvent(new CustomEvent('indicator-id-updated', {
                 detail: { oldId, newId }
             }));
@@ -552,6 +548,15 @@ export class IndicatorManager {
                 crosshairMarkerVisible: line.crosshairMarkerVisible
             });
         });
+
+        // ✅ Sync legend dot color with first line color after settings change
+        const firstLineName  = indicator.lines.keys().next().value;
+        const firstLine      = firstLineName ? indicator.lines.get(firstLineName) : null;
+        if (firstLine) {
+            document.dispatchEvent(new CustomEvent('legend-item-color-update', {
+                detail: { id: indicator.id, color: firstLine.color }
+            }));
+        }
     }
 
     // ================================================================
