@@ -12,6 +12,7 @@ export class ChartLegend {
     private chartContainer:    HTMLElement;
     private legendContainer:   HTMLElement | null = null;
     private mainItemContainer: HTMLElement | null = null;
+    private caretEl:           HTMLElement | null = null;
 
     private mainLegend:  MainLegend;
     private itemsLegend: ItemsLegend;
@@ -53,14 +54,6 @@ export class ChartLegend {
 
         const mainLegendEl = this.mainLegend.create();
 
-        this.mainLegend.onToggleCollapse = () => {
-            this.collapsed = !this.collapsed;
-            this.mainLegend.setCollapsed(this.collapsed);
-            if (this.mainItemContainer) {
-                this.mainItemContainer.style.display = this.collapsed ? 'none' : 'flex';
-            }
-        };
-
         this.mainItemContainer = document.createElement('div');
         this.mainItemContainer.style.cssText = `
             display: flex;
@@ -70,12 +63,81 @@ export class ChartLegend {
             align-self: flex-start;
         `;
 
+        // ── Caret — below items, hidden by default ──
+        this.caretEl = document.createElement('div');
+        this.caretEl.style.cssText = `
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding-left: 4px;
+            cursor: pointer;
+            pointer-events: auto;
+            height: 12px;
+            user-select: none;
+        `;
+
+        const caretSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        caretSvg.setAttribute('width', '10');
+        caretSvg.setAttribute('height', '7');
+        caretSvg.setAttribute('viewBox', '0 0 12 8');
+        caretSvg.setAttribute('fill', 'none');
+        caretSvg.style.transition = 'transform 200ms ease';
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M1 1L6 7L11 1');
+        path.setAttribute('stroke', '#64748b');
+        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        caretSvg.appendChild(path);
+
+        const caretCount = document.createElement('span');
+        caretCount.dataset.role = 'caret-count';
+        caretCount.style.cssText = `
+            font-size: 9px;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            display: none;
+        `;
+
+        this.caretEl.appendChild(caretSvg);
+        this.caretEl.appendChild(caretCount);
+
+        this.caretEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.collapsed = !this.collapsed;
+            if (this.mainItemContainer) {
+                this.mainItemContainer.style.display = this.collapsed ? 'none' : 'flex';
+            }
+            caretSvg.style.transform = this.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+            // show count when collapsed
+            const count = this.itemsLegend.getAll().length;
+            caretCount.style.display = this.collapsed ? 'inline' : 'none';
+            caretCount.textContent   = String(count);
+        });
+
         this.paneManager = new LegendPaneManager();
         this.paneManager.setMainContainer(this.mainItemContainer, this.chartContainer);
 
         this.legendContainer.appendChild(mainLegendEl);
         this.legendContainer.appendChild(this.mainItemContainer);
+        this.legendContainer.appendChild(this.caretEl);
         this.chartContainer.appendChild(this.legendContainer);
+    }
+
+    // ==================== CARET VISIBILITY ====================
+
+    private updateCaretVisibility(): void {
+        if (!this.caretEl) return;
+        const hasItems = this.itemsLegend.getAll().length > 0;
+        this.caretEl.style.display = hasItems ? 'flex' : 'none';
+        if (!hasItems && this.collapsed) {
+            this.collapsed = false;
+            if (this.mainItemContainer) this.mainItemContainer.style.display = 'flex';
+            const svg = this.caretEl.querySelector('svg') as SVGElement;
+            if (svg) svg.style.transform = 'rotate(0deg)';
+            const count = this.caretEl.querySelector('[data-role="caret-count"]') as HTMLElement;
+            if (count) count.style.display = 'none';
+        }
     }
 
     // ==================== EVENT LISTENERS ====================
@@ -144,14 +206,12 @@ export class ChartLegend {
             return;
         }
         this.itemsLegend.addItem(item, container);
-        this.mainLegend.setCaretVisible(true);
+        this.updateCaretVisibility();
     }
 
     public removeItem(id: string): void {
         this.itemsLegend.removeItem(id);
-        if (this.itemsLegend.getAll().length === 0) {
-            this.mainLegend.setCaretVisible(false);
-        }
+        this.updateCaretVisibility();
     }
 
     public updateItemValue(id: string, value: string): void {
@@ -203,7 +263,7 @@ export class ChartLegend {
             .filter(item => item.icon !== 'fa-robot')
             .forEach(item => this.itemsLegend.removeItem(item.id));
         this.paneManager.clearAll();
-        this.mainLegend.setCaretVisible(false);
+        this.updateCaretVisibility();
     }
 
     // ==================== DESTROY ====================
@@ -218,6 +278,7 @@ export class ChartLegend {
         removeElement(this.legendContainer);
         this.legendContainer   = null;
         this.mainItemContainer = null;
+        this.caretEl           = null;
         this.collapsed         = false;
     }
 }
