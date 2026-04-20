@@ -502,6 +502,10 @@ export class IndicatorSettingsModal {
     // ==================== APPLY ====================
 
     private applySettings(): void {
+        console.log('applySettings fired');
+        console.log('lineSettings:', this.lineSettings);
+        console.log('periodInputs:', Object.entries(this.periodInputs).map(([k,v]) => `${k}=${v.value}`));
+
         // ── Line color + width ──
         const lines: Record<string, { color: string; lineWidth: number }> = {};
         this.lineSettings.forEach(line => {
