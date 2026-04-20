@@ -462,14 +462,80 @@ export class IndicatorManager {
     // ================================================================
     // ON SYMBOL CHANGE
     // ================================================================
-    public onSymbolChange(): void {
+    public onSymbolChange(newSymbol: string): void {
+        const toUpdate: Array<{
+            oldId:     string;
+            newId:     string;
+            indicator: ActiveIndicator;
+            key:       string;
+            timeframe: string;
+        }> = [];
+
+        this.pool.forEach((indicator, id) => {
+            if (indicator.isStrategy) {
+                this.clearSeriesData(indicator);
+                document.dispatchEvent(new CustomEvent('indicator-removed', {
+                    detail: {
+                        key:       indicator.key,
+                        symbol:    indicator.symbol,
+                        timeframe: indicator.timeframe
+                    }
+                }));
+                document.dispatchEvent(new CustomEvent('legend-item-remove', {
+                    detail: { id }
+                }));
+            } else {
+                document.dispatchEvent(new CustomEvent('indicator-removed', {
+                    detail: {
+                        key:       indicator.key,
+                        symbol:    indicator.symbol,
+                        timeframe: indicator.timeframe
+                    }
+                }));
+
+                this.clearSeriesData(indicator);
+
+                toUpdate.push({
+                    oldId:     id,
+                    newId:     `${indicator.key}_${newSymbol}_${indicator.timeframe}`,
+                    indicator,
+                    key:       indicator.key,
+                    timeframe: indicator.timeframe
+                });
+            }
+        });
+
+        // ── Remove strategies from pool and legendIds ──
+        this.pool.forEach((indicator, id) => {
+            if (indicator.isStrategy) {
+                this.pool.delete(id);
+                this.legendIds.delete(indicator.key);
+            }
+        });
+
+        toUpdate.forEach(({ oldId, newId, indicator, key, timeframe }) => {
+            this.pool.delete(oldId);
+            indicator.id     = newId;
+            indicator.symbol = newSymbol;
+            indicator.active = false;
+            this.pool.set(newId, indicator);
+
+            document.dispatchEvent(new CustomEvent('indicator-id-updated', {
+                detail: { oldId, newId }
+            }));
+
+            document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
+                detail: { key, symbol: newSymbol, timeframe }
+            }));
+        });
+    }
+
+    public clearAll(): void {
         this.pool.forEach(indicator => { this.clearSeriesData(indicator); });
         this.pool.clear();
         this.legendIds.clear();
         this.savedSettings.clear();
     }
-
-    public clearAll(): void { this.onSymbolChange(); }
 
     // ================================================================
     // REMOVE
