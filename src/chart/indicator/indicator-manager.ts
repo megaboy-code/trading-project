@@ -196,12 +196,9 @@ export class IndicatorManager {
         const params = this.paramsMap.get(key);
         if (!params) return '';
 
-        // ── Single line indicator — show period ──
         if (lineName === 'ema' || lineName === 'line') {
             return params.period > 0 ? String(params.period) : '';
         }
-
-        // ── Strategy lines ──
         if (lineName === 'fast') {
             return params.fast_period > 0 ? String(params.fast_period) : '';
         }
@@ -232,6 +229,7 @@ export class IndicatorManager {
     // ================================================================
     // CREATE — first time this id is seen
     // Restores saved settings if available (TF change scenario)
+    // Saves defaults into savedSettings so modal always has values
     // ================================================================
     private createIndicator(
         id:   string,
@@ -254,23 +252,39 @@ export class IndicatorManager {
             active:    true
         };
 
-        // ── Get saved settings for this key if exists ──
-        const keySaved = this.savedSettings.get(data.key);
+        // ── Ensure savedSettings map exists for this key ──
+        if (!this.savedSettings.has(data.key)) {
+            this.savedSettings.set(data.key, new Map());
+        }
+        const keySaved = this.savedSettings.get(data.key)!;
 
         const legendValues: Array<{
+            key:   string;
             label: string;
             value: string;
             color: string;
         }> = [];
 
         data.lines.forEach((line, index) => {
-            // ── Restore saved color/settings or use defaults ──
-            const saved = keySaved?.get(line.name);
-            const color = saved?.color ?? LINE_COLORS[index % LINE_COLORS.length];
-            const width = saved?.width ?? 1;
-            const priceLineVisible       = saved?.priceLineVisible      ?? false;
-            const lastValueVisible       = saved?.lastValueVisible       ?? true;
+            // ── Restore saved or use defaults ──
+            const saved = keySaved.get(line.name);
+            const color                = saved?.color                 ?? LINE_COLORS[index % LINE_COLORS.length];
+            const width                = saved?.width                 ?? 1;
+            const priceLineVisible     = saved?.priceLineVisible      ?? false;
+            const lastValueVisible     = saved?.lastValueVisible      ?? true;
             const crosshairMarkerVisible = saved?.crosshairMarkerVisible ?? true;
+
+            // ── Always persist to savedSettings — even defaults ──
+            // This ensures modal always has values to seed from
+            if (!saved) {
+                keySaved.set(line.name, {
+                    color,
+                    width,
+                    priceLineVisible,
+                    lastValueVisible,
+                    crosshairMarkerVisible
+                });
+            }
 
             try {
                 const series = this.chart.addSeries(LineSeries, {
@@ -301,8 +315,8 @@ export class IndicatorManager {
                     crosshairMarkerVisible
                 });
 
-                // ── label = period value, value = last computed value ──
                 legendValues.push({
+                    key:   line.name,
                     label: this.getPeriodLabel(data.key, line.name),
                     value: (line.values[line.values.length - 1] ?? 0).toFixed(precision),
                     color
@@ -314,6 +328,13 @@ export class IndicatorManager {
         this.pool.set(id, indicator);
 
         if (this.legendIds.has(data.key)) {
+            // ── TF change — update legend item id then update values ──
+            document.dispatchEvent(new CustomEvent('indicator-id-updated', {
+                detail: {
+                    oldId: this.getLegendIdForKey(data.key),
+                    newId: id
+                }
+            }));
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
             }));
@@ -334,6 +355,16 @@ export class IndicatorManager {
     }
 
     // ================================================================
+    // GET LEGEND ID FOR KEY — finds current pool id for a given key
+    // ================================================================
+    private getLegendIdForKey(key: string): string {
+        for (const [id, indicator] of this.pool) {
+            if (indicator.key === key) return id;
+        }
+        return '';
+    }
+
+    // ================================================================
     // UPDATE — handles both initial burst and live single point
     // ================================================================
     private updateIndicator(
@@ -343,6 +374,7 @@ export class IndicatorManager {
     ): void {
         const precision    = getDecimalPrecision(data.symbol);
         const legendValues: Array<{
+            key:   string;
             label: string;
             value: string;
             color: string;
@@ -371,6 +403,7 @@ export class IndicatorManager {
             } catch (e) {}
 
             legendValues.push({
+                key:   line.name,
                 label: this.getPeriodLabel(indicator.key, line.name),
                 value: (line.values[line.values.length - 1] ?? 0).toFixed(precision),
                 color: activeLine.color
@@ -400,10 +433,6 @@ export class IndicatorManager {
 
     // ================================================================
     // ON TIMEFRAME CHANGE
-    // Indicators — unsub old TF, clear data, UPDATE pool entry id/timeframe
-    //              legendIds NOT cleared — prevents duplicate legend item
-    //              resubscribe on new TF
-    // Strategies  — clear data only, pool entry stays
     // ================================================================
     public onTimeframeChange(newTimeframe: string): void {
         const toUpdate: Array<{
@@ -421,7 +450,6 @@ export class IndicatorManager {
                     detail: { id, deployedTF: indicator.timeframe }
                 }));
             } else {
-                // ── Unsub old TF from backend ──
                 document.dispatchEvent(new CustomEvent('indicator-removed', {
                     detail: {
                         key:       indicator.key,
@@ -442,7 +470,6 @@ export class IndicatorManager {
             }
         });
 
-        // ── Update pool entries — new id, new timeframe, series reused ──
         toUpdate.forEach(({ oldId, newId, indicator, key, symbol }) => {
             this.pool.delete(oldId);
             indicator.id        = newId;
@@ -450,7 +477,6 @@ export class IndicatorManager {
             indicator.active    = false;
             this.pool.set(newId, indicator);
 
-            // ── Resubscribe on new TF ──
             document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
                 detail: { key, symbol, timeframe: newTimeframe }
             }));
@@ -458,7 +484,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // ON SYMBOL CHANGE — clear everything including saved settings
+    // ON SYMBOL CHANGE
     // ================================================================
     public onSymbolChange(): void {
         this.pool.forEach(indicator => {
@@ -511,7 +537,6 @@ export class IndicatorManager {
 
     // ================================================================
     // UPDATE LINES — color + lineWidth + display options per line
-    // Also persists settings to savedSettings for TF change restore
     // ================================================================
     private updateLines(
         id:    string,
@@ -526,7 +551,6 @@ export class IndicatorManager {
         const indicator = this.pool.get(id);
         if (!indicator) return;
 
-        // ── Ensure savedSettings map exists for this key ──
         if (!this.savedSettings.has(indicator.key)) {
             this.savedSettings.set(indicator.key, new Map());
         }
@@ -538,15 +562,14 @@ export class IndicatorManager {
 
             const apply: any = {};
 
-            if (opts.color                  !== undefined) { apply.color                  = opts.color;      line.color = opts.color; }
-            if (opts.lineWidth              !== undefined) { apply.lineWidth              = opts.lineWidth;   line.width = opts.lineWidth; }
-            if (opts.priceLineVisible       !== undefined) { apply.priceLineVisible       = opts.priceLineVisible;       line.priceLineVisible      = opts.priceLineVisible; }
-            if (opts.lastValueVisible       !== undefined) { apply.lastValueVisible       = opts.lastValueVisible;       line.lastValueVisible      = opts.lastValueVisible; }
-            if (opts.crosshairMarkerVisible !== undefined) { apply.crosshairMarkerVisible = opts.crosshairMarkerVisible; line.crosshairMarkerVisible = opts.crosshairMarkerVisible; }
+            if (opts.color                  !== undefined) { apply.color                  = opts.color;                  line.color                  = opts.color; }
+            if (opts.lineWidth              !== undefined) { apply.lineWidth              = opts.lineWidth;               line.width                  = opts.lineWidth; }
+            if (opts.priceLineVisible       !== undefined) { apply.priceLineVisible       = opts.priceLineVisible;        line.priceLineVisible       = opts.priceLineVisible; }
+            if (opts.lastValueVisible       !== undefined) { apply.lastValueVisible       = opts.lastValueVisible;        line.lastValueVisible       = opts.lastValueVisible; }
+            if (opts.crosshairMarkerVisible !== undefined) { apply.crosshairMarkerVisible = opts.crosshairMarkerVisible;  line.crosshairMarkerVisible = opts.crosshairMarkerVisible; }
 
             try { line.series.applyOptions(apply); } catch (e) {}
 
-            // ── Persist to savedSettings ──
             keySaved.set(name, {
                 color:                 line.color,
                 width:                 line.width,
@@ -564,7 +587,6 @@ export class IndicatorManager {
         return this.pool.has(id);
     }
 
-    // ── Get saved line settings for modal to restore on reopen ──
     public getSavedSettings(key: string): Map<string, SavedLineSettings> | null {
         return this.savedSettings.get(key) ?? null;
     }
