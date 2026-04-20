@@ -61,6 +61,7 @@ interface IndicatorParams {
     volume:        number;
     price_type:    string;
     is_strategy:   boolean;
+    description:   string;
 }
 
 export interface IndicatorUpdatePayload {
@@ -162,7 +163,8 @@ export class IndicatorManager {
                     oversold:      item.oversold      ?? 0,
                     volume:        item.volume        ?? 0.0,
                     price_type:    item.price_type    ?? 'close',
-                    is_strategy:   item.is_strategy   ?? false
+                    is_strategy:   item.is_strategy   ?? false,
+                    description:   item.description   ?? ''
                 });
             });
         }, { signal });
@@ -189,7 +191,6 @@ export class IndicatorManager {
 
     // ================================================================
     // CREATE — first time this id is seen
-    // If legendIds already has key — update values only, no duplicate
     // ================================================================
     private createIndicator(
         id:   string,
@@ -247,10 +248,10 @@ export class IndicatorManager {
                     visible: true
                 });
 
-                const lastVal = line.values[line.values.length - 1] ?? 0;
+                // ── label is backend line name — used by settings modal ──
                 legendValues.push({
-                    label: isStrategy ? line.name : '',
-                    value: lastVal.toFixed(precision),
+                    label: line.name,
+                    value: (line.values[line.values.length - 1] ?? 0).toFixed(precision),
                     color
                 });
 
@@ -259,7 +260,6 @@ export class IndicatorManager {
 
         this.pool.set(id, indicator);
 
-        // ── legendIds has key — TF change, update values only, no new legend item ──
         if (this.legendIds.has(data.key)) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
@@ -317,10 +317,9 @@ export class IndicatorManager {
                 }
             } catch (e) {}
 
-            const lastVal = line.values[line.values.length - 1] ?? 0;
             legendValues.push({
-                label: indicator.isStrategy ? line.name : '',
-                value: lastVal.toFixed(precision),
+                label: line.name,
+                value: (line.values[line.values.length - 1] ?? 0).toFixed(precision),
                 color: activeLine.color
             });
         });
@@ -335,7 +334,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // CLEAR SERIES DATA — setData([]) only, no hide, no remove
+    // CLEAR SERIES DATA
     // ================================================================
     private clearSeriesData(indicator: ActiveIndicator): void {
         indicator.lines.forEach(line => {
@@ -348,10 +347,6 @@ export class IndicatorManager {
 
     // ================================================================
     // ON TIMEFRAME CHANGE
-    // Indicators — unsub old TF, clear series, delete from pool
-    //              legendIds NOT cleared — prevents duplicate legend item
-    //              resubscribe on new TF
-    // Strategies  — clear data only, pool entry stays
     // ================================================================
     public onTimeframeChange(newTimeframe: string): void {
         const toDelete:      string[] = [];
@@ -379,7 +374,6 @@ export class IndicatorManager {
                     timeframe: newTimeframe
                 });
                 toDelete.push(id);
-                // ── legendIds NOT cleared — prevents duplicate legend on TF change ──
             }
         });
 
@@ -393,7 +387,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // ON SYMBOL CHANGE — clear everything including legend tracker
+    // ON SYMBOL CHANGE
     // ================================================================
     public onSymbolChange(): void {
         this.pool.forEach(indicator => {
@@ -443,11 +437,18 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // UPDATE LINES — color + lineWidth per line from settings modal
+    // UPDATE LINES — color + lineWidth + display options per line
+    // Key is backend line name ('ema', 'fast', 'slow')
     // ================================================================
     private updateLines(
         id:    string,
-        lines: Record<string, { color?: string; lineWidth?: number }>
+        lines: Record<string, {
+            color?:                  string;
+            lineWidth?:              number;
+            priceLineVisible?:       boolean;
+            lastValueVisible?:       boolean;
+            crosshairMarkerVisible?: boolean;
+        }>
     ): void {
         const indicator = this.pool.get(id);
         if (!indicator) return;
@@ -456,8 +457,11 @@ export class IndicatorManager {
             const line = indicator.lines.get(name);
             if (!line) return;
             const apply: any = {};
-            if (opts.color)     { apply.color     = opts.color;     line.color = opts.color; }
-            if (opts.lineWidth) { apply.lineWidth = opts.lineWidth; line.width = opts.lineWidth; }
+            if (opts.color                  !== undefined) { apply.color                  = opts.color;      line.color = opts.color; }
+            if (opts.lineWidth              !== undefined) { apply.lineWidth              = opts.lineWidth;   line.width = opts.lineWidth; }
+            if (opts.priceLineVisible       !== undefined) { apply.priceLineVisible       = opts.priceLineVisible; }
+            if (opts.lastValueVisible       !== undefined) { apply.lastValueVisible       = opts.lastValueVisible; }
+            if (opts.crosshairMarkerVisible !== undefined) { apply.crosshairMarkerVisible = opts.crosshairMarkerVisible; }
             try { line.series.applyOptions(apply); } catch (e) {}
         });
     }
