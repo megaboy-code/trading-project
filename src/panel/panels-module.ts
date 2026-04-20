@@ -13,11 +13,12 @@ export class PanelsModule {
     private activeTool: string = 'trading';
 
     private panelMap: PanelMap = {
-        'trading':   '.trading-panel',
-        'watchlist': '.watchlist-panel',
-        'calendar':  '.calendar-panel',
-        'alerts':    '.alerts-panel',
-        'journal':   '.journal-panel',
+        'trading':    '.trading-panel',
+        'watchlist':  '.watchlist-panel',
+        'calendar':   '.calendar-panel',
+        'alerts':     '.alerts-panel',
+        'journal':    '.journal-panel',
+        'strategies': '.strategies-panel',  // ← added
     };
 
     // ✅ Tools that do NOT expand the panel — trigger modals or tabs
