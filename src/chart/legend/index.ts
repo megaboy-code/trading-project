@@ -67,6 +67,7 @@ export class ChartLegend {
             flex-direction: column;
             gap: 2px;
             pointer-events: auto;
+            align-self: flex-start;
         `;
 
         this.paneManager = new LegendPaneManager();
@@ -143,10 +144,14 @@ export class ChartLegend {
             return;
         }
         this.itemsLegend.addItem(item, container);
+        this.mainLegend.setCaretVisible(true);
     }
 
     public removeItem(id: string): void {
         this.itemsLegend.removeItem(id);
+        if (this.itemsLegend.getAll().length === 0) {
+            this.mainLegend.setCaretVisible(false);
+        }
     }
 
     public updateItemValue(id: string, value: string): void {
@@ -198,6 +203,7 @@ export class ChartLegend {
             .filter(item => item.icon !== 'fa-robot')
             .forEach(item => this.itemsLegend.removeItem(item.id));
         this.paneManager.clearAll();
+        this.mainLegend.setCaretVisible(false);
     }
 
     // ==================== DESTROY ====================
