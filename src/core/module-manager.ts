@@ -353,7 +353,6 @@ export class ModuleManager {
         document.addEventListener('symbol-changed', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
             if (!symbol) return;
-            this.chart?.getIndicatorManager()?.onSymbolChange();
             this.connectionManager.setSymbol(symbol);
             this.chart?.handleSymbolChange(symbol);
         });
