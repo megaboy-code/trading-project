@@ -12,26 +12,13 @@ const STATUS_COLORS: Record<ConnectionStatus, string> = {
     error:        '#dc2626'
 };
 
-function injectPulseStyle(): void {
-    if (document.getElementById('legend-pulse-style')) return;
-    const style = document.createElement('style');
-    style.id = 'legend-pulse-style';
-    style.textContent = `
-        @keyframes legend-pulse {
-            0%, 100% { opacity: 1; }
-            50%       { opacity: 0.4; }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
 export class MainLegend {
     private container:    HTMLElement | null = null;
     private nameEl:       HTMLElement | null = null;
     private timeframeEl:  HTMLElement | null = null;
-    private dotEl:        HTMLElement | null = null;
-    private arrowEl:      HTMLElement | null = null;
-    private arrowWrapper: HTMLElement | null = null;
+    private dotInnerEl:   HTMLElement | null = null;
+    private dotOuterEl:   HTMLElement | null = null;
+    private caretEl:      HTMLElement | null = null;
     private precision:    number = 5;
 
     private ohlcEls: {
@@ -44,19 +31,25 @@ export class MainLegend {
     public onToggleCollapse: (() => void) | null = null;
 
     public create(): HTMLElement {
-        injectPulseStyle();
-
         this.container = document.createElement('div');
         this.container.style.cssText = `
             display: flex;
+            flex-direction: column;
+            gap: 4px;
+            pointer-events: none;
+            user-select: none;
+            font-family: 'Inter', sans-serif;
+        `;
+
+        // ── Main row ──
+        const row = document.createElement('div');
+        row.style.cssText = `
+            display: flex;
             align-items: center;
             gap: 5px;
-            font-family: 'Inter', sans-serif;
             font-size: 11px;
             line-height: 16px;
             height: 16px;
-            pointer-events: none;
-            user-select: none;
         `;
 
         // ── Full symbol name ──
@@ -79,15 +72,39 @@ export class MainLegend {
 
         const sep2 = this.makeSep();
 
-        // ── Connection dot ──
-        this.dotEl = document.createElement('div');
-        this.dotEl.style.cssText = `
-            width: 7px;
-            height: 7px;
+        // ── Connection dot — TV style: outer ring + inner circle ──
+        const dotWrapper = document.createElement('div');
+        dotWrapper.style.cssText = `
+            position: relative;
+            width: 10px;
+            height: 10px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+
+        this.dotOuterEl = document.createElement('div');
+        this.dotOuterEl.style.cssText = `
+            position: absolute;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            background-color: #ef4444;
+            border: 1.5px solid #ef4444;
+            opacity: 0.4;
+        `;
+
+        this.dotInnerEl = document.createElement('div');
+        this.dotInnerEl.style.cssText = `
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #ef4444;
             flex-shrink: 0;
         `;
+
+        dotWrapper.appendChild(this.dotOuterEl);
+        dotWrapper.appendChild(this.dotInnerEl);
 
         const sep3 = this.makeSep();
 
@@ -102,61 +119,39 @@ export class MainLegend {
         this.ohlcEls.l = ohlcL.val;
         this.ohlcEls.c = ohlcC.val;
 
-        // ── Collapse arrow wrapper ──
-        this.arrowWrapper = document.createElement('div');
-        this.arrowWrapper.style.cssText = `
-            width: 20px;
-            height: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            pointer-events: auto;
-            cursor: pointer;
-            margin-left: 2px;
-            overflow: hidden;
-        `;
+        // ── Assemble row: symbol · tf · dot · O H L C ──
+        row.appendChild(this.nameEl);
+        row.appendChild(sep1);
+        row.appendChild(this.timeframeEl);
+        row.appendChild(sep2);
+        row.appendChild(dotWrapper);
+        row.appendChild(sep3);
+        [ohlcO, ohlcH, ohlcL, ohlcC].forEach(({ cell }) => row.appendChild(cell));
 
-        this.arrowEl = document.createElement('span');
-        this.arrowEl.style.cssText = `
-            color: var(--text-muted);
-            font-size: 30px;
+        // ── Caret — below items, hidden by default ──
+        this.caretEl = document.createElement('div');
+        this.caretEl.style.cssText = `
+            display: none;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 4px;
             cursor: pointer;
             pointer-events: auto;
-            transition: transform 200ms ease;
-            line-height: 1;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: 12px;
         `;
-        this.arrowEl.textContent = '▾';
-
-        this.arrowWrapper.addEventListener('click', (e) => {
+        this.caretEl.innerHTML = `
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                <path d="M1 1L6 7L11 1" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
+        this.caretEl.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             if (this.onToggleCollapse) this.onToggleCollapse();
         });
 
-        this.arrowWrapper.addEventListener('mouseenter', (e) => {
-            e.stopPropagation();
-        });
-
-        this.arrowWrapper.addEventListener('mouseleave', (e) => {
-            e.stopPropagation();
-        });
-
-        this.arrowWrapper.appendChild(this.arrowEl);
-
-        // ── Assemble: pair · tf · dot · O H L C · arrow ──
-        this.container.appendChild(this.nameEl);
-        this.container.appendChild(sep1);
-        this.container.appendChild(this.timeframeEl);
-        this.container.appendChild(sep2);
-        this.container.appendChild(this.dotEl);
-        this.container.appendChild(sep3);
-        [ohlcO, ohlcH, ohlcL, ohlcC].forEach(({ cell }) => this.container!.appendChild(cell));
-        this.container.appendChild(this.arrowWrapper);
+        this.container.appendChild(row);
+        this.container.appendChild(this.caretEl);
 
         return this.container;
     }
@@ -238,17 +233,21 @@ export class MainLegend {
     }
 
     public updateStatus(status: ConnectionStatus): void {
-        if (!this.dotEl) return;
+        if (!this.dotInnerEl || !this.dotOuterEl) return;
         const color = STATUS_COLORS[status] || '#ef4444';
-        this.dotEl.style.backgroundColor = color;
-        this.dotEl.style.animation = (status === 'connected' || status === 'connecting')
-            ? 'legend-pulse 2s ease-in-out infinite'
-            : 'none';
+        this.dotInnerEl.style.background     = color;
+        this.dotOuterEl.style.borderColor    = color;
     }
 
     public setCollapsed(collapsed: boolean): void {
-        if (!this.arrowEl) return;
-        this.arrowEl.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+        if (!this.caretEl) return;
+        const svg = this.caretEl.querySelector('svg');
+        if (svg) svg.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    }
+
+    public setCaretVisible(visible: boolean): void {
+        if (!this.caretEl) return;
+        this.caretEl.style.display = visible ? 'flex' : 'none';
     }
 
     // ==================== DESTROY ====================
@@ -257,9 +256,9 @@ export class MainLegend {
         this.container    = null;
         this.nameEl       = null;
         this.timeframeEl  = null;
-        this.dotEl        = null;
-        this.arrowEl      = null;
-        this.arrowWrapper = null;
+        this.dotInnerEl   = null;
+        this.dotOuterEl   = null;
+        this.caretEl      = null;
         this.ohlcEls      = { o: null, h: null, l: null, c: null };
         this.onToggleCollapse = null;
     }
