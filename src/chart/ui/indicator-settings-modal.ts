@@ -56,25 +56,39 @@ export class IndicatorSettingsModal {
         this.isStrategy  = item.icon === 'fa-robot';
         this.triggerRect = triggerRect || null;
 
-        // ── Build line settings from legend values ──
-        // v.label is the backend line name ('ema', 'fast', 'slow')
-        this.lineSettings = (item.values || []).map(v => ({
-            name:                  v.label || 'ema',
-            color:                 v.color || '#00d394',
-            lineWidth:             1,
-            priceLineVisible:      true,
-            lastValueVisible:      true,
-            crosshairMarkerVisible: true
-        }));
+        // ── savedLines attached by chart-core before opening modal ──
+        const savedLines = (item.settings as any)?.savedLines as
+            Record<string, {
+                color:                 string;
+                width:                 number;
+                priceLineVisible:      boolean;
+                lastValueVisible:      boolean;
+                crosshairMarkerVisible: boolean;
+            }> | undefined;
+
+        // ── Build line settings — use v.key as backend name, seed from savedLines ──
+        this.lineSettings = (item.values || []).map(v => {
+            const name  = (v as any).key || v.label || 'ema';
+            const saved = savedLines?.[name];
+            return {
+                name,
+                color:                 saved?.color                 ?? v.color ?? '#00d394',
+                lineWidth:             saved?.width                 ?? 1,
+                priceLineVisible:      saved?.priceLineVisible      ?? false,
+                lastValueVisible:      saved?.lastValueVisible      ?? true,
+                crosshairMarkerVisible: saved?.crosshairMarkerVisible ?? true
+            };
+        });
 
         if (this.lineSettings.length === 0) {
+            const saved = savedLines?.['ema'];
             this.lineSettings.push({
                 name:                  'ema',
-                color:                 item.color || '#00d394',
-                lineWidth:             1,
-                priceLineVisible:      true,
-                lastValueVisible:      true,
-                crosshairMarkerVisible: true
+                color:                 saved?.color                 ?? item.color ?? '#00d394',
+                lineWidth:             saved?.width                 ?? 1,
+                priceLineVisible:      saved?.priceLineVisible      ?? false,
+                lastValueVisible:      saved?.lastValueVisible      ?? true,
+                crosshairMarkerVisible: saved?.crosshairMarkerVisible ?? true
             });
         }
     }
@@ -136,7 +150,7 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // POSITION — open below and to the right of the legend item
+    // POSITION
     // ================================================================
     private positionModal(): void {
         if (!this.modal) return;
@@ -152,7 +166,6 @@ export class IndicatorSettingsModal {
             left = this.triggerRect.right + margin;
             top  = this.triggerRect.top;
 
-            // ── Clamp to viewport ──
             if (left + modalW > window.innerWidth - margin) {
                 left = this.triggerRect.left - modalW - margin;
             }
@@ -168,7 +181,7 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // HEADER — item.name as title, description as subtitle
+    // HEADER
     // ================================================================
     private createHeader(): HTMLElement {
         const header = document.createElement('div');
@@ -325,7 +338,7 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // LINE ROW — shows display name, not backend key
+    // LINE ROW
     // ================================================================
     private createLineRow(line: LineSettings, index: number): HTMLElement {
         const wrapper = document.createElement('div');
@@ -345,7 +358,6 @@ export class IndicatorSettingsModal {
             font-weight: 500;
             flex: 1;
         `;
-        // ── Use display name — never show backend key ──
         label.textContent = LINE_DISPLAY_NAMES[line.name] ?? 'Line';
 
         const widthInput   = document.createElement('input');
@@ -410,13 +422,15 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // DISPLAY OPTIONS — price line, last value, crosshair
+    // DISPLAY OPTIONS — seeded from lineSettings[0]
     // ================================================================
     private createDisplayOptions(): HTMLElement {
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `margin-top: 4px;`;
 
-        const options = [
+        const first = this.lineSettings[0];
+
+        const options: Array<{ key: keyof LineSettings; label: string }> = [
             { key: 'priceLineVisible',       label: 'Price Line'       },
             { key: 'lastValueVisible',        label: 'Last Value'       },
             { key: 'crosshairMarkerVisible',  label: 'Crosshair Marker' }
@@ -442,7 +456,8 @@ export class IndicatorSettingsModal {
 
             const checkbox     = document.createElement('input');
             checkbox.type      = 'checkbox';
-            checkbox.checked   = true;
+            // ── Seed from saved settings ──
+            checkbox.checked   = (first?.[opt.key] as boolean) ?? true;
             checkbox.style.cssText = `
                 width: 16px;
                 height: 16px;
@@ -535,11 +550,9 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // APPLY — dispatches line settings + period override
+    // APPLY
     // ================================================================
     private applySettings(): void {
-        // ── Line color + width + display options ──
-        // Key is backend line name ('ema', 'fast', 'slow')
         const lines: Record<string, {
             color:                 string;
             lineWidth:             number;
@@ -565,7 +578,6 @@ export class IndicatorSettingsModal {
             }
         }));
 
-        // ── Period override ──
         const periodOverrides: Record<string, number> = {};
         let hasPeriodChange = false;
 
