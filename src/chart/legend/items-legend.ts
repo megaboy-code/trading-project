@@ -148,7 +148,6 @@ export class ItemsLegend {
                 font-size: 9px;
                 color: ${item.color};
                 flex-shrink: 0;
-                text-shadow: 0 0 4px ${item.color};
             `;
             return i;
         }
@@ -161,7 +160,6 @@ export class ItemsLegend {
             border-radius: 50%;
             background-color: ${item.color};
             flex-shrink: 0;
-            box-shadow: 0 0 4px ${item.color};
         `;
         return dot;
     }
@@ -279,6 +277,15 @@ export class ItemsLegend {
     private updateElement(id: string, item: LegendItem): void {
         const el = this.elements.get(id);
         if (!el) return;
+
+        // ✅ Sync dot color with item.color
+        const dotEl = el.querySelector('[data-role="dot"]') as HTMLElement;
+        if (dotEl) dotEl.style.backgroundColor = item.color;
+
+        // ✅ Sync icon color with item.color
+        const iconEl = el.querySelector('i.fas:not([data-action])') as HTMLElement;
+        if (iconEl) iconEl.style.color = item.color;
+
         const oldValuesEl = el.querySelector('[data-role="values"]') as HTMLElement;
         if (!oldValuesEl) return;
         oldValuesEl.replaceWith(this.createValuesEl(item.values));
