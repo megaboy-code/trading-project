@@ -1,323 +1,70 @@
 <!-- ================================================================
-     STRATEGY STUDIO — Configuration & Backtesting Hub
+     STRATEGIES PANEL
      ================================================================ -->
+<div class="panel-content strategies-panel">
 
-<div class="strategy-studio" id="strategy-studio">
+    <!-- Header -->
+    <div class="panel-header">
+        <div class="panel-header-left">
+            <i class="fas fa-robot"></i>
+            <span>Strategies</span>
+        </div>
+        <div class="panel-header-right" style="position:relative;">
+            <button class="panel-icon-btn" id="strategyMenuBtn" title="Options">
+                <i class="fas fa-ellipsis-vertical"></i>
+            </button>
 
-    <!-- HEADER -->
-    <div class="strategy-header">
-        <div class="strategy-header-left">
-            <span class="strategy-header-icon">⚡</span>
-            <span class="strategy-header-title">Strategy Studio</span>
+            <!-- Settings dropdown — same pattern as calendar -->
+            <div class="strat-settings-drop" id="strategySettingsDrop">
+                <div class="strat-settings-label">Show Status</div>
+                <div class="strat-settings-option active" data-filter="all">
+                    <span class="strat-radio"></span> All
+                </div>
+                <div class="strat-settings-option" data-filter="running">
+                    <span class="strat-radio"></span> Running
+                </div>
+                <div class="strat-settings-option" data-filter="paused">
+                    <span class="strat-radio"></span> Paused
+                </div>
+                <div class="strat-settings-option" data-filter="stopped">
+                    <span class="strat-radio"></span> Stopped
+                </div>
+                <div class="strat-settings-divider"></div>
+                <div class="strat-settings-option strat-settings-action" id="strategyRefreshBtn">
+                    <i class="fas fa-rotate-right"></i> Refresh Stats
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- TABS -->
-    <div class="strategy-tabs">
-        <button class="strategy-tab active" data-tab="library">
-            <i class="fas fa-layer-group"></i>
-            <span>Library</span>
-        </button>
-        <button class="strategy-tab" data-tab="backtest">
-            <i class="fas fa-flask"></i>
-            <span>Backtest</span>
-        </button>
+    <!-- Summary stats -->
+    <div class="strat-summary">
+        <div class="strat-summary-stat">
+            <span class="strat-summary-label">Active</span>
+            <span class="strat-summary-value" id="stratStatActive">0</span>
+        </div>
+        <div class="strat-summary-stat">
+            <span class="strat-summary-label">Trades</span>
+            <span class="strat-summary-value" id="stratStatTrades">0</span>
+        </div>
+        <div class="strat-summary-stat">
+            <span class="strat-summary-label">P&L</span>
+            <span class="strat-summary-value" id="stratStatPnl">$0.00</span>
+        </div>
+        <div class="strat-summary-stat">
+            <span class="strat-summary-label">Win %</span>
+            <span class="strat-summary-value" id="stratStatWin">0%</span>
+        </div>
     </div>
 
-    <!-- ==================== LIBRARY TAB ==================== -->
-    <div id="library-tab" class="strategy-tab-content active">
+    <!-- Strategy list -->
+    <div class="strat-list" id="strategyList"></div>
 
-        <!-- Category Navigation -->
-        <div class="category-nav">
-            <button class="category-btn active" data-category="indicator">
-                <i class="fas fa-chart-line"></i>
-                <span>Indicator</span>
-            </button>
-            <button class="category-btn" data-category="market_structure">
-                <i class="fas fa-building"></i>
-                <span>Market Structure</span>
-            </button>
-            <button class="category-btn" data-category="pattern">
-                <i class="fas fa-candlestick-chart"></i>
-                <span>Pattern</span>
-            </button>
-            <button class="category-btn" data-category="triangular">
-                <i class="fas fa-triangle-exclamation"></i>
-                <span>Triangular</span>
-            </button>
-            <button class="category-btn" data-category="correlation">
-                <i class="fas fa-link"></i>
-                <span>Correlation</span>
-            </button>
-            <button class="category-btn" data-category="ml">
-                <i class="fas fa-brain"></i>
-                <span>ML</span>
-            </button>
-            <button class="category-btn custom" data-category="custom">
-                <i class="fas fa-sliders"></i>
-                <span>Custom</span>
-            </button>
-        </div>
-
-        <!-- Strategy Grid -->
-        <div class="strategy-grid-wrapper">
-            <div id="strategy-grid" class="strategy-grid">
-                <!-- Cards will be injected by JS -->
-            </div>
-        </div>
-
-        <!-- Inline Config Panel -->
-        <div id="config-panel" class="config-panel hidden">
-
-            <!-- Config Header -->
-            <div class="config-panel-header">
-                <div class="config-panel-title">
-                    <i class="fas fa-sliders"></i>
-                    <span id="config-strategy-name">Configure Strategy</span>
-                </div>
-                <button class="config-close-btn" id="cancel-config-btn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <!-- Config Body -->
-            <div class="config-body">
-
-                <!-- Symbol + Timeframe -->
-                <div class="config-row">
-                    <div class="config-field">
-                        <label class="config-label">Symbol</label>
-                        <select id="config-symbol" class="config-select">
-                            <option>EURUSD</option>
-                            <option>GBPUSD</option>
-                            <option>USDJPY</option>
-                            <option>AUDUSD</option>
-                            <option>USDCAD</option>
-                            <option>USDCHF</option>
-                            <option>NZDUSD</option>
-                            <option>XAUUSD</option>
-                            <option>BTCUSD</option>
-                        </select>
-                    </div>
-                    <div class="config-field">
-                        <label class="config-label">Timeframe</label>
-                        <select id="config-timeframe" class="config-select">
-                            <option>M1</option>
-                            <option>M5</option>
-                            <option>M15</option>
-                            <option>M30</option>
-                            <option selected>H1</option>
-                            <option>H4</option>
-                            <option>D1</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Dynamic Parameters -->
-                <div id="param-fields" class="param-fields">
-                    <!-- Will be populated by JS -->
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="config-actions">
-                    <button class="config-btn backtest-btn" id="config-backtest-btn">
-                        <i class="fas fa-flask"></i>
-                        Backtest
-                    </button>
-                    <button class="config-btn deploy-btn" id="execute-config-btn">
-                        <i class="fas fa-rocket"></i>
-                        Add to Chart
-                    </button>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- Config Placeholder -->
-        <div id="config-placeholder" class="config-placeholder">
-            <i class="fas fa-hand-pointer"></i>
-            <span>Select a strategy to configure</span>
-        </div>
-
-    </div>
-
-    <!-- ==================== BACKTEST TAB ==================== -->
-    <div id="backtest-tab" class="strategy-tab-content">
-
-        <!-- Backtest Config -->
-        <div class="backtest-config">
-            <div class="backtest-config-row">
-
-                <div class="config-field">
-                    <label class="config-label">Strategy</label>
-                    <select id="bt-category" class="config-select">
-                        <option value="indicator">Indicator Based</option>
-                        <option value="market_structure">Market Structure</option>
-                        <option value="pattern">Pattern</option>
-                        <option value="ml">ML</option>
-                    </select>
-                </div>
-
-                <div class="config-field">
-                    <label class="config-label">Type</label>
-                    <select id="bt-strategy" class="config-select">
-                        <!-- Populated by JS -->
-                    </select>
-                </div>
-
-                <div class="config-field">
-                    <label class="config-label">Symbol</label>
-                    <select id="bt-symbol" class="config-select">
-                        <option>EURUSD</option>
-                        <option>GBPUSD</option>
-                        <option>USDJPY</option>
-                        <option>XAUUSD</option>
-                        <option>BTCUSD</option>
-                    </select>
-                </div>
-
-                <div class="config-field">
-                    <label class="config-label">Timeframe</label>
-                    <select id="bt-timeframe" class="config-select">
-                        <option>M15</option>
-                        <option>M30</option>
-                        <option selected>H1</option>
-                        <option>H4</option>
-                        <option>D1</option>
-                    </select>
-                </div>
-
-            </div>
-
-            <!-- Studio Params -->
-            <div id="studio-params" class="param-fields">
-                <!-- Injected by JS -->
-            </div>
-
-            <!-- Days Slider -->
-            <div class="days-slider-group">
-                <div class="days-slider-header">
-                    <label class="config-label">Backtest Period</label>
-                    <span class="days-display"><span id="bt-days-value">30</span> days</span>
-                </div>
-                <input type="range" id="bt-days" min="7" max="365" value="30" class="days-slider">
-                <div class="days-marks">
-                    <span>7d</span>
-                    <span>30d</span>
-                    <span>90d</span>
-                    <span>180d</span>
-                    <span>365d</span>
-                </div>
-            </div>
-
-            <button class="run-backtest-btn" id="run-backtest-btn">
-                <i class="fas fa-play"></i>
-                Run Backtest
-            </button>
-        </div>
-
-        <!-- Backtest Results -->
-        <div id="results-container" class="results-container">
-
-            <!-- Empty State -->
-            <div id="no-results-msg" class="results-empty">
-                <i class="fas fa-flask"></i>
-                <p>No backtests yet</p>
-                <small>Configure and run a backtest to see results</small>
-            </div>
-
-            <!-- Results Panel -->
-            <div id="latest-result" class="results-panel hidden">
-
-                <!-- Result Header -->
-                <div class="result-header">
-                    <div class="result-title">
-                        <span id="result-strategy-name">—</span>
-                        <span class="result-market" id="result-market">—</span>
-                    </div>
-                    <div class="result-meta">
-                        <span id="result-days">—</span>
-                        <span id="result-timestamp">—</span>
-                    </div>
-                </div>
-
-                <!-- Key Metrics -->
-                <div class="result-metrics">
-                    <div class="result-metric">
-                        <div class="result-metric-value" id="result-trades">—</div>
-                        <div class="result-metric-label">Trades</div>
-                    </div>
-                    <div class="result-metric">
-                        <div class="result-metric-value" id="result-winrate">—</div>
-                        <div class="result-metric-label">Win Rate</div>
-                    </div>
-                    <div class="result-metric">
-                        <div class="result-metric-value" id="result-pnl">—</div>
-                        <div class="result-metric-label">Net P&L</div>
-                    </div>
-                    <div class="result-metric">
-                        <div class="result-metric-value" id="result-sharpe">—</div>
-                        <div class="result-metric-label">Sharpe</div>
-                    </div>
-                    <div class="result-metric">
-                        <div class="result-metric-value" id="result-maxdd">—</div>
-                        <div class="result-metric-label">Max DD</div>
-                    </div>
-                </div>
-
-                <!-- Equity Curve Chart -->
-                <div class="chart-section">
-                    <div class="chart-section-label">Equity Curve</div>
-                    <div id="equity-chart" class="plotly-chart"></div>
-                </div>
-
-                <!-- Drawdown Chart -->
-                <div class="chart-section">
-                    <div class="chart-section-label">Drawdown</div>
-                    <div id="drawdown-chart" class="plotly-chart"></div>
-                </div>
-
-                <!-- Detail Grid -->
-                <div class="result-detail-grid">
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Profit Factor</div>
-                        <div class="result-detail-value" id="result-pf">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Avg Win</div>
-                        <div class="result-detail-value positive" id="result-avgwin">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Avg Loss</div>
-                        <div class="result-detail-value negative" id="result-avgloss">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Final Balance</div>
-                        <div class="result-detail-value" id="result-balance">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Total Return</div>
-                        <div class="result-detail-value" id="result-return">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Winning Trades</div>
-                        <div class="result-detail-value positive" id="result-wins">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Losing Trades</div>
-                        <div class="result-detail-value negative" id="result-losses">—</div>
-                    </div>
-                    <div class="result-detail-item">
-                        <div class="result-detail-label">Deploy</div>
-                        <div class="result-detail-value">
-                            <button class="deploy-from-result-btn" id="deploy-from-result-btn">
-                                <i class="fas fa-rocket"></i> Add to Chart
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+    <!-- Footer -->
+    <div class="panel-footer">
+        <div class="strat-footer-info">
+            <i class="fas fa-circle"></i>
+            <span id="stratDeployedCount">0</span> deployed
         </div>
     </div>
 
