@@ -56,12 +56,13 @@ export class ItemsLegend {
         const item = this.items.get(id);
         if (!item) return;
         item.settings = { ...item.settings, ...settings };
+    }
 
-        // ✅ Sync dot color if color changed in settings
-        if (settings.color) {
-            item.color = settings.color;
-            this.syncDotColor(id, settings.color);
-        }
+    public updateColor(id: string, color: string): void {
+        const item = this.items.get(id);
+        if (!item) return;
+        item.color = color;
+        this.syncDotColor(id, color);
     }
 
     public setVisible(id: string, visible: boolean): void {
@@ -122,7 +123,7 @@ export class ItemsLegend {
         el.style.cssText = `
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
             padding: 1px 4px;
             font-size: 10px;
             font-family: 'Inter', sans-serif;
@@ -203,7 +204,18 @@ export class ItemsLegend {
             gap: 3px;
         `;
 
-        values.forEach(v => {
+        values.forEach((v, i) => {
+            // ── · separator before each value group ──
+            const sep = document.createElement('span');
+            sep.style.cssText = `
+                color: var(--border);
+                font-weight: 400;
+                font-size: 10px;
+                flex-shrink: 0;
+            `;
+            sep.textContent = '·';
+            el.appendChild(sep);
+
             if (v.label) {
                 const label = document.createElement('span');
                 label.style.cssText = `
@@ -212,6 +224,17 @@ export class ItemsLegend {
                 `;
                 label.textContent = v.label;
                 el.appendChild(label);
+
+                // ── · between label and value ──
+                const sep2 = document.createElement('span');
+                sep2.style.cssText = `
+                    color: var(--border);
+                    font-weight: 400;
+                    font-size: 10px;
+                    flex-shrink: 0;
+                `;
+                sep2.textContent = '·';
+                el.appendChild(sep2);
             }
 
             const val = document.createElement('span');
@@ -234,11 +257,12 @@ export class ItemsLegend {
         el.style.cssText = `
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             opacity: 0;
             transition: opacity 150ms ease;
             margin-left: auto;
             flex-shrink: 0;
+            padding-left: 4px;
         `;
 
         const settingsBtn = this.createActionIcon('fa-cog',   'var(--text-muted)');
