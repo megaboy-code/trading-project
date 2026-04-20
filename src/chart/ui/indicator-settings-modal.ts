@@ -4,16 +4,27 @@
 // One modal for both indicators and strategies
 // Lines built from LegendItem.values — one row per line
 // Period override — dispatches resubscribe with new period
-// Position — top-left under legend
+// Position — opens near clicked legend item
 // ================================================================
 
 import { LegendItem } from '../chart-types';
 
 interface LineSettings {
-    name:      string;
+    name:      string; // backend key — 'ema' | 'fast' | 'slow'
     color:     string;
     lineWidth: number;
+    priceLineVisible:      boolean;
+    lastValueVisible:      boolean;
+    crosshairMarkerVisible: boolean;
 }
+
+// ── Display name map — backend key → UI label ──
+const LINE_DISPLAY_NAMES: Record<string, string> = {
+    'ema':  'Line',
+    'fast': 'Fast Line',
+    'slow': 'Slow Line',
+    'line': 'Line',
+};
 
 // ── Period field labels ──
 const PERIOD_LABELS: Record<string, string> = {
@@ -32,33 +43,38 @@ export class IndicatorSettingsModal {
     private lineSettings: LineSettings[] = [];
     private isStrategy:   boolean;
 
-    // ── Period overrides — only fields with value > 0 from settings ──
     private periodInputs: Record<string, HTMLInputElement> = {};
 
-    // ==================== DRAGGING ====================
     private isDragging:  boolean = false;
     private dragOffsetX: number  = 0;
     private dragOffsetY: number  = 0;
 
-    constructor(item: LegendItem) {
-        this.item       = item;
-        this.isStrategy = item.icon === 'fa-robot';
+    private triggerRect: DOMRect | null = null;
+
+    constructor(item: LegendItem, triggerRect?: DOMRect) {
+        this.item        = item;
+        this.isStrategy  = item.icon === 'fa-robot';
+        this.triggerRect = triggerRect || null;
 
         // ── Build line settings from legend values ──
-        // Use line.name from pool via item.values label
-        // For non-strategy label is '' — show 'Line' as fallback
+        // v.label is the backend line name ('ema', 'fast', 'slow')
         this.lineSettings = (item.values || []).map(v => ({
-            name:      v.label || 'Line',
-            color:     v.color || '#00d394',
-            lineWidth: 1
+            name:                  v.label || 'ema',
+            color:                 v.color || '#00d394',
+            lineWidth:             1,
+            priceLineVisible:      true,
+            lastValueVisible:      true,
+            crosshairMarkerVisible: true
         }));
 
-        // ── Fallback — at least one line ──
         if (this.lineSettings.length === 0) {
             this.lineSettings.push({
-                name:      'Line',
-                color:     item.color || '#00d394',
-                lineWidth: 1
+                name:                  'ema',
+                color:                 item.color || '#00d394',
+                lineWidth:             1,
+                priceLineVisible:      true,
+                lastValueVisible:      true,
+                crosshairMarkerVisible: true
             });
         }
     }
@@ -70,7 +86,6 @@ export class IndicatorSettingsModal {
         this.modal    = document.createElement('div');
         this.modal.id = modalId;
 
-        // ── Position top-left under legend ──
         this.modal.style.cssText = `
             position: fixed;
             top: 60px;
@@ -89,31 +104,26 @@ export class IndicatorSettingsModal {
             overflow: hidden;
         `;
 
-        const title = this.isStrategy ? 'Strategy Settings' : 'Indicator Settings';
-        this.modal.appendChild(this.createHeader(title));
+        this.modal.appendChild(this.createHeader());
 
         const body = document.createElement('div');
         body.style.cssText = `padding: 14px 16px;`;
 
-        // ── Name label ──
-        body.appendChild(this.createNameLabel());
-
-        // ── Period inputs — from item.settings, only non-zero fields ──
         const periodsEl = this.createPeriodInputs();
         if (periodsEl) body.appendChild(periodsEl);
 
-        // ── One color + line width row per line ──
         this.lineSettings.forEach((line, index) => {
             body.appendChild(this.createLineRow(line, index));
         });
 
-        // ── Display options ──
         body.appendChild(this.createDisplayOptions());
 
         this.modal.appendChild(body);
         this.modal.appendChild(this.createFooter());
 
         document.body.appendChild(this.modal);
+
+        this.positionModal();
         this.setupDragging();
         this.setupCloseOnOutsideClick();
     }
@@ -125,35 +135,130 @@ export class IndicatorSettingsModal {
         this.modal = null;
     }
 
-    // ==================== NAME LABEL ====================
+    // ================================================================
+    // POSITION — open below and to the right of the legend item
+    // ================================================================
+    private positionModal(): void {
+        if (!this.modal) return;
 
-    private createNameLabel(): HTMLElement {
-        const label = document.createElement('div');
-        label.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 14px;
-            font-size: var(--text-lg);
-            color: var(--text-muted);
-        `;
+        const modalW = 300;
+        const modalH = this.modal.offsetHeight || 320;
+        const margin = 8;
 
-        if (this.isStrategy) {
-            const icon     = document.createElement('i');
-            icon.className = 'fas fa-robot';
-            icon.style.color = this.lineSettings[0]?.color || '#00d394';
-            label.appendChild(icon);
+        let left = 12;
+        let top  = 60;
+
+        if (this.triggerRect) {
+            left = this.triggerRect.right + margin;
+            top  = this.triggerRect.top;
+
+            // ── Clamp to viewport ──
+            if (left + modalW > window.innerWidth - margin) {
+                left = this.triggerRect.left - modalW - margin;
+            }
+            if (top + modalH > window.innerHeight - margin) {
+                top = window.innerHeight - modalH - margin;
+            }
+            if (left < margin) left = margin;
+            if (top  < margin) top  = margin;
         }
 
-        const name       = document.createElement('span');
-        name.textContent = this.item.name;
-        label.appendChild(name);
-
-        return label;
+        this.modal.style.left = `${left}px`;
+        this.modal.style.top  = `${top}px`;
     }
 
-    // ==================== PERIOD INPUTS ====================
+    // ================================================================
+    // HEADER — item.name as title, description as subtitle
+    // ================================================================
+    private createHeader(): HTMLElement {
+        const header = document.createElement('div');
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 14px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            cursor: grab;
+            user-select: none;
+            flex-shrink: 0;
+        `;
 
+        const left = document.createElement('div');
+        left.style.cssText = `display: flex; align-items: center; gap: 8px;`;
+
+        const dragIcon     = document.createElement('i');
+        dragIcon.className = 'fas fa-grip-vertical';
+        dragIcon.style.cssText = `
+            color: var(--text-muted);
+            font-size: var(--text-base);
+            flex-shrink: 0;
+        `;
+
+        const titleBlock = document.createElement('div');
+        titleBlock.style.cssText = `display: flex; flex-direction: column; gap: 1px;`;
+
+        const titleEl       = document.createElement('span');
+        titleEl.style.cssText = `
+            font-size: var(--text-xl);
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.2;
+        `;
+        titleEl.textContent = this.item.name;
+
+        const subtitleEl       = document.createElement('span');
+        subtitleEl.style.cssText = `
+            font-size: var(--text-base);
+            color: var(--text-muted);
+            line-height: 1.2;
+        `;
+        const description = (this.item.settings as any)?.description || '';
+        subtitleEl.textContent = description;
+
+        titleBlock.appendChild(titleEl);
+        if (description) titleBlock.appendChild(subtitleEl);
+
+        left.appendChild(dragIcon);
+        left.appendChild(titleBlock);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.style.cssText = `
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: var(--text-xl);
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transition: all 0.15s ease;
+        `;
+        closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background  = `rgba(var(--accent-sell-rgb), 0.1)`;
+            closeBtn.style.borderColor = `var(--accent-sell)`;
+            closeBtn.style.color       = `var(--accent-sell)`;
+        });
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background  = `var(--bg-base)`;
+            closeBtn.style.borderColor = `var(--border)`;
+            closeBtn.style.color       = `var(--text-muted)`;
+        });
+        closeBtn.addEventListener('click', () => this.close());
+
+        header.appendChild(left);
+        header.appendChild(closeBtn);
+        return header;
+    }
+
+    // ================================================================
+    // PERIOD INPUTS
+    // ================================================================
     private createPeriodInputs(): HTMLElement | null {
         const settings = this.item.settings as Record<string, any> | undefined;
         if (!settings) return null;
@@ -219,8 +324,9 @@ export class IndicatorSettingsModal {
         return wrapper;
     }
 
-    // ==================== LINE ROW ====================
-
+    // ================================================================
+    // LINE ROW — shows display name, not backend key
+    // ================================================================
     private createLineRow(line: LineSettings, index: number): HTMLElement {
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `
@@ -239,9 +345,9 @@ export class IndicatorSettingsModal {
             font-weight: 500;
             flex: 1;
         `;
-        label.textContent = line.name;
+        // ── Use display name — never show backend key ──
+        label.textContent = LINE_DISPLAY_NAMES[line.name] ?? 'Line';
 
-        // ── Line width input ──
         const widthInput   = document.createElement('input');
         widthInput.type    = 'number';
         widthInput.value   = String(line.lineWidth);
@@ -267,7 +373,6 @@ export class IndicatorSettingsModal {
             this.lineSettings[index].lineWidth = parseInt(widthInput.value) || 1;
         });
 
-        // ── Color swatch ──
         const preview = document.createElement('div');
         preview.style.cssText = `
             width: 32px;
@@ -288,11 +393,11 @@ export class IndicatorSettingsModal {
                 color:    current.hex,
                 opacity:  current.opacity,
                 onChange: (hex: string, opacity: number) => {
-                    const newColor             = opacity < 1
+                    const newColor                    = opacity < 1
                         ? this.hexToRgba(hex, opacity)
                         : hex;
                     this.lineSettings[index].color    = newColor;
-                    preview.style.backgroundColor = this.toDisplayColor(newColor);
+                    preview.style.backgroundColor     = this.toDisplayColor(newColor);
                 }
             });
             picker.open(preview);
@@ -304,8 +409,9 @@ export class IndicatorSettingsModal {
         return wrapper;
     }
 
-    // ==================== DISPLAY OPTIONS ====================
-
+    // ================================================================
+    // DISPLAY OPTIONS — price line, last value, crosshair
+    // ================================================================
     private createDisplayOptions(): HTMLElement {
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `margin-top: 4px;`;
@@ -357,80 +463,9 @@ export class IndicatorSettingsModal {
         return wrapper;
     }
 
-    // ==================== HEADER ====================
-
-    private createHeader(title: string): HTMLElement {
-        const header = document.createElement('div');
-        header.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 11px 14px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            cursor: grab;
-            user-select: none;
-            flex-shrink: 0;
-        `;
-
-        const left = document.createElement('div');
-        left.style.cssText = `display: flex; align-items: center; gap: 8px;`;
-
-        const dragIcon     = document.createElement('i');
-        dragIcon.className = 'fas fa-grip-vertical';
-        dragIcon.style.cssText = `
-            color: var(--text-muted);
-            font-size: var(--text-base);
-            flex-shrink: 0;
-        `;
-
-        const titleEl       = document.createElement('span');
-        titleEl.style.cssText = `
-            font-size: var(--text-xl);
-            font-weight: 600;
-            color: var(--text-primary);
-        `;
-        titleEl.textContent = title;
-
-        left.appendChild(dragIcon);
-        left.appendChild(titleEl);
-
-        const closeBtn = document.createElement('button');
-        closeBtn.style.cssText = `
-            background: var(--bg-base);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-xs);
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: var(--text-xl);
-            width: 26px;
-            height: 26px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-            transition: all 0.15s ease;
-        `;
-        closeBtn.innerHTML = '&times;';
-        closeBtn.addEventListener('mouseenter', () => {
-            closeBtn.style.background  = `rgba(var(--accent-sell-rgb), 0.1)`;
-            closeBtn.style.borderColor = `var(--accent-sell)`;
-            closeBtn.style.color       = `var(--accent-sell)`;
-        });
-        closeBtn.addEventListener('mouseleave', () => {
-            closeBtn.style.background  = `var(--bg-base)`;
-            closeBtn.style.borderColor = `var(--border)`;
-            closeBtn.style.color       = `var(--text-muted)`;
-        });
-        closeBtn.addEventListener('click', () => this.close());
-
-        header.appendChild(left);
-        header.appendChild(closeBtn);
-        return header;
-    }
-
-    // ==================== FOOTER ====================
-
+    // ================================================================
+    // FOOTER
+    // ================================================================
     private createFooter(): HTMLElement {
         const footer = document.createElement('div');
         footer.style.cssText = `
@@ -499,19 +534,27 @@ export class IndicatorSettingsModal {
         return footer;
     }
 
-    // ==================== APPLY ====================
-
+    // ================================================================
+    // APPLY — dispatches line settings + period override
+    // ================================================================
     private applySettings(): void {
-        console.log('applySettings fired');
-        console.log('lineSettings:', this.lineSettings);
-        console.log('periodInputs:', Object.entries(this.periodInputs).map(([k,v]) => `${k}=${v.value}`));
+        // ── Line color + width + display options ──
+        // Key is backend line name ('ema', 'fast', 'slow')
+        const lines: Record<string, {
+            color:                 string;
+            lineWidth:             number;
+            priceLineVisible:      boolean;
+            lastValueVisible:      boolean;
+            crosshairMarkerVisible: boolean;
+        }> = {};
 
-        // ── Line color + width ──
-        const lines: Record<string, { color: string; lineWidth: number }> = {};
         this.lineSettings.forEach(line => {
             lines[line.name] = {
-                color:     line.color,
-                lineWidth: line.lineWidth
+                color:                 line.color,
+                lineWidth:             line.lineWidth,
+                priceLineVisible:      line.priceLineVisible,
+                lastValueVisible:      line.lastValueVisible,
+                crosshairMarkerVisible: line.crosshairMarkerVisible
             };
         });
 
@@ -522,7 +565,7 @@ export class IndicatorSettingsModal {
             }
         }));
 
-        // ── Period override — only if any period input exists ──
+        // ── Period override ──
         const periodOverrides: Record<string, number> = {};
         let hasPeriodChange = false;
 
@@ -544,8 +587,9 @@ export class IndicatorSettingsModal {
         }
     }
 
-    // ==================== DRAGGING ====================
-
+    // ================================================================
+    // DRAGGING
+    // ================================================================
     private setupDragging(): void {
         const header = this.modal?.querySelector('div') as HTMLElement;
         if (!header || !this.modal) return;
@@ -579,8 +623,9 @@ export class IndicatorSettingsModal {
         });
     }
 
-    // ==================== OUTSIDE CLICK ====================
-
+    // ================================================================
+    // OUTSIDE CLICK
+    // ================================================================
     private setupCloseOnOutsideClick(): void {
         setTimeout(() => {
             const handler = (e: MouseEvent) => {
@@ -594,8 +639,9 @@ export class IndicatorSettingsModal {
         }, 100);
     }
 
-    // ==================== COLOR HELPERS ====================
-
+    // ================================================================
+    // COLOR HELPERS
+    // ================================================================
     private parseToHexOpacity(value: string): { hex: string; opacity: number } {
         if (!value) return { hex: '#3b82f6', opacity: 1 };
         const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
