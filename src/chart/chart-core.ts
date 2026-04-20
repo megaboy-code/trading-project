@@ -585,7 +585,7 @@ export class ChartModule {
 
         // ── Settings — fetch live item from legend store + fresh config from chart-ui ──
         document.addEventListener('legend-item-settings', (e: Event) => {
-            const { id } = (e as CustomEvent).detail;
+            const { id, triggerRect } = (e as CustomEvent).detail;
             if (!id) return;
 
             const item = this.chartLegend?.getItem(id);
@@ -593,12 +593,11 @@ export class ChartModule {
 
             const key    = id.split('_')[0];
             const config = this.chartUI?.getConfigByKey(key);
-            console.log('id:', id, 'key:', key, 'config:', config, 'item.settings:', item.settings);
             if (config) item.settings = config;
 
             import('./ui/indicator-settings-modal').then(
                 ({ IndicatorSettingsModal }) => {
-                    new IndicatorSettingsModal(item).open();
+                    new IndicatorSettingsModal(item, triggerRect).open();
                 }
             );
         }, { signal });
