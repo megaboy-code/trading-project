@@ -57,7 +57,7 @@ export const cryptoLogoMap: Record<string, string> = {
 // ================================================================
 
 export const metalIconMap: Record<string, { icon: string; color: string; bg: string; border: string }> = {
-    'xau': { icon: 'fas fa-coins', color: '#D4A017', bg: 'rgba(212,160,23,0.15)', border: 'rgba(212,160,23,0.4)' },
+    'xau': { icon: 'fas fa-coins',    color: '#C9A227', bg: 'rgba(201,162,39,0.15)', border: 'rgba(201,162,39,0.4)' },
     'xag': { icon: 'fas fa-coins',    color: '#C0C0C0', bg: 'rgba(192,192,192,0.15)', border: 'rgba(192,192,192,0.4)' },
     'oil': { icon: 'fas fa-oil-well', color: '#8B6914', bg: 'rgba(139,105,20,0.15)',  border: 'rgba(139,105,20,0.4)'  },
 };
@@ -78,6 +78,7 @@ export function stripBrokerSuffix(symbol: string): string {
 // ================================================================
 // BUILD FLAG STACK — returns HTML string
 // Used by: chart-ui.ts (innerHTML context)
+// Forex: two overlapping circles | Icon: single circle only
 // ================================================================
 
 export function buildFlagStack(symbol: string): string {
@@ -85,34 +86,40 @@ export function buildFlagStack(symbol: string): string {
     const config = symbolIconMap[lookup];
 
     if (!config) {
-        return `<div class="symbol-flag-stack">
-            <div class="flag-circle flag-base" style="background:#444"></div>
+        return `<div class="wl-symbol-icon-wrap">
+            <div class="wl-symbol-icon"></div>
         </div>`;
     }
 
-    const baseHtml  = buildFlagCircleHtml(config.base, config.baseType, 'flag-base');
-    const quoteHtml = buildFlagCircleHtml(config.quote, config.quoteType, 'flag-quote');
+    // ── Icon type (crypto / metal) — single circle only ──
+    if (config.baseType === 'icon') {
+        if (cryptoLogoMap[config.base]) {
+            return `<div class="wl-symbol-icon-wrap">
+                <div class="wl-symbol-icon">
+                    <img src="${cryptoLogoMap[config.base]}" alt="${config.base.toUpperCase()}">
+                </div>
+            </div>`;
+        }
 
-    return `<div class="symbol-flag-stack">${baseHtml}${quoteHtml}</div>`;
-}
+        const metal = metalIconMap[config.base];
+        if (metal) {
+            return `<div class="wl-symbol-icon-wrap">
+                <div class="wl-symbol-icon" style="background:${metal.bg}; border-color:${metal.border}; color:${metal.color};">
+                    <i class="${metal.icon}"></i>
+                </div>
+            </div>`;
+        }
 
-function buildFlagCircleHtml(src: string, type: 'flag' | 'icon', pos: string): string {
-    if (type === 'flag') {
-        return `<div class="flag-circle ${pos}" style="background-image:url('${src}')"></div>`;
-    }
-
-    if (cryptoLogoMap[src]) {
-        return `<div class="flag-circle ${pos}" style="background-image:url('${cryptoLogoMap[src]}'); background-size:cover; background-position:center;"></div>`;
-    }
-
-    const metal = metalIconMap[src];
-    if (metal) {
-        return `<div class="flag-circle ${pos} icon-circle" style="background:${metal.bg}; border-color:${metal.border}; color:${metal.color};">
-            <i class="${metal.icon}"></i>
+        return `<div class="wl-symbol-icon-wrap">
+            <div class="wl-symbol-icon"></div>
         </div>`;
     }
 
-    return `<div class="flag-circle ${pos}" style="background:#444"></div>`;
+    // ── Both flags — overlapping pair ──
+    return `<div class="wl-flag-container">
+        <div class="wl-flag-circle wl-flag-base"  style="background-image:url('${config.base}')"></div>
+        <div class="wl-flag-circle wl-flag-quote" style="background-image:url('${config.quote}')"></div>
+    </div>`;
 }
 
 // ================================================================
@@ -162,13 +169,11 @@ export function buildIconElement(symbolName: string): HTMLElement {
     const key = config.base;
 
     if (cryptoLogoMap[key]) {
-        // Real crypto logo image
         const img = document.createElement('img');
         img.src = cryptoLogoMap[key];
         img.alt = key.toUpperCase();
         iconWrap.appendChild(img);
     } else if (metalIconMap[key]) {
-        // Metal fallback with colored FA icon
         const metal = metalIconMap[key];
         iconWrap.style.background   = metal.bg;
         iconWrap.style.borderColor  = metal.border;
