@@ -8,8 +8,9 @@
     left: 50%;
     transform: translateX(-50%);
     width: 720px;
+    min-width: 520px;
     max-width: calc(100vw - 40px);
-    background: var(--glass-gradient), var(--bg-card);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     box-shadow: var(--card-shadow);
@@ -18,6 +19,7 @@
     flex-direction: column;
     max-height: calc(100vh - 160px);
     overflow: hidden;
+    resize: horizontal;
 }
 
 .positions-modal.hidden { display: none; }
@@ -28,11 +30,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    background: var(--glass-gradient), var(--bg-elevated);
+    background: var(--bg-elevated);
     border-bottom: 1px solid var(--border);
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     cursor: grab;
     user-select: none;
+    flex-shrink: 0;
 }
 
 .positions-modal-header:active { cursor: grabbing; }
@@ -43,20 +46,17 @@
     gap: 8px;
 }
 
-/* md — header icon */
 .modal-header-left i {
     color: var(--accent-info);
     font-size: var(--text-md);
 }
 
-/* base — modal title */
 .modal-title {
     font-size: var(--text-base);
     font-weight: 700;
     color: var(--text-primary);
 }
 
-/* xs — position count badge */
 .modal-position-count {
     background: var(--accent-info);
     color: var(--bg-body);
@@ -75,7 +75,6 @@
     gap: 8px;
 }
 
-/* xs — close all button */
 .modal-close-all-btn {
     display: flex;
     align-items: center;
@@ -89,7 +88,6 @@
     font-weight: 600;
     cursor: pointer;
     font-family: var(--text-sans);
-    /* ✅ FIX: Replaced transition: all */
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -98,7 +96,6 @@
     border-color: var(--accent-sell);
 }
 
-/* close X button */
 .modal-close-btn {
     width: 28px;
     height: 28px;
@@ -111,7 +108,6 @@
     color: var(--text-muted);
     cursor: pointer;
     font-size: var(--text-base);
-    /* ✅ FIX: Replaced transition: all */
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
@@ -128,6 +124,7 @@
     gap: 1px;
     background: var(--border);
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
 
 .summary-item {
@@ -138,7 +135,6 @@
     gap: 2px;
 }
 
-/* xs — summary label */
 .summary-label {
     font-size: var(--text-xs);
     color: var(--text-muted);
@@ -146,7 +142,6 @@
     letter-spacing: 0.3px;
 }
 
-/* xl — summary value */
 .summary-value {
     font-family: var(--text-mono);
     font-size: var(--text-xl);
@@ -160,6 +155,7 @@
 /* ── TABLE WRAP ── */
 .positions-table-wrap {
     overflow-y: auto;
+    overflow-x: auto;
     flex: 1;
 }
 
@@ -179,8 +175,6 @@
 }
 
 .positions-empty i { font-size: 1.5rem; }
-
-/* base — empty text */
 .positions-empty p { font-size: var(--text-base); }
 .positions-empty.hidden { display: none; }
 
@@ -191,7 +185,6 @@
     font-size: var(--text-base);
 }
 
-/* xs — table headers */
 .positions-table thead th {
     padding: 8px 12px;
     text-align: left;
@@ -211,7 +204,6 @@
 .positions-table tbody tr {
     border-bottom: 1px solid var(--border-light);
     cursor: pointer;
-    /* ✅ FIX: background shorthand → background-color */
     transition: background-color 0.12s ease;
 }
 
@@ -222,7 +214,6 @@
     border-left: 2px solid var(--accent-info);
 }
 
-/* base — table cells */
 .positions-table tbody td {
     padding: 9px 12px;
     font-family: var(--text-mono);
@@ -234,6 +225,16 @@
 .positions-table td.type-sell    { color: var(--accent-sell); font-weight: 700; }
 .positions-table td.pnl-positive { color: var(--accent-buy); }
 .positions-table td.pnl-negative { color: var(--accent-sell); }
+
+/* ── COLUMN VISIBILITY AT SMALL WIDTH ── */
+@media (max-width: 600px) {
+    .positions-table th:nth-child(6),
+    .positions-table td:nth-child(6),
+    .positions-table th:nth-child(7),
+    .positions-table td:nth-child(7) {
+        display: none;
+    }
+}
 
 .row-expand-btn {
     width: 26px;
@@ -247,7 +248,6 @@
     color: var(--text-muted);
     cursor: pointer;
     font-size: var(--text-xs);
-    /* ✅ FIX: Replaced transition: all */
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
@@ -260,9 +260,10 @@
 /* ── INLINE EDITOR ── */
 .inline-editor {
     border-top: 1px solid var(--border);
-    background: var(--glass-gradient), var(--bg-elevated);
+    background: var(--bg-elevated);
     padding: 14px 16px;
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    flex-shrink: 0;
 }
 
 .inline-editor.hidden { display: none; }
@@ -273,7 +274,6 @@
     gap: 12px;
 }
 
-/* base — editor title */
 .inline-editor-title {
     display: flex;
     align-items: center;
@@ -285,7 +285,6 @@
 
 .inline-editor-title i { color: var(--accent-info); }
 
-/* xs — ticket */
 .inline-editor-ticket {
     font-family: var(--text-mono);
     font-size: var(--text-xs);
@@ -293,7 +292,6 @@
     margin-left: 4px;
 }
 
-/* xs — time */
 .inline-editor-time {
     font-family: var(--text-mono);
     font-size: var(--text-xs);
@@ -313,7 +311,6 @@
     gap: 5px;
 }
 
-/* xs — field label */
 .inline-field-label {
     display: flex;
     align-items: center;
@@ -328,7 +325,6 @@
 .inline-field-label.tp-label { color: var(--accent-buy); }
 .inline-field-label i { font-size: var(--text-xs); }
 
-/* base — field input */
 .inline-field-input {
     background: var(--bg-base);
     border: 1px solid var(--border);
@@ -344,7 +340,6 @@
 
 .inline-field-input:focus { border-color: var(--accent-info); }
 
-/* xs — pip display */
 .inline-field-pips {
     font-family: var(--text-mono);
     font-size: var(--text-xs);
@@ -359,7 +354,6 @@
     gap: 8px;
 }
 
-/* base — inline buttons */
 .inline-btn {
     display: flex;
     align-items: center;
@@ -371,7 +365,6 @@
     cursor: pointer;
     font-family: var(--text-sans);
     border: 1px solid transparent;
-    /* ✅ FIX: Replaced transition: all */
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
@@ -409,7 +402,6 @@
     border-color: var(--border-light);
 }
 
-/* xs — row close button */
 .row-close-btn {
     width: 26px;
     height: 26px;
@@ -422,7 +414,6 @@
     color: var(--accent-sell);
     cursor: pointer;
     font-size: var(--text-xs);
-    /* ✅ FIX: Replaced transition: all */
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -431,7 +422,6 @@
     border-color: var(--accent-sell);
 }
 
-/* xs — inline pip presets */
 .inline-pip-presets {
     display: flex;
     gap: 6px;
@@ -448,7 +438,6 @@
     font-family: var(--text-mono);
     font-weight: 600;
     cursor: pointer;
-    /* ✅ FIX: Replaced transition: all */
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
