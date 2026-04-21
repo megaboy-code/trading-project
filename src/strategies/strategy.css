@@ -153,7 +153,6 @@
 
 .strat-item:hover { background: var(--bg-hover); }
 
-/* active = currently selected / chart switched to it */
 .strat-item.selected {
     background: rgba(var(--accent-info-rgb), 0.05);
     border-left: 2px solid var(--accent-info);
@@ -164,7 +163,7 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    padding: 9px 10px;
+    padding: 9px 10px 6px;
 }
 
 /* base — strategy icon badge */
@@ -180,6 +179,8 @@
     background: rgba(131,56,236,0.12);
     border: 1px solid rgba(131,56,236,0.3);
     color: var(--accent-purple);
+    align-self: flex-start;
+    margin-top: 2px;
 }
 
 .strat-icon.green {
@@ -200,13 +201,36 @@
     color: var(--accent-warn);
 }
 
-/* ── Name + meta ── */
+/* ── Info column ── */
 .strat-item-info {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0;
     min-width: 0;
+}
+
+/* ── Row 1: name + status group ── */
+.strat-item-row1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.strat-item-status-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+/* ── Row 2: symbol/tf + pnl ── */
+.strat-item-row2 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
 }
 
 /* base — strategy name */
@@ -245,20 +269,13 @@
     font-family: var(--text-mono);
 }
 
-/* ── Right side: pulse + status + pnl + chevron ── */
-.strat-item-right {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-}
-
 .strat-pulse {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--accent-buy);
     animation: stratPulse 1.8s ease-in-out infinite;
+    flex-shrink: 0;
 }
 
 .strat-pulse.paused  { background: var(--accent-warn); animation: none; }
@@ -323,6 +340,8 @@
     cursor: pointer;
     transition: all 0.15s ease;
     flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
 }
 
 .strat-chevron:hover {
@@ -478,9 +497,7 @@
     transition: border-color 0.15s ease;
 }
 
-.strat-control-input-wrap:focus-within {
-    border-color: var(--accent-info);
-}
+.strat-control-input-wrap:focus-within { border-color: var(--accent-info); }
 
 /* base — control input */
 .strat-control-input {
