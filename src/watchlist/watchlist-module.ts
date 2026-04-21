@@ -6,6 +6,8 @@
 // Config-driven — symbols from backend config, no hardcoded list
 // ================================================================
 
+import { buildIconElement, stripBrokerSuffix } from '../core/symbol-icons';
+
 interface WatchlistSymbol {
     name:        string;
     description: string;
@@ -37,48 +39,6 @@ export class WatchlistModule {
 
     // ── Config-driven symbol list from backend ──
     private configSymbols: WatchlistSymbol[] = [];
-
-    // ── Frontend visual maps — decoration only, backend never sees these ──
-    private readonly symbolIconMap: Record<string, {
-        base:      string;
-        quote:     string;
-        baseType:  'flag' | 'icon';
-        quoteType: 'flag' | 'icon';
-    }> = {
-        'EURUSD':  { base: 'https://flagcdn.com/w320/eu.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'GBPUSD':  { base: 'https://flagcdn.com/w320/gb.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'USDJPY':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/jp.png', baseType: 'flag', quoteType: 'flag' },
-        'AUDUSD':  { base: 'https://flagcdn.com/w320/au.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'USDCAD':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/ca.png', baseType: 'flag', quoteType: 'flag' },
-        'NZDUSD':  { base: 'https://flagcdn.com/w320/nz.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'USDCHF':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/ch.png', baseType: 'flag', quoteType: 'flag' },
-        'EURGBP':  { base: 'https://flagcdn.com/w320/eu.png', quote: 'https://flagcdn.com/w320/gb.png', baseType: 'flag', quoteType: 'flag' },
-        'EURJPY':  { base: 'https://flagcdn.com/w320/eu.png', quote: 'https://flagcdn.com/w320/jp.png', baseType: 'flag', quoteType: 'flag' },
-        'GBPJPY':  { base: 'https://flagcdn.com/w320/gb.png', quote: 'https://flagcdn.com/w320/jp.png', baseType: 'flag', quoteType: 'flag' },
-        'XAUUSD':  { base: 'xau', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'XAGUSD':  { base: 'xag', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'BTCUSD':  { base: 'btc', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'ETHUSD':  { base: 'eth', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'SOLUSD':  { base: 'sol', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'LTCUSD':  { base: 'ltc', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'XRPUSD':  { base: 'xrp', quote: 'https://flagcdn.com/w320/us.png', baseType: 'icon', quoteType: 'flag' },
-        'US30':    { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'US500':   { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'NAS100':  { base: 'https://flagcdn.com/w320/us.png', quote: 'https://flagcdn.com/w320/us.png', baseType: 'flag', quoteType: 'flag' },
-        'GER40':   { base: 'https://flagcdn.com/w320/de.png', quote: 'https://flagcdn.com/w320/de.png', baseType: 'flag', quoteType: 'flag' },
-        'UK100':   { base: 'https://flagcdn.com/w320/gb.png', quote: 'https://flagcdn.com/w320/gb.png', baseType: 'flag', quoteType: 'flag' },
-    };
-
-    private readonly iconCircleMap: Record<string, string> = {
-        'btc': '<i class="fab fa-bitcoin"></i>',
-        'eth': '<i class="fab fa-ethereum"></i>',
-        'sol': '<span>◎</span>',
-        'ltc': '<span>Ł</span>',
-        'xrp': '<span>X</span>',
-        'xau': '<i class="fas fa-coins"></i>',
-        'xag': '<i class="fas fa-coins"></i>',
-        'oil': '<i class="fas fa-oil-well"></i>',
-    };
 
     // ================================================================
     // CONSTRUCTOR
@@ -169,7 +129,7 @@ export class WatchlistModule {
         item.className = 'watch-item';
         item.setAttribute('data-symbol', sym.name);
 
-        item.appendChild(this.buildIconElement(sym.name));
+        item.appendChild(buildIconElement(sym.name));
 
         const wrap = document.createElement('div');
         wrap.className = 'watch-symbol-wrap';
@@ -207,62 +167,6 @@ export class WatchlistModule {
         this.elementRefs.set(sym.name, { price: priceEl, change: chgEl });
 
         return item;
-    }
-
-    private buildIconElement(symbolName: string): HTMLElement {
-        const lookup = this.stripSuffix(symbolName);
-        const config = this.symbolIconMap[lookup];
-
-        if (!config) {
-            const fallback = document.createElement('div');
-            fallback.className = 'wl-flag-container';
-            const circle = document.createElement('div');
-            circle.className        = 'wl-flag-circle wl-flag-base';
-            circle.style.background = '#444';
-            fallback.appendChild(circle);
-            return fallback;
-        }
-
-        if (config.baseType === 'flag' && config.quoteType === 'flag') {
-            const container = document.createElement('div');
-            container.className = 'wl-flag-container';
-
-            const base = document.createElement('div');
-            base.className             = 'wl-flag-circle wl-flag-base';
-            base.style.backgroundImage = `url('${config.base}')`;
-
-            const quote = document.createElement('div');
-            quote.className             = 'wl-flag-circle wl-flag-quote';
-            quote.style.backgroundImage = `url('${config.quote}')`;
-
-            container.appendChild(base);
-            container.appendChild(quote);
-            return container;
-        }
-
-        const wrap = document.createElement('div');
-        wrap.className = 'wl-symbol-icon-wrap';
-
-        const iconWrap = document.createElement('div');
-        iconWrap.className = 'wl-symbol-icon';
-
-        if (config.baseType === 'icon') {
-            iconWrap.innerHTML = this.iconCircleMap[config.base] || '';
-        } else {
-            iconWrap.style.backgroundImage = `url('${config.base}')`;
-        }
-
-        wrap.appendChild(iconWrap);
-        return wrap;
-    }
-
-    // ── Strip broker suffixes for icon/flag lookup ──
-    private stripSuffix(name: string): string {
-        return name
-            .toUpperCase()
-            .replace('/', '')
-            .replace(/\.[A-Z0-9]+$/, '')
-            .replace(/[MC]$/, '');
     }
 
     // ================================================================
@@ -355,7 +259,7 @@ export class WatchlistModule {
             const item = document.createElement('div');
             item.className = 'search-result-item';
 
-            item.appendChild(this.buildIconElement(sym.name));
+            item.appendChild(buildIconElement(sym.name));
 
             const nameSpan = document.createElement('span');
             nameSpan.className   = 'search-result-name';
