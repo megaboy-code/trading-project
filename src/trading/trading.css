@@ -734,12 +734,6 @@
     color: var(--accent-info);
 }
 
-.action-btn.danger:hover {
-    background: rgba(var(--accent-sell-rgb), 0.1);
-    border-color: var(--accent-sell);
-    color: var(--accent-sell);
-}
-
 /* ==================== POSITIONS FOOTER ==================== */
 .panel-footer {
     display: flex;
