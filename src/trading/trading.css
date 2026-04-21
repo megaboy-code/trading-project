@@ -25,18 +25,13 @@
 .trading-panel-body::-webkit-scrollbar-track { background: transparent; }
 .trading-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* ==================== ELEVATED HELPER ==================== */
-.elevated {
-    background: var(--glass-gradient), var(--bg-elevated);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm);
-    transition: background-color 0.25s ease, border-color 0.25s ease;
-}
-
 /* ==================== P&L HERO ==================== */
 .trading-hero {
     padding: 12px;
     margin-bottom: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
 }
 
 .pnl-label {
@@ -112,7 +107,9 @@
 .metric-card {
     padding: 8px 10px;
     text-align: center;
-    border-radius: var(--radius-sm);
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
 }
 
 .metric-label {
@@ -234,7 +231,12 @@
 }
 
 /* ==================== LOT CARD ==================== */
-.lot-card { padding: 12px; }
+.lot-card {
+    padding: 12px;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
 
 .lot-header {
     display: flex;
@@ -271,10 +273,10 @@
 .lot-max {
     font-size: var(--text-sm);
     color: var(--text-muted);
-    background: var(--bg-base);
+    background: var(--bg-elevated);
     padding: 2px 6px;
     border-radius: var(--radius-xs);
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border);
     font-family: var(--text-mono);
 }
 
@@ -282,11 +284,11 @@
     width: 100%;
     height: 4px;
     appearance: none;
-    background: var(--bg-base);
+    background: var(--bg-elevated);
     border-radius: 2px;
     outline: none;
     cursor: pointer;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border);
     margin-bottom: 4px;
 }
 
@@ -342,7 +344,7 @@
 .preset-btn {
     flex: 1;
     padding: 5px 0;
-    background: var(--bg-base);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     font-family: var(--text-mono);
@@ -398,8 +400,8 @@
     flex: 1;
     padding: 10px 8px;
     border-radius: var(--radius-sm);
-    border: 1.5px solid var(--border);
-    background: var(--bg-base);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
     cursor: pointer;
     display: flex;
     flex-direction: column;
@@ -468,9 +470,9 @@
     align-items: center;
     gap: 6px;
     padding: 5px 8px;
-    background: var(--bg-base);
+    background: var(--bg-elevated);
     border-radius: var(--radius-xs);
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border);
     margin-bottom: 4px;
 }
 
@@ -541,8 +543,8 @@
 .pip-preset-btn {
     flex: 1;
     padding: 4px 0;
-    background: var(--bg-base);
-    border: 1px solid var(--border-light);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     font-size: var(--text-base);
     color: var(--text-muted);
@@ -604,7 +606,7 @@
 .risk-pct-btn {
     flex: 1;
     padding: 5px 0;
-    background: var(--bg-base);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     font-family: var(--text-mono);
@@ -636,7 +638,7 @@
 
 .risk-pct-input {
     flex: 1;
-    background: var(--bg-base);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     padding: 4px 8px;
@@ -675,8 +677,8 @@
 }
 
 .stat-item {
-    background: var(--bg-base);
-    border: 1px solid var(--border-light);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     padding: 5px 4px;
     text-align: center;
@@ -719,7 +721,7 @@
     cursor: pointer;
     font-family: var(--text-sans);
     white-space: nowrap;
-    background: var(--glass-gradient), var(--bg-elevated);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -739,22 +741,40 @@
 }
 
 /* ==================== POSITIONS FOOTER ==================== */
-.positions-btn-footer {
+.panel-footer {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: transparent;
-    border: none;
+    padding: 5px 8px;
+    height: 42px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-elevated);
+    flex-shrink: 0;
+}
+
+.positions-btn-footer {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 30px;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
     cursor: pointer;
     color: var(--text-secondary);
     font-size: var(--text-base);
     font-weight: 600;
     font-family: var(--text-sans);
-    padding: 0;
-    transition: color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.positions-btn-footer:hover { color: var(--text-primary); }
+.positions-btn-footer:hover {
+    background: rgba(var(--accent-info-rgb), 0.08);
+    border-color: rgba(var(--accent-info-rgb), 0.35);
+    color: var(--accent-info);
+}
 
 .positions-btn-footer i { color: var(--accent-info); }
 
@@ -768,6 +788,31 @@
     border-radius: 10px;
     min-width: 20px;
     text-align: center;
+}
+
+.action-btn.danger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 12px;
+    background: rgba(var(--accent-sell-rgb), 0.06);
+    border: 1px solid rgba(var(--accent-sell-rgb), 0.2);
+    border-radius: var(--radius-xs);
+    color: var(--accent-sell);
+    font-size: var(--text-base);
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--text-sans);
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.action-btn.danger:hover {
+    background: rgba(var(--accent-sell-rgb), 0.12);
+    border-color: rgba(var(--accent-sell-rgb), 0.38);
+    color: var(--accent-sell);
 }
 
 /* ==================== REDUCED MOTION ==================== */
