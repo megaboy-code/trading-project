@@ -193,7 +193,8 @@ export class IndicatorManager {
         const params = this.paramsMap.get(key);
         if (!params) return '';
 
-        if (lineName === 'ema' || lineName === 'line') {
+        if (lineName === 'ema' || lineName === 'sma' || lineName === 'line') {
+
             return params.period > 0 ? String(params.period) : '';
         }
         if (lineName === 'fast') {
