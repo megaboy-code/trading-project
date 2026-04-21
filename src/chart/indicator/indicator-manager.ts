@@ -11,8 +11,18 @@ import { LineSeries, ISeriesApi, SeriesType } from 'lightweight-charts';
 import { getDecimalPrecision }                from '../chart-utils';
 
 // ================================================================
-// DEFAULT LINE COLORS — cycled per line index
+// DEFAULT COLORS — per indicator key, fallback to cycle
 // ================================================================
+const INDICATOR_COLORS: Record<string, string> = {
+    'EMA':  '#00d394',
+    'SMA':  '#3a86ff',
+    'RSI':  '#ffbe0b',
+    'MACD': '#8338ec',
+    'BB':   '#ff4d6b',
+    'STOCH':'#ff006e',
+    'ATR':  '#06d6a0',
+};
+
 const LINE_COLORS = [
     '#00d394',
     '#ff4d6b',
@@ -194,7 +204,6 @@ export class IndicatorManager {
         if (!params) return '';
 
         if (lineName === 'ema' || lineName === 'sma' || lineName === 'line') {
-
             return params.period > 0 ? String(params.period) : '';
         }
         if (lineName === 'fast') {
@@ -261,8 +270,13 @@ export class IndicatorManager {
         }> = [];
 
         data.lines.forEach((line, index) => {
-            const saved                  = keySaved.get(line.name);
-            const color                  = saved?.color                  ?? LINE_COLORS[index % LINE_COLORS.length];
+            const saved = keySaved.get(line.name);
+
+            // ── Default color: saved → per-key map → cycle ──
+            const color = saved?.color
+                ?? INDICATOR_COLORS[data.key]
+                ?? LINE_COLORS[index % LINE_COLORS.length];
+
             const width                  = saved?.width                  ?? 1;
             const priceLineVisible       = saved?.priceLineVisible       ?? false;
             const lastValueVisible       = saved?.lastValueVisible       ?? true;
@@ -616,9 +630,9 @@ export class IndicatorManager {
             });
         });
 
-        // ✅ Sync legend dot color with first line color after settings change
-        const firstLineName  = indicator.lines.keys().next().value;
-        const firstLine      = firstLineName ? indicator.lines.get(firstLineName) : null;
+        // ── Sync legend dot color with first line color after settings change ──
+        const firstLineName = indicator.lines.keys().next().value;
+        const firstLine     = firstLineName ? indicator.lines.get(firstLineName) : null;
         if (firstLine) {
             document.dispatchEvent(new CustomEvent('legend-item-color-update', {
                 detail: { id: indicator.id, color: firstLine.color }
