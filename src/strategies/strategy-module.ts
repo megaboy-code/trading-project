@@ -34,17 +34,16 @@
 // ================================================================
 
 interface StrategyItem {
-    id:       string;
-    name:     string;
-    symbol:   string;
-    tf:       string;
-    status:   'running' | 'paused' | 'stopped';
-    pnl:      number;
-    trades:   number;
-    winrate:  number;
-    volume:   number;
-    risk:     number;
-    // iconColor: used for icon variant — green/blue/warn/purple
+    id:        string;
+    name:      string;
+    symbol:    string;
+    tf:        string;
+    status:    'running' | 'paused' | 'stopped';
+    pnl:       number;
+    trades:    number;
+    winrate:   number;
+    volume:    number;
+    risk:      number;
     iconColor: 'green' | 'blue' | 'warn' | 'purple';
 }
 
@@ -52,14 +51,13 @@ type StratFilter = 'all' | 'running' | 'paused' | 'stopped';
 
 export class StrategiesModule {
 
-    private container:   HTMLElement | null = null;
-    private listEl:      HTMLElement | null = null;
+    private container:     HTMLElement | null = null;
+    private listEl:        HTMLElement | null = null;
     private currentFilter: StratFilter = 'all';
-    private expandedId:  string | null = null;
-    private selectedId:  string | null = null;
+    private expandedId:    string | null = null;
+    private selectedId:    string | null = null;
 
     // ── Mock data — replace with real data from ConnectionManager ──
-    // TODO: call this.setStrategies(data) from onStrategyData callback
     private strategies: StrategyItem[] = [
         {
             id: 'ema-cross-eurusd-h1',
@@ -128,7 +126,6 @@ export class StrategiesModule {
 
     // ================================================================
     // PUBLIC — called by ModuleManager when real data arrives
-    // TODO: wire to ConnectionManager.onStrategyData callback
     // ================================================================
 
     public setStrategies(data: StrategyItem[]): void {
@@ -166,9 +163,8 @@ export class StrategiesModule {
     // ================================================================
 
     private bindEvents(): void {
-        // ── Three-dot dropdown ──
-        const menuBtn  = document.getElementById('strategyMenuBtn');
-        const drop     = document.getElementById('strategySettingsDrop');
+        const menuBtn = document.getElementById('strategyMenuBtn');
+        const drop    = document.getElementById('strategySettingsDrop');
 
         menuBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -177,7 +173,6 @@ export class StrategiesModule {
 
         document.addEventListener('click', () => drop?.classList.remove('show'));
 
-        // ── Filter options ──
         document.querySelectorAll('.strat-settings-option[data-filter]').forEach(opt => {
             opt.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -192,7 +187,6 @@ export class StrategiesModule {
             });
         });
 
-        // ── Refresh ──
         document.getElementById('strategyRefreshBtn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             drop?.classList.remove('show');
@@ -224,7 +218,6 @@ export class StrategiesModule {
             this.listEl!.appendChild(this.buildItem(s));
         });
 
-        // Re-expand previously expanded
         if (this.expandedId) {
             const detail = document.getElementById(`strat-detail-${this.expandedId}`);
             const item   = this.listEl.querySelector(`[data-strat-id="${this.expandedId}"]`);
@@ -234,7 +227,6 @@ export class StrategiesModule {
             }
         }
 
-        // Re-apply selected highlight
         if (this.selectedId) {
             const item = this.listEl.querySelector(`[data-strat-id="${this.selectedId}"]`);
             item?.closest('.strat-item')?.classList.add('selected');
@@ -252,35 +244,37 @@ export class StrategiesModule {
         const wrapper = document.createElement('div');
         wrapper.className = 'strat-item';
 
-        // ── Main row ──
         const main = document.createElement('div');
         main.className = 'strat-item-main';
         main.setAttribute('data-strat-id', s.id);
 
-        const pnlClass = s.pnl > 0 ? 'positive' : s.pnl < 0 ? 'negative' : 'neutral';
-        const pnlText  = s.pnl > 0 ? `+$${s.pnl.toFixed(2)}` : s.pnl < 0 ? `-$${Math.abs(s.pnl).toFixed(2)}` : '$0.00';
+        const pnlClass   = s.pnl > 0 ? 'positive' : s.pnl < 0 ? 'negative' : 'neutral';
+        const pnlText    = s.pnl > 0 ? `+$${s.pnl.toFixed(2)}` : s.pnl < 0 ? `-$${Math.abs(s.pnl).toFixed(2)}` : '$0.00';
         const pulseClass = s.status === 'running' ? '' : s.status === 'paused' ? 'paused' : 'stopped';
 
         main.innerHTML = `
             <div class="strat-icon ${s.iconColor}"><i class="fas fa-robot"></i></div>
             <div class="strat-item-info">
-                <span class="strat-item-name">${s.name}</span>
-                <div class="strat-item-meta">
-                    <span class="strat-item-symbol">${s.symbol}</span>
-                    <span class="strat-item-tf">${s.tf}</span>
+                <div class="strat-item-row1">
+                    <span class="strat-item-name">${s.name}</span>
+                    <div class="strat-item-status-group">
+                        <div class="strat-pulse ${pulseClass}"></div>
+                        <span class="strat-status ${s.status}">${s.status}</span>
+                    </div>
+                </div>
+                <div class="strat-item-row2">
+                    <div class="strat-item-meta">
+                        <span class="strat-item-symbol">${s.symbol}</span>
+                        <span class="strat-item-tf">${s.tf}</span>
+                    </div>
+                    <span class="strat-item-pnl ${pnlClass}">${pnlText}</span>
                 </div>
             </div>
-            <div class="strat-item-right">
-                <div class="strat-pulse ${pulseClass}"></div>
-                <span class="strat-status ${s.status}">${s.status}</span>
-                <span class="strat-item-pnl ${pnlClass}">${pnlText}</span>
-                <button class="strat-chevron" data-strat-id="${s.id}">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-            </div>
+            <button class="strat-chevron" data-strat-id="${s.id}">
+                <i class="fas fa-chevron-down"></i>
+            </button>
         `;
 
-        // ── Stats sub-row ──
         const stats = document.createElement('div');
         stats.className = 'strat-item-stats';
         stats.innerHTML = `
@@ -296,18 +290,14 @@ export class StrategiesModule {
             </div>
         `;
 
-        // ── Detail ──
         const detail = this.buildDetail(s);
 
-        // ── Click main row (not chevron) → switch chart ──
         main.addEventListener('click', (e) => {
             const chevron = (e.target as HTMLElement).closest('.strat-chevron');
-            if (chevron) return; // chevron handles its own click
-
+            if (chevron) return;
             this.switchChart(s);
         });
 
-        // ── Chevron → expand detail ──
         const chevronBtn = main.querySelector('.strat-chevron') as HTMLElement;
         chevronBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -332,7 +322,6 @@ export class StrategiesModule {
         const isPaused  = s.status === 'paused';
         const isStopped = s.status === 'stopped';
 
-        // ── Toggle + Remove row ──
         const toggleRow = document.createElement('div');
         toggleRow.className = 'strat-toggle-row';
 
@@ -343,15 +332,12 @@ export class StrategiesModule {
                 ? `<i class="fas fa-play"></i> Resume`
                 : `<i class="fas fa-pause"></i> Pause`;
 
-            // TODO: dispatch 'update-strategy' event with { strategyId: s.id, updates: { paused: !isPaused } }
-            // ModuleManager picks this up → connectionManager.updateStrategy()
             toggleBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const newStatus = isPaused ? 'running' : 'paused';
                 document.dispatchEvent(new CustomEvent('update-strategy', {
                     detail: { strategyId: s.id, updates: { paused: newStatus === 'paused' } }
                 }));
-                // Mock: update local state
                 this.updateStrategyStatus(s.id, newStatus);
             });
 
@@ -363,14 +349,11 @@ export class StrategiesModule {
         removeBtn.innerHTML = `<i class="fas fa-trash"></i>`;
         removeBtn.title = 'Remove strategy';
 
-        // TODO: dispatch 'remove-strategy' event with { strategyId: s.id }
-        // ModuleManager picks this up → connectionManager.removeStrategy() + indicatorManager.removeIndicator()
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             document.dispatchEvent(new CustomEvent('remove-strategy', {
                 detail: { strategyId: s.id }
             }));
-            // Mock: animate and remove locally
             const item = detail.closest('.strat-item') as HTMLElement;
             if (item) {
                 item.classList.add('removing');
@@ -381,13 +364,8 @@ export class StrategiesModule {
         toggleRow.appendChild(removeBtn);
         detail.appendChild(toggleRow);
 
-        // ── Volume control ──
-        // TODO: on blur/change dispatch 'update-strategy' with { strategyId: s.id, updates: { volume } }
         detail.appendChild(this.buildControl('Volume', s.volume.toFixed(2), 'lots', s.id, 'volume'));
-
-        // ── Risk control ──
-        // TODO: on blur/change dispatch 'update-strategy' with { strategyId: s.id, updates: { risk } }
-        detail.appendChild(this.buildControl('Risk', s.risk.toFixed(1), '%', s.id, 'risk'));
+        detail.appendChild(this.buildControl('Risk',   s.risk.toFixed(1),   '%',    s.id, 'risk'));
 
         return detail;
     }
@@ -397,11 +375,11 @@ export class StrategiesModule {
     // ================================================================
 
     private buildControl(
-        label: string,
-        value: string,
-        unit:  string,
+        label:   string,
+        value:   string,
+        unit:    string,
         stratId: string,
-        field: string
+        field:   string
     ): HTMLElement {
         const row = document.createElement('div');
         row.className = 'strat-control-row';
@@ -427,7 +405,6 @@ export class StrategiesModule {
             e.stopPropagation();
             const val = parseFloat((e.target as HTMLInputElement).value);
             if (isNaN(val)) return;
-            // TODO: dispatch 'update-strategy' with real strategyId from backend
             document.dispatchEvent(new CustomEvent('update-strategy', {
                 detail: { strategyId: stratId, updates: { [field]: val } }
             }));
@@ -441,15 +418,11 @@ export class StrategiesModule {
     // ================================================================
 
     private switchChart(s: StrategyItem): void {
-        // Update selected highlight
         this.selectedId = s.id;
         this.listEl?.querySelectorAll('.strat-item').forEach(el => el.classList.remove('selected'));
         const main = this.listEl?.querySelector(`[data-strat-id="${s.id}"]`);
         main?.closest('.strat-item')?.classList.add('selected');
 
-        // TODO: These two events are already wired in ModuleManager.setupDOMEventBridge()
-        // symbol-changed → connectionManager.setSymbol() + chart.handleSymbolChange()
-        // timeframe-changed → connectionManager.setTimeframe() + chart.handleTimeframeChange()
         document.dispatchEvent(new CustomEvent('symbol-changed', {
             detail: { symbol: s.symbol }
         }));
@@ -467,7 +440,6 @@ export class StrategiesModule {
     private toggleExpand(id: string, wrapper: HTMLElement, detail: HTMLElement): void {
         const isOpen = detail.classList.contains('show');
 
-        // Close all
         document.querySelectorAll('.strat-item-detail').forEach(d => d.classList.remove('show'));
         document.querySelectorAll('.strat-item').forEach(i => i.classList.remove('expanded'));
 
@@ -485,27 +457,30 @@ export class StrategiesModule {
     // ================================================================
 
     private updateSummary(items: StrategyItem[]): void {
-        const active = items.filter(s => s.status === 'running').length;
-        const trades = items.reduce((acc, s) => acc + s.trades, 0);
-        const pnl    = items.reduce((acc, s) => acc + s.pnl, 0);
+        const active   = items.filter(s => s.status === 'running').length;
+        const trades   = items.reduce((acc, s) => acc + s.trades, 0);
+        const pnl      = items.reduce((acc, s) => acc + s.pnl, 0);
         const winItems = items.filter(s => s.winrate > 0);
-        const avgWin = winItems.length
+        const avgWin   = winItems.length
             ? Math.round(winItems.reduce((acc, s) => acc + s.winrate, 0) / winItems.length)
             : 0;
 
-        const pnlEl = document.getElementById('stratStatPnl');
         const pnlText = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
 
         const el = (id: string) => document.getElementById(id);
         if (el('stratStatActive')) el('stratStatActive')!.textContent = String(active);
         if (el('stratStatTrades')) el('stratStatTrades')!.textContent = String(trades);
+
+        const pnlEl = el('stratStatPnl');
         if (pnlEl) {
             pnlEl.textContent = pnlText;
-            pnlEl.className = `strat-summary-value ${pnl >= 0 ? 'positive' : 'negative'}`;
+            pnlEl.className   = `strat-summary-value ${pnl >= 0 ? 'positive' : 'negative'}`;
         }
-        if (el('stratStatWin')) {
-            el('stratStatWin')!.textContent = avgWin > 0 ? `${avgWin}%` : '0%';
-            el('stratStatWin')!.className = `strat-summary-value ${avgWin >= 50 ? 'positive' : ''}`;
+
+        const winEl = el('stratStatWin');
+        if (winEl) {
+            winEl.textContent = avgWin > 0 ? `${avgWin}%` : '0%';
+            winEl.className   = `strat-summary-value ${avgWin >= 50 ? 'positive' : ''}`;
         }
     }
 
