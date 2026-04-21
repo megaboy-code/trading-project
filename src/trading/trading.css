@@ -82,14 +82,13 @@
     border: 1px solid rgba(var(--accent-sell-rgb), 0.25);
 }
 
-/* ── inner chip — uses surface (same as header bg) ── */
 .pnl-change {
     display: flex;
     align-items: center;
     gap: 4px;
     font-size: var(--text-sm);
     color: var(--text-muted);
-    background: var(--bg-surface);
+    background: var(--bg-base);
     padding: 2px 8px;
     border-radius: 20px;
     width: fit-content;
@@ -105,7 +104,6 @@
     gap: 6px;
 }
 
-/* ── same level as hero ── */
 .metric-card {
     padding: 8px 10px;
     text-align: center;
@@ -182,6 +180,8 @@
     color: var(--accent-sell);
 }
 
+.section-badge i { font-size: var(--text-sm); }
+
 /* ==================== BUY / SELL ==================== */
 .button-group {
     display: grid;
@@ -232,7 +232,6 @@
 }
 
 /* ==================== LOT CARD ==================== */
-/* ── same level as hero ── */
 .lot-card {
     padding: 12px;
     background: var(--bg-elevated);
@@ -272,11 +271,10 @@
     margin-bottom: 6px;
 }
 
-/* ── inner chip ── */
 .lot-max {
     font-size: var(--text-sm);
     color: var(--text-muted);
-    background: var(--bg-surface);
+    background: var(--bg-base);
     padding: 2px 6px;
     border-radius: var(--radius-xs);
     border: 1px solid var(--border-light);
@@ -287,7 +285,7 @@
     width: 100%;
     height: 4px;
     appearance: none;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border-radius: 2px;
     outline: none;
     cursor: pointer;
@@ -343,11 +341,10 @@
     gap: 4px;
 }
 
-/* ── inner buttons use surface ── */
 .preset-btn {
     flex: 1;
     padding: 5px 0;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     font-family: var(--text-mono);
@@ -397,13 +394,12 @@
     margin-bottom: 12px;
 }
 
-/* ── toggle uses surface ── */
 .tpsl-toggle {
     flex: 1;
     padding: 10px 8px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--bg-surface);
+    background: var(--bg-base);
     cursor: pointer;
     display: flex;
     flex-direction: column;
@@ -457,13 +453,12 @@
     text-align: center;
 }
 
-/* ── tpsl rows use surface ── */
 .tpsl-row {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 5px 8px;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border-radius: var(--radius-xs);
     border: 1px solid var(--border-light);
     margin-bottom: 4px;
@@ -526,7 +521,6 @@
     color: var(--accent-info);
 }
 
-/* ── pip presets use surface ── */
 .pip-presets {
     display: flex;
     gap: 4px;
@@ -537,7 +531,7 @@
 .pip-preset-btn {
     flex: 1;
     padding: 4px 0;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     font-size: var(--text-base);
@@ -597,11 +591,10 @@
     margin-bottom: 6px;
 }
 
-/* ── inner buttons use surface ── */
 .risk-pct-btn {
     flex: 1;
     padding: 5px 0;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     font-family: var(--text-mono);
@@ -631,10 +624,9 @@
     white-space: nowrap;
 }
 
-/* ── input uses surface ── */
 .risk-pct-input {
     flex: 1;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     padding: 4px 8px;
@@ -673,9 +665,8 @@
     margin-top: 10px;
 }
 
-/* ── stat items use surface ── */
 .stat-item {
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-xs);
     padding: 5px 4px;
@@ -718,7 +709,7 @@
     justify-content: center;
     gap: 6px;
     height: 30px;
-    background: var(--bg-surface);
+    background: var(--bg-base);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     cursor: pointer;
