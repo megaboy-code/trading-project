@@ -313,12 +313,12 @@ export class ChartUI {
 
         if (sym.name === this.currentSymbol) row.classList.add('active');
 
-        const flagStack = buildFlagStack(sym.name);
+        const iconHtml  = buildFlagStack(sym.name);
         const starClass = isStarred ? 'symbol-star-btn active' : 'symbol-star-btn';
 
         row.innerHTML = `
             <div class="symbol-modal-name">
-                ${flagStack}
+                ${iconHtml}
                 <span>${sym.name}</span>
             </div>
             <div class="symbol-modal-desc">${sym.description}</div>
@@ -737,16 +737,12 @@ export class ChartUI {
     // ================================================================
 
     private updateSymbolPill(symbol: string): void {
+        const pillIcon = document.getElementById('symbolPillIcon');
+        if (pillIcon) {
+            pillIcon.innerHTML = buildFlagStack(symbol);
+        }
         const symbolText = document.getElementById('symbolText');
         if (symbolText) symbolText.textContent = symbol;
-        this.updateSymbolFlags(symbol);
-    }
-
-    private updateSymbolFlags(symbol: string): void {
-        const baseEl  = document.getElementById('symbolFlagBase');
-        const quoteEl = document.getElementById('symbolFlagQuote');
-        if (!baseEl || !quoteEl) return;
-        applySymbolFlags(baseEl, quoteEl, symbol);
     }
 
     // ================================================================
