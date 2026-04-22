@@ -2,8 +2,6 @@
 // 🎨 DRAWING PERSISTENCE - Save, load, purge drawing tools
 // ================================================================
 
-import { TF_INTERVALS } from './drawing-constants';
-
 const NON_PERSISTENT_TOOLS = new Set<string>(['TradeArrow']);
 const GLOBAL_STORAGE_KEY   = 'chart_drawings_all';
 const MIGRATED_FLAG_KEY    = 'chart_drawings_migrated_v2';
@@ -140,6 +138,35 @@ export class DrawingPersistence {
         this._metaMap.clear();
     }
 
+    // ==================== PURGE DELETED TOOLS ====================
+
+    // ✅ Hard remove soft-deleted ghosts from engine after TF/symbol switch
+    // Safe to call mid-session — deleted tools are already visible:false
+    // Engine has moved to new context so no render cycle is touching them
+    public purgeDeletedTools(): void {
+        const lt = this.lineTools();
+        if (!lt || !this.isInitialized()) return;
+        try {
+            const deletedIds: string[] = [];
+            this._metaMap.forEach((meta, id) => {
+                if (meta.deleted) deletedIds.push(id);
+            });
+
+            if (deletedIds.length === 0) return;
+
+            if (typeof lt.removeLineToolsById === 'function') {
+                lt.removeLineToolsById(deletedIds);
+            }
+
+            // ✅ Clean metaMap — they no longer exist anywhere
+            deletedIds.forEach(id => this._metaMap.delete(id));
+
+            console.log(`🧹 Purged ${deletedIds.length} deleted tools from engine`);
+        } catch (error) {
+            console.error('❌ Failed to purge deleted tools:', error);
+        }
+    }
+
     // ==================== SAVE ====================
 
     public saveDrawings(): void {
@@ -172,7 +199,6 @@ export class DrawingPersistence {
 
                     existingMap.set(t.id, {
                         ...t,
-                        // ✅ Fix 3 — store actual visibility, not forced true
                         options: {
                             ...t.options,
                             visible: this.shouldToolBeVisible(t.id, this.currentTimeframe())
@@ -262,9 +288,9 @@ export class DrawingPersistence {
             const timeframe = this.currentTimeframe();
 
             const relevant = allTools.filter((t: StoredTool) => {
-                if (!t._meta)          return false;
-                if (t._meta.deleted)   return false;
-                if (t._meta.symbol !== symbol) return false;
+                if (!t._meta)                    return false;
+                if (t._meta.deleted)             return false;
+                if (t._meta.symbol !== symbol)   return false;
                 return t._meta.allTF || t._meta.timeframe === timeframe;
             });
 
@@ -293,7 +319,7 @@ export class DrawingPersistence {
                 }
             });
 
-            // ✅ Fix 3 — resolve visibility correctly on load, no forced visible:true
+            // ✅ Resolve visibility correctly on load
             const cleanTools = relevant
                 .filter((t: StoredTool) => {
                     const meta = this._metaMap.get(t.id);
