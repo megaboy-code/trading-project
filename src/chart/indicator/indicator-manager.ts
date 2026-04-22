@@ -53,6 +53,7 @@ interface IndicatorLine {
     priceLineVisible:       boolean;
     lastValueVisible:       boolean;
     crosshairMarkerVisible: boolean;
+    lastValue:              number;   // ── persists last known value for live color update
 }
 
 interface ActiveIndicator {
@@ -397,6 +398,7 @@ export class IndicatorManager {
             const priceLineVisible       = saved?.priceLineVisible       ?? false;
             const lastValueVisible       = saved?.lastValueVisible       ?? true;
             const crosshairMarkerVisible = saved?.crosshairMarkerVisible ?? true;
+            const lastValue              = line.values[line.values.length - 1] ?? 0;
 
             if (!saved) {
                 keySaved.set(line.name, {
@@ -434,13 +436,14 @@ export class IndicatorManager {
                     visible:                true,
                     priceLineVisible,
                     lastValueVisible,
-                    crosshairMarkerVisible
+                    crosshairMarkerVisible,
+                    lastValue
                 });
 
                 legendValues.push({
                     key:   line.name,
                     label: this.getPeriodLabel(data.key, line.name),
-                    value: (line.values[line.values.length - 1] ?? 0).toFixed(precision),
+                    value: lastValue.toFixed(precision),
                     color
                 });
 
@@ -519,10 +522,16 @@ export class IndicatorManager {
                 }
             } catch (e) {}
 
+            // ── Store last known value ──
+            const lastVal = line.values[line.values.length - 1];
+            if (lastVal !== undefined && lastVal !== 0) {
+                activeLine.lastValue = lastVal;
+            }
+
             legendValues.push({
                 key:   line.name,
                 label: this.getPeriodLabel(indicator.key, line.name),
-                value: (line.values[line.values.length - 1] ?? 0).toFixed(precision),
+                value: activeLine.lastValue.toFixed(precision),
                 color: activeLine.color
             });
         });
@@ -699,7 +708,6 @@ export class IndicatorManager {
 
     // ================================================================
     // CLEAR ALL — wipes memory only, localStorage preserved
-    // Called on disconnect — subs survive for refresh/reconnect restore
     // ================================================================
     public clearAll(): void {
         this.pool.forEach(indicator => { this.clearSeriesData(indicator); });
@@ -713,7 +721,6 @@ export class IndicatorManager {
 
     // ================================================================
     // REMOVE — user explicitly removes indicator
-    // Clears localStorage entry for this key
     // ================================================================
     public removeIndicator(id: string): void {
         const indicator = this.pool.get(id);
@@ -751,7 +758,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // UPDATE LINES
+    // UPDATE LINES — applies color/width/options + dispatches legend update
     // ================================================================
     private updateLines(
         id:    string,
@@ -769,7 +776,14 @@ export class IndicatorManager {
         if (!this.savedSettings.has(indicator.key)) {
             this.savedSettings.set(indicator.key, new Map());
         }
-        const keySaved = this.savedSettings.get(indicator.key)!;
+        const keySaved   = this.savedSettings.get(indicator.key)!;
+        const precision  = getDecimalPrecision(indicator.symbol);
+        const legendValues: Array<{
+            key:   string;
+            label: string;
+            value: string;
+            color: string;
+        }> = [];
 
         Object.entries(lines).forEach(([name, opts]) => {
             const line = indicator.lines.get(name);
@@ -792,14 +806,28 @@ export class IndicatorManager {
                 lastValueVisible:       line.lastValueVisible,
                 crosshairMarkerVisible: line.crosshairMarkerVisible
             });
+
+            legendValues.push({
+                key:   line.name,
+                label: this.getPeriodLabel(indicator.key, line.name),
+                value: line.lastValue.toFixed(precision),
+                color: line.color
+            });
         });
 
-        // ── Sync legend dot color with first line color after settings change ──
+        // ── Sync legend dot color ──
         const firstLineName = indicator.lines.keys().next().value;
         const firstLine     = firstLineName ? indicator.lines.get(firstLineName) : null;
         if (firstLine) {
             document.dispatchEvent(new CustomEvent('legend-item-color-update', {
                 detail: { id: indicator.id, color: firstLine.color }
+            }));
+        }
+
+        // ── Sync legend value color immediately — no need to wait for next bar ──
+        if (legendValues.length > 0) {
+            document.dispatchEvent(new CustomEvent('indicator-value-update', {
+                detail: { id: indicator.id, values: legendValues }
             }));
         }
     }
