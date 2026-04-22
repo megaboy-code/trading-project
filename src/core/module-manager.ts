@@ -13,7 +13,7 @@ import { WatchlistModule }                     from '../watchlist/watchlist-modu
 import { EconomicCalendarModule }              from '../calendar/calendar-module';
 import { AlertsModule }                        from '../alerts/alerts-module';
 import { JournalMiniModule }                   from '../journal/journal-mini';
-import { StrategiesModule }                    from '../strategies/strategy-module';  // ← added
+import { StrategiesModule }                    from '../strategies/strategy-module';
 import { OHLCData }                            from '../chart/chart-types';
 import { NotificationPayload }                 from '../generated/MegaFlowzDecoder';
 import { Severity }                            from '../generated/mega-flowz';
@@ -31,7 +31,7 @@ export class ModuleManager {
     private calendarInstance:    EconomicCalendarModule | null = null;
     private alertsInstance:      AlertsModule | null = null;
     private journalMiniInstance: JournalMiniModule | null = null;
-    private strategiesInstance:  StrategiesModule | null = null;  // ← added
+    private strategiesInstance:  StrategiesModule | null = null;
 
     private journalLoading: boolean = false;
 
@@ -50,7 +50,7 @@ export class ModuleManager {
         this.initializeCalendarModule();
         this.initializeAlertsModule();
         this.initializeJournalMiniModule();
-        this.initializeStrategiesModule();  // ← added
+        this.initializeStrategiesModule();
         this.setupDOMEventBridge();
 
         if (this.chart) {
@@ -69,7 +69,7 @@ export class ModuleManager {
         this.watchlistInstance?.destroy();
         this.calendarInstance?.destroy();
         this.alertsInstance?.destroy();
-        this.strategiesInstance?.destroy();  // ← added
+        this.strategiesInstance?.destroy();
         this.notifications.destroy();
     }
 
@@ -297,16 +297,13 @@ export class ModuleManager {
             ));
         });
 
-        // ── Strategy data ──
-        // TODO: wire when backend sends strategy updates via onStrategyData
-        // Uncomment and implement when ConnectionManager.onStrategyData is ready:
-        // this.connectionManager.onStrategyData((type, data) => {
-        //     if (type === 'list')   this.strategiesInstance?.setStrategies(data);
-        //     if (type === 'update') this.strategiesInstance?.addStrategy(data);
-        //     if (type === 'remove') this.strategiesInstance?.removeStrategyById(data.id);
-        //     // Also update badge count
-        //     this.updateStrategiesBadge();
-        // });
+        // ── Strategy data — wired to StrategiesModule ──
+        this.connectionManager.onStrategyData((type, data) => {
+            if (type === 'list')   this.strategiesInstance?.setStrategies(data);
+            if (type === 'update') this.strategiesInstance?.addStrategy(data);
+            if (type === 'remove') this.strategiesInstance?.removeStrategyById(data.id);
+            this.updateStrategiesBadge();
+        });
     }
 
     // ==================== NOTIFICATION HANDLER ====================
@@ -468,18 +465,15 @@ export class ModuleManager {
         });
 
         // ── Remove strategy ──
-        // Fired by StrategiesModule when user clicks trash icon in detail expand
         document.addEventListener('remove-strategy', (e: Event) => {
             const { strategyId } = (e as CustomEvent).detail;
             if (!strategyId) return;
             this.connectionManager.removeStrategy(strategyId);
             this.chart?.getIndicatorManager()?.removeIndicator(strategyId);
-            // TODO: update strategies badge after removal
-            // this.updateStrategiesBadge();
+            this.updateStrategiesBadge();
         });
 
         // ── Update strategy ──
-        // Fired by StrategiesModule when pause/resume or volume/risk changes
         document.addEventListener('update-strategy', (e: Event) => {
             const { strategyId, updates } = (e as CustomEvent).detail;
             if (strategyId && updates)
@@ -670,11 +664,10 @@ export class ModuleManager {
 
     // ==================== STRATEGIES BADGE ====================
 
-    // TODO: call this whenever strategies list changes
-    // private updateStrategiesBadge(): void {
-    //     const badge = document.getElementById('strategiesBadge');
-    //     if (badge) badge.textContent = String(this.strategiesInstance?.getCount() ?? 0);
-    // }
+    private updateStrategiesBadge(): void {
+        const badge = document.getElementById('strategiesBadge');
+        if (badge) badge.textContent = String(this.strategiesInstance?.getCount() ?? 0);
+    }
 
     // ==================== NOTIFICATION HELPER ====================
 
@@ -700,7 +693,7 @@ export class ModuleManager {
     public getWatchlistModule(): WatchlistModule | null       { return this.watchlistInstance; }
     public getCalendarModule(): EconomicCalendarModule | null { return this.calendarInstance; }
     public getAlertsModule(): AlertsModule | null             { return this.alertsInstance; }
-    public getStrategiesModule(): StrategiesModule | null     { return this.strategiesInstance; }  // ← added
+    public getStrategiesModule(): StrategiesModule | null     { return this.strategiesInstance; }
     public getConnectionManager(): ConnectionManager          { return this.connectionManager; }
     public getPanelsModule(): typeof Panels                   { return this.panels; }
     public getNotificationModule(): typeof Notification       { return this.notifications; }
