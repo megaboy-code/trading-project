@@ -631,13 +631,32 @@ export class ChartModule {
             }
         }, { signal });
 
+        // ── Legend item remove — handles both indicators and strategies ──
         document.addEventListener('legend-item-remove', async (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             if (!id) return;
 
             if (id === 'volume') {
                 await this.mainChart.toggleVolume();
+                return;
+            }
+
+            // Check if this is a strategy by looking it up in chartLegend
+            const item = this.chartLegend?.getItem(id);
+            if (item?.icon === 'fa-robot') {
+                // Strategy - dispatch remove-strategy event
+                const parts = id.split('_');
+                // id format: STRATEGYKEY_SYMBOL_TIMEFRAME
+                // Example: EMA_CROSS_BTCUSDm_M15
+                const strategyType = parts[0];      // EMA_CROSS
+                const symbol       = parts[1];      // BTCUSDm
+                const timeframe    = parts[2];      // M15
+                
+                document.dispatchEvent(new CustomEvent('remove-strategy', {
+                    detail: { strategyType, symbol, timeframe }
+                }));
             } else {
+                // Indicator - normal removal
                 this.indicatorManager?.removeIndicator(id);
             }
         }, { signal });
