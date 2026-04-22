@@ -634,6 +634,8 @@ export class ChartModule {
         // ── Legend item remove — handles both indicators and strategies ──
         document.addEventListener('legend-item-remove', async (e: Event) => {
             const { id } = (e as CustomEvent).detail;
+            console.log('🔵 LEGEND REMOVE ID:', id);  // ADDED CONSOLE LOG
+            
             if (!id) return;
 
             if (id === 'volume') {
@@ -651,6 +653,8 @@ export class ChartModule {
                 const strategyType = parts[0];      // EMA_CROSS
                 const symbol       = parts[1];      // BTCUSDm
                 const timeframe    = parts[2];      // M15
+                
+                console.log('🔵 REMOVE STRATEGY - parsed:', { strategyType, symbol, timeframe });
                 
                 document.dispatchEvent(new CustomEvent('remove-strategy', {
                     detail: { strategyType, symbol, timeframe }
