@@ -739,7 +739,7 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // REMOVE — user explicitly removes indicator
+    // REMOVE — user explicitly removes indicator (calls backend unsubscribe)
     // ================================================================
     public removeIndicator(id: string): void {
         const indicator = this.pool.get(id);
@@ -761,6 +761,30 @@ export class IndicatorManager {
                 timeframe: indicator.timeframe
             }
         }));
+    }
+
+    // ================================================================
+    // REMOVE STRATEGY FROM CHART — frontend only, no backend call
+    // ================================================================
+    public removeStrategyFromChart(id: string): void {
+        const indicator = this.pool.get(id);
+        if (!indicator) return;
+
+        // Clear series data (remove lines from chart)
+        indicator.lines.forEach(line => {
+            try { line.series.setData([]); } catch (e) {}
+        });
+        
+        // Remove from pool
+        this.pool.delete(id);
+        this.legendIds.delete(indicator.key);
+        this.savedSettings.delete(indicator.key);
+        this.periodOverrides.delete(indicator.key);
+        this.activeSubs.delete(indicator.key);
+        this.persistPeriodOverrides();
+        this.persistActiveSubs();
+
+        // Do NOT dispatch indicator-removed event (no backend call)
     }
 
     // ================================================================
