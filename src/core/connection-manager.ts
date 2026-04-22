@@ -206,16 +206,23 @@ export class ConnectionManager {
     ): void {
         const tf = this.normalizeTimeframe(timeframe);
         this.sendCommand(
-            `DEPLOY_STRATEGY_${strategyType}_${symbol}_${tf}_${JSON.stringify(params)}`
+            `DEPLOY_STRATEGY_${strategyType}_${symbol}_${tf}`
         );
     }
 
-    public removeStrategy(strategyId: string): void {
-        this.sendCommand(`REMOVE_STRATEGY_${strategyId}`);
+    public removeStrategy(
+        strategyType: string,
+        symbol:       string,
+        timeframe:    string
+    ): void {
+        const tf = this.normalizeTimeframe(timeframe);
+        this.sendCommand(
+            `REMOVE_STRATEGY_${strategyType}_${symbol}_${tf}`
+        );
     }
 
     public updateStrategy(strategyId: string, updates: object): void {
-        this.sendCommand(`UPDATE_STRATEGY_${strategyId}_${JSON.stringify(updates)}`);
+        this.sendCommand(`UPDATE_STRATEGY_${strategyId}`);
     }
 
     public getActiveStrategies(): void { this.sendCommand('GET_ACTIVE_STRATEGIES'); }
@@ -229,7 +236,7 @@ export class ConnectionManager {
     ): void {
         const tf = this.normalizeTimeframe(timeframe);
         this.sendCommand(
-            `BACKTEST_STRATEGY_${strategyType}_${symbol}_${tf}_${days}_${JSON.stringify(params)}`
+            `BACKTEST_STRATEGY_${strategyType}_${symbol}_${tf}_${days}`
         );
     }
 
