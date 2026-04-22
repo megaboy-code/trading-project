@@ -18,10 +18,10 @@
 //    { strategyId, updates: { volume, risk } }
 //    ModuleManager listens and calls connectionManager.updateStrategy()
 //
-// 5. Remove → dispatches 'remove-strategy' CustomEvent with { strategyId }
+// 5. Remove → dispatches 'remove-strategy' CustomEvent with
+//    { strategyType, symbol, timeframe }
 //    ModuleManager listens → connectionManager.removeStrategy()
-//    IndicatorManager.removeIndicator() removes legend from chart
-//    Also dispatches 'legend-item-remove' with { id: strategyId } to sync legend
+//    Also dispatches 'legend-item-remove' with full id to sync legend
 //
 // 6. When strategy is deployed on current chart symbol+TF:
 //    Legend shows via indicator-added event from IndicatorManager
@@ -40,9 +40,9 @@ interface StrategyItem {
     symbol:    string;
     tf:        string;
     status:    'running' | 'paused' | 'stopped';
-    pnl:       number;
+    pnl:       number | null;
     trades:    number;
-    winrate:   number;
+    winrate:   number | null;
     volume:    number;
     risk:      number;
     iconColor: 'green' | 'blue' | 'warn' | 'purple';
@@ -58,7 +58,7 @@ export class StrategiesModule {
     private expandedId:    string | null = null;
     private selectedId:    string | null = null;
 
-    // ── Real data from backend — mock removed ──
+    // ── Real data from backend ──
     private strategies: StrategyItem[] = [];
 
     // ================================================================
@@ -219,8 +219,8 @@ export class StrategiesModule {
         main.className = 'strat-item-main';
         main.setAttribute('data-strat-id', s.id);
 
-        const pnlClass   = s.pnl > 0 ? 'positive' : s.pnl < 0 ? 'negative' : 'neutral';
-        const pnlText    = s.pnl > 0 ? `+$${s.pnl.toFixed(2)}` : s.pnl < 0 ? `-$${Math.abs(s.pnl).toFixed(2)}` : '$0.00';
+        const pnlClass   = s.pnl && s.pnl > 0 ? 'positive' : s.pnl && s.pnl < 0 ? 'negative' : 'neutral';
+        const pnlText    = s.pnl !== null ? (s.pnl > 0 ? `+$${s.pnl.toFixed(2)}` : s.pnl < 0 ? `-$${Math.abs(s.pnl).toFixed(2)}` : '$0.00') : '—';
         const pulseClass = s.status === 'running' ? '' : s.status === 'paused' ? 'paused' : 'stopped';
 
         main.innerHTML = `
@@ -248,16 +248,20 @@ export class StrategiesModule {
 
         const stats = document.createElement('div');
         stats.className = 'strat-item-stats';
+        
+        const tradesDisplay = s.trades > 0 ? s.trades : '0';
+        const winrateDisplay = s.winrate !== null && s.winrate > 0 ? `${s.winrate}%` : '—';
+        
         stats.innerHTML = `
             <div class="strat-stat">
                 <i class="fas fa-chart-bar"></i>
                 <span>Trades:</span>
-                <span class="strat-stat-val">${s.trades}</span>
+                <span class="strat-stat-val">${tradesDisplay}</span>
             </div>
             <div class="strat-stat">
                 <i class="fas fa-percent"></i>
                 <span>Win:</span>
-                <span class="strat-stat-val">${s.winrate > 0 ? s.winrate + '%' : '—'}</span>
+                <span class="strat-stat-val">${winrateDisplay}</span>
             </div>
         `;
 
@@ -322,14 +326,20 @@ export class StrategiesModule {
 
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            
+            // ── Build full id for legend removal ──
+            const fullId = `${s.id}_${s.symbol}_${s.tf}`;
+            
             // ── Remove from backend ──
             document.dispatchEvent(new CustomEvent('remove-strategy', {
-                detail: { strategyId: s.id }
+                detail: { strategyType: s.id, symbol: s.symbol, timeframe: s.tf }
             }));
-            // ── Sync legend — remove legend item with same id ──
+            
+            // ── Sync legend — remove legend item with full id ──
             document.dispatchEvent(new CustomEvent('legend-item-remove', {
-                detail: { id: s.id }
+                detail: { id: fullId }
             }));
+            
             const item = detail.closest('.strat-item') as HTMLElement;
             if (item) {
                 item.classList.add('removing');
@@ -435,13 +445,16 @@ export class StrategiesModule {
     private updateSummary(items: StrategyItem[]): void {
         const active   = items.filter(s => s.status === 'running').length;
         const trades   = items.reduce((acc, s) => acc + s.trades, 0);
-        const pnl      = items.reduce((acc, s) => acc + s.pnl, 0);
-        const winItems = items.filter(s => s.winrate > 0);
+        const pnl      = items.reduce((acc, s) => acc + (s.pnl || 0), 0);
+        
+        // Calculate winrate average only from strategies that have winrate data
+        const winItems = items.filter(s => s.winrate !== null && s.winrate > 0);
         const avgWin   = winItems.length
-            ? Math.round(winItems.reduce((acc, s) => acc + s.winrate, 0) / winItems.length)
+            ? Math.round(winItems.reduce((acc, s) => acc + (s.winrate || 0), 0) / winItems.length)
             : 0;
 
         const pnlText = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
+        const pnlClass = pnl >= 0 ? 'positive' : 'negative';
 
         const el = (id: string) => document.getElementById(id);
         if (el('stratStatActive')) el('stratStatActive')!.textContent = String(active);
@@ -450,12 +463,12 @@ export class StrategiesModule {
         const pnlEl = el('stratStatPnl');
         if (pnlEl) {
             pnlEl.textContent = pnlText;
-            pnlEl.className   = `strat-summary-value ${pnl >= 0 ? 'positive' : 'negative'}`;
+            pnlEl.className   = `strat-summary-value ${pnlClass}`;
         }
 
         const winEl = el('stratStatWin');
         if (winEl) {
-            winEl.textContent = avgWin > 0 ? `${avgWin}%` : '0%';
+            winEl.textContent = avgWin > 0 ? `${avgWin}%` : '—';
             winEl.className   = `strat-summary-value ${avgWin >= 50 ? 'positive' : ''}`;
         }
     }
