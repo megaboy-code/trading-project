@@ -634,7 +634,7 @@ export class ChartModule {
         // ── Legend item remove — handles both indicators and strategies ──
         document.addEventListener('legend-item-remove', async (e: Event) => {
             const { id } = (e as CustomEvent).detail;
-            console.log('🔵 LEGEND REMOVE ID:', id);  // ADDED CONSOLE LOG
+            console.log('🔵 LEGEND REMOVE ID:', id);
             
             if (!id) return;
 
@@ -647,12 +647,15 @@ export class ChartModule {
             const item = this.chartLegend?.getItem(id);
             if (item?.icon === 'fa-robot') {
                 // Strategy - dispatch remove-strategy event
-                const parts = id.split('_');
+                // Parse correctly: key may contain underscores (e.g., EMA_CROSS)
                 // id format: STRATEGYKEY_SYMBOL_TIMEFRAME
                 // Example: EMA_CROSS_BTCUSDm_M15
-                const strategyType = parts[0];      // EMA_CROSS
-                const symbol       = parts[1];      // BTCUSDm
-                const timeframe    = parts[2];      // M15
+                const lastUnderscore = id.lastIndexOf('_');
+                const secondLastUnderscore = id.lastIndexOf('_', lastUnderscore - 1);
+                
+                const strategyType = id.substring(0, secondLastUnderscore);
+                const symbol = id.substring(secondLastUnderscore + 1, lastUnderscore);
+                const timeframe = id.substring(lastUnderscore + 1);
                 
                 console.log('🔵 REMOVE STRATEGY - parsed:', { strategyType, symbol, timeframe });
                 
