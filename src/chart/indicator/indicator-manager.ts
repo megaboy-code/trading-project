@@ -536,8 +536,7 @@ export class IndicatorManager {
             });
         });
 
-        indicator.active = true;
-
+        // ── Update values on legend ──
         if (legendValues.length > 0) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id: indicator.id, values: legendValues }
@@ -557,8 +556,9 @@ export class IndicatorManager {
                     settings: this.getEffectiveSettings(indicator.key)
                 }
             }));
-            indicator.active = true;
         }
+
+        indicator.active = true;
     }
 
     // ================================================================
@@ -585,11 +585,14 @@ export class IndicatorManager {
 
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
+                // Strategies: only clear visual data and mark inactive
+                // Keep same ID, don't resubscribe
                 this.clearSeriesData(indicator);
                 document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
                     detail: { id, deployedTF: indicator.timeframe }
                 }));
             } else {
+                // Indicators: unsubscribe old, resubscribe new TF
                 document.dispatchEvent(new CustomEvent('indicator-removed', {
                     detail: {
                         key:       indicator.key,
