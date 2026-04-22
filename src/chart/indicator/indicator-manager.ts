@@ -543,6 +543,22 @@ export class IndicatorManager {
                 detail: { id: indicator.id, values: legendValues }
             }));
         }
+
+        // ── Re-add legend if strategy was inactive (TF change removed it) ──
+        if (!indicator.active && indicator.isStrategy) {
+            document.dispatchEvent(new CustomEvent('indicator-added', {
+                detail: {
+                    id: indicator.id,
+                    name: indicator.label,
+                    color: legendValues[0]?.color,
+                    icon: 'fa-robot',
+                    pane: null,
+                    values: legendValues,
+                    settings: this.getEffectiveSettings(indicator.key)
+                }
+            }));
+            indicator.active = true;
+        }
     }
 
     // ================================================================
