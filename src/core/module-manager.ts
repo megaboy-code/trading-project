@@ -476,7 +476,7 @@ export class ModuleManager {
             
             // Remove from frontend chart - build full id matching pool key
             const fullId = `${strategyType}_${sym}_${tf}`;
-            this.chart?.getIndicatorManager()?.removeIndicator(fullId);
+            this.chart?.getIndicatorManager()?.removeStrategyFromChart(fullId);
             
             this.updateStrategiesBadge();
         });
