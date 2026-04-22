@@ -159,9 +159,27 @@ export class ModuleManager {
             this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
         });
 
-        // ── Indicator update — direct to IndicatorManager ──
+        // ── Indicator update — direct to IndicatorManager + strategy panel sync ──
         this.connectionManager.onIndicatorUpdate((data) => {
             this.chart?.getIndicatorManager()?.onIndicatorUpdate(data);
+
+            // ── If strategy (2 lines = fast + slow), sync strategies panel ──
+            if (data.lines.length > 1) {
+                this.strategiesInstance?.addStrategy({
+                    id:        data.key,
+                    name:      data.label,
+                    symbol:    data.symbol,
+                    tf:        data.timeframe,
+                    status:    'running',
+                    pnl:       null,
+                    trades:    0,
+                    winrate:   null,
+                    volume:    0.01,
+                    risk:      1.0,
+                    iconColor: 'green'
+                });
+                this.updateStrategiesBadge();
+            }
         });
 
         // ── Watchlist ──
@@ -288,20 +306,22 @@ export class ModuleManager {
             ));
         });
 
-        // ── Available config — also populates active strategies from backend ──
+        // ── Available config — populates paramsMap + active strategies on refresh ──
         this.connectionManager.onAvailableConfig((config: AvailableConfigPayload) => {
-            // Dispatch to UI for indicators/timeframes/symbols
             document.dispatchEvent(new CustomEvent(
                 'available-config-received', {
                     detail: config
                 }
             ));
 
-            // ── Populate active strategies from strategies array (if symbol+timeframe exist) ──
+            // ── Populate strategies panel from GET_ACTIVE_STRATEGIES response ──
+            // Only maps entries that have symbol + timeframe (real instances, not templates)
             if (config.strategies && config.strategies.length > 0) {
-                const hasSymbolAndTimeframe = config.strategies.some(s => s.symbol && s.timeframe);
-                if (hasSymbolAndTimeframe) {
-                    const strategyItems = config.strategies.map((s: AvailableItemData) => ({
+                const instances = config.strategies.filter(
+                    (s: AvailableItemData) => s.symbol && s.timeframe
+                );
+                if (instances.length > 0) {
+                    const strategyItems = instances.map((s: AvailableItemData) => ({
                         id:        s.key,
                         name:      s.label,
                         symbol:    s.symbol,
@@ -320,7 +340,7 @@ export class ModuleManager {
             }
         });
 
-        // ── Strategy data — from explicit GET_ACTIVE_STRATEGIES response ──
+        // ── Strategy data — from explicit onStrategyData backend message ──
         this.connectionManager.onStrategyData((type, data) => {
             if (type === 'list')   this.strategiesInstance?.setStrategies(data);
             if (type === 'update') this.strategiesInstance?.addStrategy(data);
@@ -487,20 +507,20 @@ export class ModuleManager {
             );
         });
 
-        // ── Remove strategy — FIXED: use correct fullId for frontend removal ──
+        // ── Remove strategy ──
         document.addEventListener('remove-strategy', (e: Event) => {
             const { strategyType, symbol, timeframe } = (e as CustomEvent).detail;
             if (!strategyType) return;
             const sym = symbol    || this.connectionManager.getCurrentSymbol();
             const tf  = timeframe || this.connectionManager.getCurrentTimeframe();
-            
-            // Remove from backend
+
+            // ── Remove from backend ──
             this.connectionManager.removeStrategy(strategyType, sym, tf);
-            
-            // Remove from frontend chart - build full id matching pool key
+
+            // ── Remove from chart — full pool id ──
             const fullId = `${strategyType}_${sym}_${tf}`;
             this.chart?.getIndicatorManager()?.removeStrategyFromChart(fullId);
-            
+
             this.updateStrategiesBadge();
         });
 
