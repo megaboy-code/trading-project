@@ -83,7 +83,6 @@ export class ItemsLegend {
         return Array.from(this.items.values());
     }
 
-    // ── Remap both maps to new id after TF change ──
     public updateItemId(oldId: string, newId: string): void {
         const item = this.items.get(oldId);
         const el   = this.elements.get(oldId);
@@ -218,9 +217,11 @@ export class ItemsLegend {
 
             if (v.label) {
                 const label = document.createElement('span');
+                // ── Bold primary color for period label e.g. (21) ──
                 label.style.cssText = `
                     font-size: 9px;
-                    color: var(--text-muted);
+                    font-weight: 700;
+                    color: var(--text-primary);
                 `;
                 label.textContent = v.label;
                 el.appendChild(label);
