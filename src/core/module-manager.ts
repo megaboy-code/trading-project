@@ -163,10 +163,11 @@ export class ModuleManager {
         this.connectionManager.onIndicatorUpdate((data) => {
             this.chart?.getIndicatorManager()?.onIndicatorUpdate(data);
 
-            // ── If strategy (2 lines = fast + slow), sync strategies panel ──
+            // ── Bug 2 fix: use full id so strategies with same key but different
+            //    symbol/TF don't overwrite each other in the panel ──
             if (data.lines.length > 1) {
                 this.strategiesInstance?.addStrategy({
-                    id:        data.key,
+                    id:        `${data.key}_${data.symbol}_${data.timeframe}`,
                     name:      data.label,
                     symbol:    data.symbol,
                     tf:        data.timeframe,
@@ -315,14 +316,13 @@ export class ModuleManager {
             ));
 
             // ── Populate strategies panel from GET_ACTIVE_STRATEGIES response ──
-            // Only maps entries that have symbol + timeframe (real instances, not templates)
             if (config.strategies && config.strategies.length > 0) {
                 const instances = config.strategies.filter(
                     (s: AvailableItemData) => s.symbol && s.timeframe
                 );
                 if (instances.length > 0) {
                     const strategyItems = instances.map((s: AvailableItemData) => ({
-                        id:        s.key,
+                        id:        `${s.key}_${s.symbol}_${s.timeframe}`,
                         name:      s.label,
                         symbol:    s.symbol,
                         tf:        s.timeframe,
@@ -520,6 +520,9 @@ export class ModuleManager {
             // ── Remove from chart — full pool id ──
             const fullId = `${strategyType}_${sym}_${tf}`;
             this.chart?.getIndicatorManager()?.removeStrategyFromChart(fullId);
+
+            // ── Remove from strategies panel ──
+            this.strategiesInstance?.removeStrategyById(fullId);
 
             this.updateStrategiesBadge();
         });

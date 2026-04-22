@@ -464,12 +464,13 @@ export class IndicatorManager {
             this.persistActiveSubs();
         }
 
-        if (this.legendIds.has(data.key)) {
+        // ── Bug 1 fix: legendIds uses full id (key_symbol_tf) not just key ──
+        if (this.legendIds.has(id)) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
             }));
         } else {
-            this.legendIds.add(data.key);
+            this.legendIds.add(id);
             document.dispatchEvent(new CustomEvent('indicator-added', {
                 detail: {
                     id,
@@ -585,14 +586,11 @@ export class IndicatorManager {
 
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
-                // Strategies: only clear visual data and mark inactive
-                // Keep same ID, don't resubscribe
                 this.clearSeriesData(indicator);
                 document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
                     detail: { id, deployedTF: indicator.timeframe }
                 }));
             } else {
-                // Indicators: unsubscribe old, resubscribe new TF
                 document.dispatchEvent(new CustomEvent('indicator-removed', {
                     detail: {
                         key:       indicator.key,
@@ -619,6 +617,10 @@ export class IndicatorManager {
             indicator.timeframe = newTimeframe;
             indicator.active    = false;
             this.pool.set(newId, indicator);
+
+            // ── Update legendIds to new id ──
+            this.legendIds.delete(oldId);
+            this.legendIds.add(newId);
 
             // ── Update persisted sub timeframe ──
             const sub = this.activeSubs.get(key);
@@ -654,6 +656,8 @@ export class IndicatorManager {
             timeframe: string;
         }> = [];
 
+        const toDelete: string[] = [];
+
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
                 this.clearSeriesData(indicator);
@@ -667,6 +671,7 @@ export class IndicatorManager {
                 document.dispatchEvent(new CustomEvent('legend-item-remove', {
                     detail: { id }
                 }));
+                toDelete.push(id);
             } else {
                 document.dispatchEvent(new CustomEvent('indicator-removed', {
                     detail: {
@@ -688,11 +693,12 @@ export class IndicatorManager {
             }
         });
 
-        // ── Remove strategies from pool and legendIds ──
-        this.pool.forEach((indicator, id) => {
-            if (indicator.isStrategy) {
+        // ── Remove strategies from pool and legendIds safely after iteration ──
+        toDelete.forEach(id => {
+            const indicator = this.pool.get(id);
+            if (indicator) {
                 this.pool.delete(id);
-                this.legendIds.delete(indicator.key);
+                this.legendIds.delete(id);
             }
         });
 
@@ -702,6 +708,10 @@ export class IndicatorManager {
             indicator.symbol = newSymbol;
             indicator.active = false;
             this.pool.set(newId, indicator);
+
+            // ── Update legendIds to new id ──
+            this.legendIds.delete(oldId);
+            this.legendIds.add(newId);
 
             // ── Update persisted sub symbol ──
             const sub = this.activeSubs.get(key);
@@ -747,7 +757,7 @@ export class IndicatorManager {
 
         this.clearSeriesData(indicator);
         this.pool.delete(id);
-        this.legendIds.delete(indicator.key);
+        this.legendIds.delete(id);
         this.savedSettings.delete(indicator.key);
         this.periodOverrides.delete(indicator.key);
         this.activeSubs.delete(indicator.key);
@@ -770,21 +780,17 @@ export class IndicatorManager {
         const indicator = this.pool.get(id);
         if (!indicator) return;
 
-        // Clear series data (remove lines from chart)
         indicator.lines.forEach(line => {
             try { line.series.setData([]); } catch (e) {}
         });
-        
-        // Remove from pool
+
         this.pool.delete(id);
-        this.legendIds.delete(indicator.key);
+        this.legendIds.delete(id);
         this.savedSettings.delete(indicator.key);
         this.periodOverrides.delete(indicator.key);
         this.activeSubs.delete(indicator.key);
         this.persistPeriodOverrides();
         this.persistActiveSubs();
-
-        // Do NOT dispatch indicator-removed event (no backend call)
     }
 
     // ================================================================
