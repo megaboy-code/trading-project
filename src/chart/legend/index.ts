@@ -156,10 +156,15 @@ export class ChartLegend {
             this.removeItem(id);
         }, { signal });
 
-        // ✅ Sync dot color from indicator-manager after settings change
         document.addEventListener('legend-item-color-update', (e: Event) => {
             const { id, color } = (e as CustomEvent).detail;
             this.itemsLegend.updateColor(id, color);
+        }, { signal });
+
+        // ── Sync legend item settings after period change ──
+        document.addEventListener('indicator-settings-update', (e: Event) => {
+            const { id, settings } = (e as CustomEvent).detail;
+            if (id && settings) this.itemsLegend.updateSettings(id, settings);
         }, { signal });
     }
 
@@ -248,7 +253,6 @@ export class ChartLegend {
         return this.itemsLegend.getItem(id);
     }
 
-    // ── Remap legend item id — called after TF change ──
     public updateItemId(oldId: string, newId: string): void {
         this.itemsLegend.updateItemId(oldId, newId);
     }
