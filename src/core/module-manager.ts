@@ -464,14 +464,20 @@ export class ModuleManager {
             );
         });
 
-        // ── Remove strategy — FIXED: use strategyType, symbol, timeframe ──
+        // ── Remove strategy — FIXED: use correct fullId for frontend removal ──
         document.addEventListener('remove-strategy', (e: Event) => {
             const { strategyType, symbol, timeframe } = (e as CustomEvent).detail;
             if (!strategyType) return;
             const sym = symbol    || this.connectionManager.getCurrentSymbol();
             const tf  = timeframe || this.connectionManager.getCurrentTimeframe();
+            
+            // Remove from backend
             this.connectionManager.removeStrategy(strategyType, sym, tf);
-            this.chart?.getIndicatorManager()?.removeIndicator(strategyType);
+            
+            // Remove from frontend chart - build full id matching pool key
+            const fullId = `${strategyType}_${sym}_${tf}`;
+            this.chart?.getIndicatorManager()?.removeIndicator(fullId);
+            
             this.updateStrategiesBadge();
         });
 
