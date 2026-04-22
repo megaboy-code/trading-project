@@ -21,6 +21,7 @@
 // 5. Remove → dispatches 'remove-strategy' CustomEvent with { strategyId }
 //    ModuleManager listens → connectionManager.removeStrategy()
 //    IndicatorManager.removeIndicator() removes legend from chart
+//    Also dispatches 'legend-item-remove' with { id: strategyId } to sync legend
 //
 // 6. When strategy is deployed on current chart symbol+TF:
 //    Legend shows via indicator-added event from IndicatorManager
@@ -28,8 +29,8 @@
 //    Strategy item in panel always shows current status regardless of chart
 //
 // 7. onStrategyData callback from ConnectionManager feeds real data here.
-//    Replace MOCK_DATA with real data when backend is ready.
-//    Call this.setStrategies(realData) from ModuleManager.
+//    setStrategies() called from ModuleManager with real backend data.
+//    Fields not provided by backend (pnl, trades, winrate) default to null/0.
 //
 // ================================================================
 
@@ -57,45 +58,8 @@ export class StrategiesModule {
     private expandedId:    string | null = null;
     private selectedId:    string | null = null;
 
-    // ── Mock data — replace with real data from ConnectionManager ──
-    private strategies: StrategyItem[] = [
-        {
-            id: 'ema-cross-eurusd-h1',
-            name: 'EMA Cross',
-            symbol: 'EURUSD', tf: 'H1',
-            status: 'running',
-            pnl: 142.50, trades: 18, winrate: 67,
-            volume: 0.10, risk: 1.0,
-            iconColor: 'green'
-        },
-        {
-            id: 'rsi-rev-gbpusd-m15',
-            name: 'RSI Mean Rev',
-            symbol: 'GBPUSD', tf: 'M15',
-            status: 'running',
-            pnl: 89.20, trades: 24, winrate: 58,
-            volume: 0.05, risk: 0.5,
-            iconColor: 'blue'
-        },
-        {
-            id: 'macd-trend-usdjpy-h4',
-            name: 'MACD Trend',
-            symbol: 'USDJPY', tf: 'H4',
-            status: 'paused',
-            pnl: -18.40, trades: 5, winrate: 40,
-            volume: 0.10, risk: 1.0,
-            iconColor: 'warn'
-        },
-        {
-            id: 'bb-squeeze-xauusd-d1',
-            name: 'BB Squeeze',
-            symbol: 'XAUUSD', tf: 'D1',
-            status: 'stopped',
-            pnl: 0, trades: 0, winrate: 0,
-            volume: 0.01, risk: 0.5,
-            iconColor: 'purple'
-        },
-    ];
+    // ── Real data from backend — mock removed ──
+    private strategies: StrategyItem[] = [];
 
     // ================================================================
     // INITIALIZE
@@ -113,7 +77,10 @@ export class StrategiesModule {
         this.bindEvents();
         this.render();
 
-        console.log('✅ Strategies Module initialized (mock)');
+        // ── Request real strategy list from backend ──
+        document.dispatchEvent(new CustomEvent('get-active-strategies'));
+
+        console.log('✅ Strategies Module initialized');
     }
 
     // ================================================================
@@ -158,6 +125,10 @@ export class StrategiesModule {
         }
     }
 
+    public getCount(): number {
+        return this.strategies.length;
+    }
+
     // ================================================================
     // BIND EVENTS
     // ================================================================
@@ -190,7 +161,7 @@ export class StrategiesModule {
         document.getElementById('strategyRefreshBtn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             drop?.classList.remove('show');
-            this.render();
+            document.dispatchEvent(new CustomEvent('get-active-strategies'));
         });
     }
 
@@ -351,8 +322,13 @@ export class StrategiesModule {
 
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            // ── Remove from backend ──
             document.dispatchEvent(new CustomEvent('remove-strategy', {
                 detail: { strategyId: s.id }
+            }));
+            // ── Sync legend — remove legend item with same id ──
+            document.dispatchEvent(new CustomEvent('legend-item-remove', {
+                detail: { id: s.id }
             }));
             const item = detail.closest('.strat-item') as HTMLElement;
             if (item) {
