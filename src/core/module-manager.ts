@@ -15,7 +15,7 @@ import { AlertsModule }                        from '../alerts/alerts-module';
 import { JournalMiniModule }                   from '../journal/journal-mini';
 import { StrategiesModule }                    from '../strategies/strategy-module';
 import { OHLCData }                            from '../chart/chart-types';
-import { NotificationPayload }                 from '../generated/MegaFlowzDecoder';
+import { NotificationPayload, AvailableConfigPayload, AvailableItemData } from '../generated/MegaFlowzDecoder';
 import { Severity }                            from '../generated/mega-flowz';
 
 declare global {
@@ -288,16 +288,39 @@ export class ModuleManager {
             ));
         });
 
-        // ── Available config ──
-        this.connectionManager.onAvailableConfig((config) => {
+        // ── Available config — also populates active strategies from backend ──
+        this.connectionManager.onAvailableConfig((config: AvailableConfigPayload) => {
+            // Dispatch to UI for indicators/timeframes/symbols
             document.dispatchEvent(new CustomEvent(
                 'available-config-received', {
                     detail: config
                 }
             ));
+
+            // ── Populate active strategies from strategies array (if symbol+timeframe exist) ──
+            if (config.strategies && config.strategies.length > 0) {
+                const hasSymbolAndTimeframe = config.strategies.some(s => s.symbol && s.timeframe);
+                if (hasSymbolAndTimeframe) {
+                    const strategyItems = config.strategies.map((s: AvailableItemData) => ({
+                        id:        s.key,
+                        name:      s.label,
+                        symbol:    s.symbol,
+                        tf:        s.timeframe,
+                        status:    'running' as const,
+                        pnl:       null,
+                        trades:    0,
+                        winrate:   null,
+                        volume:    s.volume || 0.01,
+                        risk:      1.0,
+                        iconColor: 'green' as const
+                    }));
+                    this.strategiesInstance?.setStrategies(strategyItems);
+                    this.updateStrategiesBadge();
+                }
+            }
         });
 
-        // ── Strategy data — wired to StrategiesModule ──
+        // ── Strategy data — from explicit GET_ACTIVE_STRATEGIES response ──
         this.connectionManager.onStrategyData((type, data) => {
             if (type === 'list')   this.strategiesInstance?.setStrategies(data);
             if (type === 'update') this.strategiesInstance?.addStrategy(data);

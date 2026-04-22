@@ -204,6 +204,8 @@ export interface AvailableItemData {
     oversold:      number;
     volume:        number;
     price_type:    string;
+    symbol:        string;
+    timeframe:     string;
 }
 
 export interface AvailableConfigPayload {
@@ -292,7 +294,7 @@ function extractCandle(c: any): CandleData {
 }
 
 // ================================================================
-// AVAILABLE ITEM EXTRACTOR — all params
+// AVAILABLE ITEM EXTRACTOR — all params including symbol + timeframe
 // ================================================================
 
 function extractAvailableItem(item: AvailableItem): AvailableItemData {
@@ -314,7 +316,9 @@ function extractAvailableItem(item: AvailableItem): AvailableItemData {
         overbought:    item.overbought(),
         oversold:      item.oversold(),
         volume:        item.volume(),
-        price_type:    item.priceType()   ?? 'close'
+        price_type:    item.priceType()   ?? 'close',
+        symbol:        item.symbol()      ?? '',
+        timeframe:     item.timeframe()   ?? ''
     };
 }
 
