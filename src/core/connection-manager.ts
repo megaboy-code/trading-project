@@ -168,10 +168,6 @@ export class ConnectionManager {
         this.sendCommand(`GET_JOURNAL_MONTH_${year}_${month}`);
     }
 
-    public searchSymbols(query: string): void {
-        this.sendCommand(`SEARCH_SYMBOLS_${query.toUpperCase()}`);
-    }
-
     // ==================== INDICATOR COMMANDS ====================
 
     public subscribeIndicator(
