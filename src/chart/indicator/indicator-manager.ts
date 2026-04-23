@@ -121,9 +121,10 @@ interface SavedLineSettings {
 // INDICATOR MANAGER
 // ================================================================
 export class IndicatorManager {
-    private chart:         any    = null;
-    private mainChart:     any    = null;
-    private currentSymbol: string = '';
+    private chart:            any    = null;
+    private mainChart:        any    = null;
+    private currentSymbol:    string = '';
+    private currentTimeframe: string = '';
 
     private pool:      Map<string, ActiveIndicator> = new Map();
     private legendIds: Set<string>                  = new Set();
@@ -145,9 +146,10 @@ export class IndicatorManager {
 
     // ==================== SETUP ====================
 
-    public setChart(chart: any):         void { this.chart         = chart; }
-    public setMainChart(mainChart: any): void { this.mainChart     = mainChart; }
-    public setSymbol(symbol: string):    void { this.currentSymbol = symbol; }
+    public setChart(chart: any):             void { this.chart            = chart; }
+    public setMainChart(mainChart: any):     void { this.mainChart        = mainChart; }
+    public setSymbol(symbol: string):        void { this.currentSymbol    = symbol; }
+    public setTimeframe(timeframe: string):  void { this.currentTimeframe = timeframe; }
 
     public initialize(): void {
         // ── Restore period overrides from localStorage ──
@@ -339,6 +341,9 @@ export class IndicatorManager {
     // ================================================================
     public onIndicatorUpdate(data: IndicatorUpdatePayload): void {
         if (!this.chart) return;
+
+        // ── Drop stale in-flight data from previous TF ──
+        if (this.currentTimeframe && data.timeframe !== this.currentTimeframe) return;
 
         const id        = `${data.key}_${data.symbol}_${data.timeframe}`;
         const isInitial = data.lines.some(l => l.timestamps.length > 1);
@@ -582,6 +587,8 @@ export class IndicatorManager {
     // ON TIMEFRAME CHANGE
     // ================================================================
     public onTimeframeChange(newTimeframe: string): void {
+        this.currentTimeframe = newTimeframe;
+
         const toUpdate: Array<{
             oldId:     string;
             newId:     string;
@@ -658,6 +665,8 @@ export class IndicatorManager {
     // ON SYMBOL CHANGE
     // ================================================================
     public onSymbolChange(newSymbol: string): void {
+        this.currentSymbol = newSymbol;
+
         const toUpdate: Array<{
             oldId:     string;
             newId:     string;
