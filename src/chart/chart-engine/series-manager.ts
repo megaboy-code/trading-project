@@ -169,9 +169,14 @@ export class SeriesManager {
         if (!this.currentSeries || !data.length) return;
         try {
             this.currentSeries.setData(data);
-            // ✅ Gate open — updates can now apply
+            // ✅ Double rAF — wait for scale to fully initialize before firing onDataReady
+            // Prevents drawing tools flickering at wrong position on TF/symbol switch
             this._isDataReady = true;
-            this.onDataReady?.();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.onDataReady?.();
+                });
+            });
         } catch (error) {
             console.error('❌ Failed to set series data:', error);
         }
