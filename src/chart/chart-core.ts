@@ -87,8 +87,18 @@ export class ChartModule {
             }
         };
 
+        // ✅ Fix 1 — dispatch chart-initial-data-loaded after double rAF resolves
+        // in SeriesManager.setData() — indicators now map timestamps against a
+        // fully initialized scale — prevents wrong indicator rendering on TF switch
         this.mainChart.onSeriesDataReady = () => {
             this.drawingModule?.onDataReady();
+
+            document.dispatchEvent(new CustomEvent('chart-initial-data-loaded', {
+                detail: {
+                    symbol:    this._currentSymbol,
+                    timeframe: this._currentTimeframe
+                }
+            }));
         };
 
         this.mainChart.onBeforeSeriesRemoved = () => {
@@ -598,7 +608,6 @@ export class ChartModule {
             const key    = id.split('_')[0];
             const config = this.chartUI?.getConfigByKey(key);
 
-            // ── Merge config with existing settings — existing period override wins ──
             if (config) {
                 item.settings = {
                     ...config,
@@ -606,7 +615,6 @@ export class ChartModule {
                 };
             }
 
-            // ── Attach saved line settings so modal seeds correctly ──
             const saved = this.indicatorManager?.getSavedSettings(key);
             if (saved) {
                 const savedLines: Record<string, any> = {};
@@ -631,11 +639,10 @@ export class ChartModule {
             }
         }, { signal });
 
-        // ── Legend item remove — handles both indicators and strategies ──
         document.addEventListener('legend-item-remove', async (e: Event) => {
             const { id } = (e as CustomEvent).detail;
             console.log('🔵 LEGEND REMOVE ID:', id);
-            
+
             if (!id) return;
 
             if (id === 'volume') {
@@ -643,27 +650,20 @@ export class ChartModule {
                 return;
             }
 
-            // Check if this is a strategy by looking it up in chartLegend
             const item = this.chartLegend?.getItem(id);
             if (item?.icon === 'fa-robot') {
-                // Strategy - dispatch remove-strategy event
-                // Parse correctly: key may contain underscores (e.g., EMA_CROSS)
-                // id format: STRATEGYKEY_SYMBOL_TIMEFRAME
-                // Example: EMA_CROSS_BTCUSDm_M15
-                const lastUnderscore = id.lastIndexOf('_');
+                const lastUnderscore       = id.lastIndexOf('_');
                 const secondLastUnderscore = id.lastIndexOf('_', lastUnderscore - 1);
-                
-                const strategyType = id.substring(0, secondLastUnderscore);
-                const symbol = id.substring(secondLastUnderscore + 1, lastUnderscore);
-                const timeframe = id.substring(lastUnderscore + 1);
-                
+                const strategyType         = id.substring(0, secondLastUnderscore);
+                const symbol               = id.substring(secondLastUnderscore + 1, lastUnderscore);
+                const timeframe            = id.substring(lastUnderscore + 1);
+
                 console.log('🔵 REMOVE STRATEGY - parsed:', { strategyType, symbol, timeframe });
-                
+
                 document.dispatchEvent(new CustomEvent('remove-strategy', {
                     detail: { strategyType, symbol, timeframe }
                 }));
             } else {
-                // Indicator - normal removal
                 this.indicatorManager?.removeIndicator(id);
             }
         }, { signal });
