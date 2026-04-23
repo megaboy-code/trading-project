@@ -5,10 +5,15 @@
 import { ChartState } from '../chart-types';
 
 export class ChartStateManager {
-  private state: ChartState = 'IDLE';
-  private container: HTMLElement | null = null;
-  private blurOverlay: HTMLElement | null = null;
-  private onStateChangeCallback: ((state: ChartState) => void) | null = null;
+  private state:                  ChartState = 'IDLE';
+  private container:              HTMLElement | null = null;
+  private blurOverlay:            HTMLElement | null = null;
+  private onStateChangeCallback:  ((state: ChartState) => void) | null = null;
+  private blurTimeout:            ReturnType<typeof setTimeout> | null = null;
+
+  // ✅ Only show blur if loading takes longer than this threshold
+  // Fast cached symbols/TFs will never see the blur
+  private readonly BLUR_DELAY_MS = 150;
 
   constructor(container?: HTMLElement) {
     if (container) {
@@ -68,8 +73,8 @@ export class ChartStateManager {
   private injectStyles(): void {
     if (document.querySelector('#chart-state-styles')) return;
 
-    const style = document.createElement('style');
-    style.id = 'chart-state-styles';
+    const style       = document.createElement('style');
+    style.id          = 'chart-state-styles';
     style.textContent = `
       @keyframes spin {
         to { transform: rotate(360deg); }
@@ -113,15 +118,36 @@ export class ChartStateManager {
   private updateBlurVisibility(): void {
     if (!this.blurOverlay || !this.container) return;
 
-    const isBlurred = this.state === 'LOADING';
+    const isLoading = this.state === 'LOADING';
 
-    this.blurOverlay.style.opacity = isBlurred ? '1' : '0';
-    this.blurOverlay.style.pointerEvents = isBlurred ? 'auto' : 'none';
-    this.container.style.cursor = isBlurred ? 'wait' : '';
+    if (isLoading) {
+      // ✅ Delay blur — only show if loading takes longer than threshold
+      // If data arrives fast (cached symbol/TF), blur never appears
+      this.blurTimeout = setTimeout(() => {
+        if (this.state !== 'LOADING') return; // already resolved — cancel
+        if (!this.blurOverlay || !this.container) return;
 
-    const spinner = this.blurOverlay.firstChild as HTMLElement;
-    if (spinner) {
-      spinner.style.opacity = isBlurred ? '1' : '0';
+        this.blurOverlay.style.opacity      = '1';
+        this.blurOverlay.style.pointerEvents = 'auto';
+        this.container.style.cursor          = 'wait';
+
+        const spinner = this.blurOverlay.firstChild as HTMLElement;
+        if (spinner) spinner.style.opacity = '1';
+      }, this.BLUR_DELAY_MS);
+
+    } else {
+      // ✅ Cancel pending blur if data arrived fast enough
+      if (this.blurTimeout) {
+        clearTimeout(this.blurTimeout);
+        this.blurTimeout = null;
+      }
+
+      this.blurOverlay.style.opacity      = '0';
+      this.blurOverlay.style.pointerEvents = 'none';
+      this.container.style.cursor          = '';
+
+      const spinner = this.blurOverlay.firstChild as HTMLElement;
+      if (spinner) spinner.style.opacity = '0';
     }
   }
 
@@ -132,18 +158,22 @@ export class ChartStateManager {
   public hideBlur(): void {
     if (!this.blurOverlay) return;
 
-    this.blurOverlay.style.opacity = '0';
+    this.blurOverlay.style.opacity      = '0';
     this.blurOverlay.style.pointerEvents = 'none';
 
     const spinner = this.blurOverlay.firstChild as HTMLElement;
-    if (spinner) {
-      spinner.style.opacity = '0';
-    }
+    if (spinner) spinner.style.opacity = '0';
   }
 
   public destroy(): void {
+    // ✅ Cancel any pending blur timeout on destroy
+    if (this.blurTimeout) {
+      clearTimeout(this.blurTimeout);
+      this.blurTimeout = null;
+    }
+
     this.removeBlurOverlay();
     this.onStateChangeCallback = null;
-    this.container = null;
+    this.container             = null;
   }
 }
