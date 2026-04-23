@@ -39,8 +39,10 @@ export class SeriesManager {
     private colors:           SeriesColors;
     private currentSymbol:    string;
 
-    // ✅ Fix #3 — series cache, lazy create, hide/show instead of remove/add
     private seriesMap: Map<string, ISeriesApi<SeriesType>> = new Map();
+
+    // ✅ Fix 2 — gate updateData until setData completes
+    private _isDataReady: boolean = false;
 
     private bidLine: any = null;
     private askLine: any = null;
@@ -62,14 +64,12 @@ export class SeriesManager {
         this.currentSymbol = symbol;
     }
 
-    // ✅ Fix #3 — lazy create + hide/show cache
     public createSeries(chartType: string): ISeriesApi<SeriesType> | null {
         if (!this.chart) {
             console.error('❌ Chart not initialized for series creation');
             return null;
         }
 
-        // ✅ Apply price formatter on every type switch
         this.chart.applyOptions({
             localization: {
                 priceFormatter: getPriceFormatter(this.currentSymbol)
@@ -84,23 +84,22 @@ export class SeriesManager {
             minMove
         };
 
-        // ✅ Hide current series and remove bid/ask lines before switch
         if (this.currentSeries && this.currentChartType !== chartType) {
             this.removeBidAskLines();
             this.currentSeries.applyOptions({ visible: false });
         }
 
-        // ✅ Series already exists — clear stale data, show it
-        // caller will immediately fill with fresh data
+        // ✅ Reset gate on every series creation / type switch
+        this._isDataReady = false;
+
         if (this.seriesMap.has(chartType)) {
             this.currentSeries    = this.seriesMap.get(chartType)!;
             this.currentChartType = chartType;
-            this.currentSeries.setData([]);                    // ✅ clear stale data
+            this.currentSeries.setData([]);
             this.currentSeries.applyOptions({ visible: true });
             return this.currentSeries;
         }
 
-        // ✅ First time this type is used — create it
         try {
             let newSeries: ISeriesApi<SeriesType> | null = null;
 
@@ -170,6 +169,8 @@ export class SeriesManager {
         if (!this.currentSeries || !data.length) return;
         try {
             this.currentSeries.setData(data);
+            // ✅ Gate open — updates can now apply
+            this._isDataReady = true;
             this.onDataReady?.();
         } catch (error) {
             console.error('❌ Failed to set series data:', error);
@@ -178,6 +179,8 @@ export class SeriesManager {
 
     public updateData(data: any): void {
         if (!this.currentSeries) return;
+        // ✅ Drop update if full data not loaded yet
+        if (!this._isDataReady) return;
         try {
             this.currentSeries.update(data);
         } catch (error) {
@@ -188,6 +191,8 @@ export class SeriesManager {
     public clearData(): void {
         if (!this.currentSeries) return;
         try {
+            // ✅ Reset gate — block updates until next setData
+            this._isDataReady = false;
             this.currentSeries.setData([]);
         } catch (error) {}
     }
@@ -332,7 +337,6 @@ export class SeriesManager {
         this.onBeforeSeriesRemoved?.();
         this.removeBidAskLines();
 
-        // ✅ Fix #3 — remove all cached series on destroy only
         if (this.chart) {
             this.seriesMap.forEach((series) => {
                 try {
@@ -342,6 +346,7 @@ export class SeriesManager {
         }
 
         this.seriesMap.clear();
+        this._isDataReady          = false;
         this.currentSeries         = null;
         this.chart                 = null;
         this.onDataReady           = null;
