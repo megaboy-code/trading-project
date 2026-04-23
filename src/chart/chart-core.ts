@@ -304,6 +304,7 @@ export class ChartModule {
             this.indicatorManager.setMainChart(this.mainChart);
             this.indicatorManager.setChart(chart);
             this.indicatorManager.setSymbol(this._currentSymbol);
+            this.indicatorManager.setTimeframe(this._currentTimeframe); // ← Fix: seed TF guard
             this.indicatorManager.initialize();
 
             this.indicatorManager.onPaneCreated = async (pane: any) => {
