@@ -328,11 +328,11 @@ export class StrategiesModule {
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
 
-            // ── Bug 3 fix: s.id is already the full id (key_symbol_tf) ──
-            // Dispatch remove-strategy — ModuleManager handles backend +
-            // chart lines + panel removal via removeStrategyById(fullId)
+            // ── Parse strategyType by stripping _symbol_tf from end of s.id ──
+            const strategyType = s.id.replace(`_${s.symbol}_${s.tf}`, '');
+
             document.dispatchEvent(new CustomEvent('remove-strategy', {
-                detail: { strategyType: s.id, symbol: s.symbol, timeframe: s.tf }
+                detail: { strategyType, symbol: s.symbol, timeframe: s.tf }
             }));
 
             const item = detail.closest('.strat-item') as HTMLElement;
