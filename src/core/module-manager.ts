@@ -150,11 +150,9 @@ export class ModuleManager {
                 timeframe
             });
 
-            document.dispatchEvent(new CustomEvent(
-                'chart-initial-data-loaded', {
-                    detail: { symbol, timeframe, count: ohlcData.length }
-                }
-            ));
+            // ✅ Fix 1 — removed chart-initial-data-loaded dispatch from here
+            // It now fires in ChartCore.onSeriesDataReady after double rAF
+            // so indicators wait for scale to fully initialize before setData()
 
             this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
         });
@@ -500,7 +498,6 @@ export class ModuleManager {
             );
         });
 
-        // ── Remove strategy ──
         document.addEventListener('remove-strategy', (e: Event) => {
             const { strategyType, symbol, timeframe } = (e as CustomEvent).detail;
             if (!strategyType) return;
@@ -590,8 +587,6 @@ export class ModuleManager {
                 this.connectionManager.getJournalMonth(year, month);
             }
         });
-
-        // ── symbol-search-request removed — search handled locally in watchlist ──
     }
 
     // ==================== LAZY LOADERS ====================
