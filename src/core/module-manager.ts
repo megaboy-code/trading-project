@@ -591,10 +591,7 @@ export class ModuleManager {
             }
         });
 
-        document.addEventListener('symbol-search-request', (e: Event) => {
-            const { query } = (e as CustomEvent).detail;
-            if (query) this.connectionManager.searchSymbols(query);
-        });
+        // ── symbol-search-request removed — search handled locally in watchlist ──
     }
 
     // ==================== LAZY LOADERS ====================
