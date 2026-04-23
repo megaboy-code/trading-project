@@ -524,16 +524,10 @@ export class ChartDrawingModule {
   public async onDataReady(): Promise<void> {
     if (!this.lineTools || !this.isInitialized) return;
 
-    // ✅ Fix 1 — skip loadDrawings during chart type switch
+    // ✅ Skip during chart type switch
     if (this._isSwitchingChartType) return;
 
     try {
-      // ✅ Wait for scale to have valid range — no fixed frame count
-      // Polls until time scale is fully initialized with new TF data
-      await this.waitForScaleReady();
-
-      if (!this.lineTools || !this.isInitialized) return;
-
       await this.persistence.loadDrawings(
         (g) => this.loadAndRegisterGroup(g),
         TOOL_GROUP_MAP
@@ -548,26 +542,6 @@ export class ChartDrawingModule {
     } catch (error) {
       console.error('❌ onDataReady failed:', error);
     }
-  }
-
-  // ✅ Wait for time scale to have a valid visible range
-  // Means chart has rendered new data and scale is stable
-  private waitForScaleReady(): Promise<void> {
-    return new Promise<void>(resolve => {
-      const chart = this.chart;
-      if (!chart) { resolve(); return; }
-
-      const check = () => {
-        const range = chart.timeScale().getVisibleLogicalRange();
-        if (range && range.to > range.from) {
-          resolve();
-        } else {
-          requestAnimationFrame(check);
-        }
-      };
-
-      requestAnimationFrame(check);
-    });
   }
 
   // ================================================================
