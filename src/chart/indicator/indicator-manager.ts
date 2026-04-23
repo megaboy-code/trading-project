@@ -363,7 +363,7 @@ export class IndicatorManager {
         id:   string,
         data: IndicatorUpdatePayload
     ): void {
-        // ── Fix 1: hard pool guard — block duplicate indicator-added events ──
+        // ── Hard pool guard — block duplicate indicator-added events ──
         if (this.pool.has(id)) return;
 
         const precision  = getDecimalPrecision(data.symbol);
@@ -501,8 +501,9 @@ export class IndicatorManager {
         data:      IndicatorUpdatePayload,
         isInitial: boolean
     ): void {
-        // ── Fix 2: block stale single-point updates on inactive strategy ──
-        if (!indicator.active && indicator.isStrategy && !isInitial) return;
+        // ── Block any single-point update on inactive indicator (all types) ──
+        // Prevents stale 15m tick from flatlineing a 1D series after TF switch
+        if (!indicator.active && !isInitial) return;
 
         const precision = getDecimalPrecision(data.symbol);
         const legendValues: Array<{
