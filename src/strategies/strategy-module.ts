@@ -33,6 +33,9 @@
 //    setStrategies() called from ModuleManager with real backend data.
 //    Fields not provided by backend (pnl, trades, winrate) default to null/0.
 //
+// 8. GET_ACTIVE_STRATEGIES is sent in ws.onopen — no race condition.
+//    Panel populates when backend responds via onAvailableConfig.
+//
 // ================================================================
 
 interface StrategyItem {
@@ -78,8 +81,7 @@ export class StrategiesModule {
         this.bindEvents();
         this.render();
 
-        // ── Request real strategy list from backend ──
-        document.dispatchEvent(new CustomEvent('get-active-strategies'));
+        // ── GET_ACTIVE_STRATEGIES sent in ws.onopen — no dispatch needed here ──
 
         console.log('✅ Strategies Module initialized');
     }

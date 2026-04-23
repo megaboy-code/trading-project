@@ -276,6 +276,7 @@ export class ConnectionManager {
             this.notifyConnectionStatus('connected');
 
             this.sendCommand('GET_STARTUP_CONFIG');
+            this.sendCommand('GET_ACTIVE_STRATEGIES');
 
             this.currentSubscription =
                 `${this.currentSymbol}_${this.currentTimeframe}`;
