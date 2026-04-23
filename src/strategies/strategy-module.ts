@@ -22,7 +22,7 @@
 //    { strategyType, symbol, timeframe }
 //    ModuleManager listens → connectionManager.removeStrategy()
 //    Also calls removeStrategyFromChart() + removeStrategyById()
-//    Legend remove dispatched from chart-core via legend-item-remove
+//    Legend remove dispatched from indicator-manager via legend-item-remove
 //
 // 6. When strategy is deployed on current chart symbol+TF:
 //    Legend shows via indicator-added event from IndicatorManager
@@ -163,6 +163,15 @@ export class StrategiesModule {
             e.stopPropagation();
             drop?.classList.remove('show');
             document.dispatchEvent(new CustomEvent('get-active-strategies'));
+        });
+
+        // ── Sync robot icon color when legend color changes ──
+        document.addEventListener('legend-item-color-update', (e: Event) => {
+            const { id, color } = (e as CustomEvent).detail;
+            const iconEl = this.listEl?.querySelector(
+                `[data-strat-id="${id}"] .strat-icon i`
+            ) as HTMLElement;
+            if (iconEl) iconEl.style.color = color;
         });
     }
 
