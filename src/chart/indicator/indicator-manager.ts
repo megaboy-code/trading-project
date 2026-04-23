@@ -53,7 +53,7 @@ interface IndicatorLine {
     priceLineVisible:       boolean;
     lastValueVisible:       boolean;
     crosshairMarkerVisible: boolean;
-    lastValue:              number;   // ── persists last known value for live color update
+    lastValue:              number;
 }
 
 interface ActiveIndicator {
@@ -464,7 +464,7 @@ export class IndicatorManager {
             this.persistActiveSubs();
         }
 
-        // ── Bug 1 fix: legendIds uses full id (key_symbol_tf) not just key ──
+        // ── legendIds uses full id (key_symbol_tf) ──
         if (this.legendIds.has(id)) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
@@ -548,12 +548,12 @@ export class IndicatorManager {
         if (!indicator.active && indicator.isStrategy) {
             document.dispatchEvent(new CustomEvent('indicator-added', {
                 detail: {
-                    id: indicator.id,
-                    name: indicator.label,
-                    color: legendValues[0]?.color,
-                    icon: 'fa-robot',
-                    pane: null,
-                    values: legendValues,
+                    id:       indicator.id,
+                    name:     indicator.label,
+                    color:    legendValues[0]?.color,
+                    icon:     'fa-robot',
+                    pane:     null,
+                    values:   legendValues,
                     settings: this.getEffectiveSettings(indicator.key)
                 }
             }));
@@ -574,6 +574,8 @@ export class IndicatorManager {
 
     // ================================================================
     // ON TIMEFRAME CHANGE
+    // Indicators — unsub old, resub new TF
+    // Strategies — clear chart lines + legend only, backend manages lifecycle
     // ================================================================
     public onTimeframeChange(newTimeframe: string): void {
         const toUpdate: Array<{
@@ -584,13 +586,15 @@ export class IndicatorManager {
             symbol:    string;
         }> = [];
 
+        const toHide: string[] = [];
+
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
+                // ── Strategy: clear lines + hide legend, stay in pool ──
                 this.clearSeriesData(indicator);
-                document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
-                    detail: { id, deployedTF: indicator.timeframe }
-                }));
+                toHide.push(id);
             } else {
+                // ── Indicator: unsub old TF, resub new TF ──
                 document.dispatchEvent(new CustomEvent('indicator-removed', {
                     detail: {
                         key:       indicator.key,
@@ -609,6 +613,13 @@ export class IndicatorManager {
                     symbol:    indicator.symbol
                 });
             }
+        });
+
+        // ── Hide strategy legend items — dispatch indicator-tf-inactive ──
+        toHide.forEach(id => {
+            document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
+                detail: { id, deployedTF: this.pool.get(id)?.timeframe }
+            }));
         });
 
         toUpdate.forEach(({ oldId, newId, indicator, key, symbol }) => {
@@ -646,6 +657,8 @@ export class IndicatorManager {
 
     // ================================================================
     // ON SYMBOL CHANGE
+    // Indicators — unsub old, resub new symbol
+    // Strategies — clear chart lines + legend only, backend manages lifecycle
     // ================================================================
     public onSymbolChange(newSymbol: string): void {
         const toUpdate: Array<{
@@ -656,17 +669,15 @@ export class IndicatorManager {
             timeframe: string;
         }> = [];
 
-        const toDelete: string[] = [];
+        const toHide: string[] = [];
 
         this.pool.forEach((indicator, id) => {
             if (indicator.isStrategy) {
+                // ── Strategy: clear lines + hide legend, stay in pool ──
                 this.clearSeriesData(indicator);
-                // ── Strategies: no indicator-removed dispatch — backend manages lifecycle ──
-                document.dispatchEvent(new CustomEvent('legend-item-remove', {
-                    detail: { id }
-                }));
-                toDelete.push(id);
+                toHide.push(id);
             } else {
+                // ── Indicator: unsub old symbol, resub new symbol ──
                 document.dispatchEvent(new CustomEvent('indicator-removed', {
                     detail: {
                         key:       indicator.key,
@@ -687,13 +698,11 @@ export class IndicatorManager {
             }
         });
 
-        // ── Remove strategies from pool and legendIds safely after iteration ──
-        toDelete.forEach(id => {
-            const indicator = this.pool.get(id);
-            if (indicator) {
-                this.pool.delete(id);
-                this.legendIds.delete(id);
-            }
+        // ── Hide strategy legend items only — no pool delete, no backend call ──
+        toHide.forEach(id => {
+            document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
+                detail: { id }
+            }));
         });
 
         toUpdate.forEach(({ oldId, newId, indicator, key, timeframe }) => {
@@ -867,7 +876,7 @@ export class IndicatorManager {
             }));
         }
 
-        // ── Sync legend value color immediately — no need to wait for next bar ──
+        // ── Sync legend value color immediately ──
         if (legendValues.length > 0) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id: indicator.id, values: legendValues }
