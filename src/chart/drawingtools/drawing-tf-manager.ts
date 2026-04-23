@@ -48,9 +48,10 @@ export class DrawingTFManager {
         this.removeTradeArrows();
 
         // ✅ Hard remove soft-deleted ghosts after switch
-        // Safe — engine has moved to new TF context, deleted tools
-        // are already visible:false and not in any render cycle
         this.persistence.purgeDeletedTools();
+
+        // ✅ Hide per-TF tools immediately before any candle renders
+        this.applyTFVisibility(newTimeframe);
     }
 
     public async onSymbolChange(
@@ -64,9 +65,10 @@ export class DrawingTFManager {
         this.removeTradeArrows();
 
         // ✅ Hard remove soft-deleted ghosts after switch
-        // Safe — engine has moved to new symbol context, deleted tools
-        // are already visible:false and not in any render cycle
         this.persistence.purgeDeletedTools();
+
+        // ✅ Hide per-TF tools immediately before any candle renders
+        this.applyTFVisibility(this.currentTimeframe());
     }
 
     // ==================== VISIBILITY ====================
@@ -88,7 +90,6 @@ export class DrawingTFManager {
                     newTimeframe
                 );
 
-                // ✅ Always apply — no early return guard
                 lt.applyLineToolOptions({
                     id:       tool.id,
                     toolType: tool.toolType,
