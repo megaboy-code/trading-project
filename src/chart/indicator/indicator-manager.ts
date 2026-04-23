@@ -344,6 +344,9 @@ export class IndicatorManager {
         const isInitial = data.lines.some(l => l.timestamps.length > 1);
         const existing  = this.pool.get(id);
 
+        // ── Fix 1: pool guard — block duplicate indicator-added events ──
+        if (this.pool.has(id) && !existing) return;
+
         if (!existing) {
             this.createIndicator(id, data);
         } else {
@@ -493,6 +496,9 @@ export class IndicatorManager {
         data:      IndicatorUpdatePayload,
         isInitial: boolean
     ): void {
+        // ── Fix 2: block stale updates on inactive strategy during TF switch ──
+        if (!indicator.active && indicator.isStrategy) return;
+
         const precision = getDecimalPrecision(data.symbol);
         const legendValues: Array<{
             key:   string;
@@ -541,21 +547,6 @@ export class IndicatorManager {
         if (legendValues.length > 0) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id: indicator.id, values: legendValues }
-            }));
-        }
-
-        // ── Re-add legend if strategy was inactive (TF change removed it) ──
-        if (!indicator.active && indicator.isStrategy) {
-            document.dispatchEvent(new CustomEvent('indicator-added', {
-                detail: {
-                    id:       indicator.id,
-                    name:     indicator.label,
-                    color:    legendValues[0]?.color,
-                    icon:     'fa-robot',
-                    pane:     null,
-                    values:   legendValues,
-                    settings: this.getEffectiveSettings(indicator.key)
-                }
             }));
         }
 
