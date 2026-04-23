@@ -51,7 +51,13 @@ export class DrawingTFManager {
         this.persistence.purgeDeletedTools();
 
         // ✅ Hide per-TF tools immediately before any candle renders
-        this.applyTFVisibility(newTimeframe);
+        // Then double rAF — wait for scale to fully initialize before
+        // making per-TF tools visible, preventing wrong geometry flicker
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this.applyTFVisibility(newTimeframe);
+            });
+        });
     }
 
     public async onSymbolChange(
@@ -67,8 +73,12 @@ export class DrawingTFManager {
         // ✅ Hard remove soft-deleted ghosts after switch
         this.persistence.purgeDeletedTools();
 
-        // ✅ Hide per-TF tools immediately before any candle renders
-        this.applyTFVisibility(this.currentTimeframe());
+        // ✅ Double rAF — same fix for symbol switch
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this.applyTFVisibility(this.currentTimeframe());
+            });
+        });
     }
 
     // ==================== VISIBILITY ====================
