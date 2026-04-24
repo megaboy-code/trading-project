@@ -76,8 +76,8 @@ export class SeriesManager {
             }
         });
 
-        const precision   = getDecimalPrecision(this.currentSymbol);
-        const minMove     = getMinMove(this.currentSymbol);
+        const precision = getDecimalPrecision(this.currentSymbol);
+        const minMove   = getMinMove(this.currentSymbol);
         const priceFormat = {
             type:      'price' as const,
             precision,
@@ -168,30 +168,7 @@ export class SeriesManager {
     public setData(data: any[]): void {
         if (!this.currentSeries || !data.length) return;
         try {
-            // ✅ Save visible candle count before data swap
-            // Preserves zoom level across TF/symbol switch
-            // Uses candle count not time window — consistent bar spacing
-            let savedBarCount: number | null = null;
-            if (this.chart) {
-                const range = this.chart.timeScale().getVisibleLogicalRange();
-                if (range) {
-                    savedBarCount = Math.round(range.to - range.from);
-                }
-            }
-
             this.currentSeries.setData(data);
-
-            // ✅ Restore visible candle count after data swap
-            // Anchors to last bar — shows most recent candles
-            if (savedBarCount !== null && this.chart) {
-                const newTo   = data.length - 1;
-                const newFrom = Math.max(0, newTo - savedBarCount);
-                this.chart.timeScale().setVisibleLogicalRange({
-                    from: newFrom,
-                    to:   newTo
-                });
-            }
-
             // ✅ Double rAF — wait for scale to fully initialize before firing onDataReady
             // Prevents drawing tools flickering at wrong position on TF/symbol switch
             this._isDataReady = true;
@@ -200,7 +177,6 @@ export class SeriesManager {
                     this.onDataReady?.();
                 });
             });
-
         } catch (error) {
             console.error('❌ Failed to set series data:', error);
         }
