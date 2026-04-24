@@ -621,8 +621,6 @@ export class ChartDrawingModule {
   // STRATEGY DRAWING TOOLS
   // ================================================================
 
-  // ✅ Called from ModuleManager after each createOrUpdateLineTool()
-  // Marks tool as backend strategy — never persisted, not editable
   public injectStrategyMeta(
     toolId:      string,
     symbol:      string,
@@ -632,15 +630,22 @@ export class ChartDrawingModule {
     this.persistence.injectStrategyMeta(toolId, symbol, timeframe, strategyKey);
   }
 
-  // ✅ Called from ModuleManager on remove-strategy event
-  // Soft hides all drawing tools for this strategy via regex
-  // Hard remove happens on next TF/symbol switch via purgeDeletedTools()
   public removeStrategyDrawings(
     strategyKey: string,
     symbol:      string,
     timeframe:   string
   ): void {
     this.persistence.softDeleteStrategyDrawings(strategyKey, symbol, timeframe);
+  }
+
+  // ================================================================
+  // ✅ NEW — refreshVisibility
+  // Called after strategy drawings are created to re-apply TF visibility
+  // so tools aren't hidden by stale applyTFVisibility run before meta existed
+  // ================================================================
+
+  public refreshVisibility(): void {
+    this.tfManager.applyTFVisibility(this._currentTimeframe);
   }
 
   // ================================================================
@@ -698,7 +703,6 @@ export class ChartDrawingModule {
     });
   }
 
-  // ✅ Soft delete — hide + remove from global storage, no detach
   public deleteTool(toolId: string): void {
     if (!this.lineTools || !this.isInitialized) return;
 
@@ -710,7 +714,6 @@ export class ChartDrawingModule {
           if (Array.isArray(parsed) && parsed.length > 0) {
             if (parsed[0].options?.locked) return;
 
-            // ✅ Hide immediately — no detach
             this.lineTools.applyLineToolOptions({
               id:       toolId,
               toolType: parsed[0].toolType,
@@ -720,10 +723,7 @@ export class ChartDrawingModule {
         }
       }
 
-      // ✅ Mark deleted in metaMap
       this.persistence.deleteMeta(toolId);
-
-      // ✅ Remove from global storage immediately
       this.persistence.removeToolFromStorage(toolId);
 
       console.log(`🗑️ Tool ${toolId} deleted`);
