@@ -33,7 +33,9 @@ import {
     Timeframe,
     PositionType,
     IndicatorUpdate,
-    IndicatorLine
+    IndicatorLine,
+    StrategyDrawingUpdate,
+    StrategyDrawing
 } from './mega-flowz';
 
 // ================================================================
@@ -232,26 +234,53 @@ export interface IndicatorUpdatePayload {
 }
 
 // ================================================================
+// STRATEGY DRAWING PAYLOADS
+// ================================================================
+
+export interface StrategyDrawingPointData {
+    timestamp: number;
+    price:     number;
+}
+
+export interface StrategyDrawingData {
+    id:             string;
+    tool_type:      string;
+    symbol:         string;
+    timeframe:      string;
+    points:         StrategyDrawingPointData[];
+    color:          string;
+    fill_opacity:   number;
+    border_opacity: number;
+    line_width:     number;
+}
+
+export interface StrategyDrawingUpdatePayload {
+    strategy_key: string;
+    drawings:     StrategyDrawingData[];
+}
+
+// ================================================================
 // DISCRIMINATED UNION — single return type
 // ================================================================
 
 export type DecodedMessage =
-    | { type: 'initial';           data: InitialPayload          }
-    | { type: 'bar_update';        data: BarUpdatePayload        }
-    | { type: 'price_update';      data: PriceUpdatePayload      }
-    | { type: 'watchlist_update';  data: WatchlistUpdatePayload  }
-    | { type: 'positions_update';  data: PositionsUpdatePayload  }
-    | { type: 'connection_status'; data: ConnectionStatusPayload }
-    | { type: 'trade_executed';    data: TradeExecutedPayload    }
-    | { type: 'position_modified'; data: PositionModifiedPayload }
-    | { type: 'notification';      data: NotificationPayload     }
-    | { type: 'error';             data: ErrorPayload            }
-    | { type: 'auto_trading';      data: AutoTradingPayload      }
-    | { type: 'cache_cleared';     data: CacheClearedPayload     }
-    | { type: 'pong';              data: PongPayload             }
-    | { type: 'journal_data';      data: JournalDataPayload      }
-    | { type: 'available_config';  data: AvailableConfigPayload  }
-    | { type: 'indicator_update';  data: IndicatorUpdatePayload  }
+    | { type: 'initial';                  data: InitialPayload                }
+    | { type: 'bar_update';               data: BarUpdatePayload              }
+    | { type: 'price_update';             data: PriceUpdatePayload            }
+    | { type: 'watchlist_update';         data: WatchlistUpdatePayload        }
+    | { type: 'positions_update';         data: PositionsUpdatePayload        }
+    | { type: 'connection_status';        data: ConnectionStatusPayload       }
+    | { type: 'trade_executed';           data: TradeExecutedPayload          }
+    | { type: 'position_modified';        data: PositionModifiedPayload       }
+    | { type: 'notification';             data: NotificationPayload           }
+    | { type: 'error';                    data: ErrorPayload                  }
+    | { type: 'auto_trading';             data: AutoTradingPayload            }
+    | { type: 'cache_cleared';            data: CacheClearedPayload           }
+    | { type: 'pong';                     data: PongPayload                   }
+    | { type: 'journal_data';             data: JournalDataPayload            }
+    | { type: 'available_config';         data: AvailableConfigPayload        }
+    | { type: 'indicator_update';         data: IndicatorUpdatePayload        }
+    | { type: 'strategy_drawing_update';  data: StrategyDrawingUpdatePayload  }
     | { type: 'unknown' };
 
 // ================================================================
@@ -294,7 +323,7 @@ function extractCandle(c: any): CandleData {
 }
 
 // ================================================================
-// AVAILABLE ITEM EXTRACTOR — all params including symbol + timeframe
+// AVAILABLE ITEM EXTRACTOR
 // ================================================================
 
 function extractAvailableItem(item: AvailableItem): AvailableItemData {
@@ -721,6 +750,49 @@ export class MegaFlowzDecoder {
                             symbol:    p.symbol()    ?? '',
                             timeframe: tfToString(p.timeframe()),
                             lines
+                        }
+                    };
+                }
+
+                // ── Strategy drawing update ──
+                case MessagePayload.StrategyDrawingUpdate: {
+                    const p = msg.payload(
+                        new StrategyDrawingUpdate()
+                    ) as StrategyDrawingUpdate;
+
+                    const drawings: StrategyDrawingData[] = [];
+                    for (let i = 0; i < p.drawingsLength(); i++) {
+                        const d = p.drawings(i);
+                        if (!d) continue;
+
+                        const points: StrategyDrawingPointData[] = [];
+                        for (let j = 0; j < d.pointsLength(); j++) {
+                            const pt = d.points(j);
+                            if (!pt) continue;
+                            points.push({
+                                timestamp: Number(pt.timestamp()),
+                                price:     pt.price()
+                            });
+                        }
+
+                        drawings.push({
+                            id:             d.id()            ?? '',
+                            tool_type:      d.toolType()      ?? '',
+                            symbol:         d.symbol()        ?? '',
+                            timeframe:      tfToString(d.timeframe()),
+                            points,
+                            color:          d.color()         ?? '#2962ff',
+                            fill_opacity:   d.fillOpacity(),
+                            border_opacity: d.borderOpacity(),
+                            line_width:     d.lineWidth()
+                        });
+                    }
+
+                    return {
+                        type: 'strategy_drawing_update',
+                        data: {
+                            strategy_key: p.strategyKey() ?? '',
+                            drawings
                         }
                     };
                 }

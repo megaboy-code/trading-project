@@ -3,28 +3,29 @@
 // FlatBuffers binary protocol — replaces all JSON
 // ================================================================
 
-import { MegaFlowzDecoder, DecodedMessage, NotificationPayload, AvailableConfigPayload, IndicatorUpdatePayload } from '../generated/MegaFlowzDecoder';
+import { MegaFlowzDecoder, DecodedMessage, NotificationPayload, AvailableConfigPayload, IndicatorUpdatePayload, StrategyDrawingUpdatePayload } from '../generated/MegaFlowzDecoder';
 import { AccountInfo, PositionData }                             from '../types';
 
 export interface ConnectionCallbacks {
-    onCandleData?:        (symbol: string, timeframe: string, candles: any[]) => void;
-    onBarUpdate?:         (symbol: string, timeframe: string, candle: any)    => void;
-    onTickData?:          (symbol: string, bid: number, ask: number, spread: number, time: number) => void;
-    onAccountUpdate?:     (account: AccountInfo)      => void;
-    onPositionsUpdate?:   (positions: PositionData[]) => void;
-    onStrategyData?:      (type: string, data: any)   => void;
-    onTradeExecuted?:     (success: boolean, direction: string, symbol: string, volume: number, price: number, ticket: number, timestamp: number, message: string) => void;
-    onPositionModified?:  (success: boolean, ticket: number, message: string) => void;
-    onNotification?:      (data: NotificationPayload) => void;
-    onConnectionStatus?:  (status: 'connected' | 'disconnected' | 'connecting' | 'error') => void;
-    onMT5Status?:         (connected: boolean, statusText: string) => void;
-    onWatchlistUpdate?:   (symbol: string, bid: number, ask: number, spread: number, time: number, change: number) => void;
-    onError?:             (message: string) => void;
-    onAutoTrading?:       (enabled: boolean, message: string) => void;
-    onCacheCleared?:      (message: string) => void;
-    onJournalData?:       (trades: any[], scope: string) => void;
-    onAvailableConfig?:   (data: AvailableConfigPayload) => void;
-    onIndicatorUpdate?:   (data: IndicatorUpdatePayload) => void;
+    onCandleData?:              (symbol: string, timeframe: string, candles: any[]) => void;
+    onBarUpdate?:               (symbol: string, timeframe: string, candle: any)    => void;
+    onTickData?:                (symbol: string, bid: number, ask: number, spread: number, time: number) => void;
+    onAccountUpdate?:           (account: AccountInfo)      => void;
+    onPositionsUpdate?:         (positions: PositionData[]) => void;
+    onStrategyData?:            (type: string, data: any)   => void;
+    onTradeExecuted?:           (success: boolean, direction: string, symbol: string, volume: number, price: number, ticket: number, timestamp: number, message: string) => void;
+    onPositionModified?:        (success: boolean, ticket: number, message: string) => void;
+    onNotification?:            (data: NotificationPayload) => void;
+    onConnectionStatus?:        (status: 'connected' | 'disconnected' | 'connecting' | 'error') => void;
+    onMT5Status?:               (connected: boolean, statusText: string) => void;
+    onWatchlistUpdate?:         (symbol: string, bid: number, ask: number, spread: number, time: number, change: number) => void;
+    onError?:                   (message: string) => void;
+    onAutoTrading?:             (enabled: boolean, message: string) => void;
+    onCacheCleared?:            (message: string) => void;
+    onJournalData?:             (trades: any[], scope: string) => void;
+    onAvailableConfig?:         (data: AvailableConfigPayload) => void;
+    onIndicatorUpdate?:         (data: IndicatorUpdatePayload) => void;
+    onStrategyDrawingUpdate?:   (data: StrategyDrawingUpdatePayload) => void;
 }
 
 export class ConnectionManager {
@@ -242,24 +243,25 @@ export class ConnectionManager {
 
     // ==================== CALLBACK REGISTRATION ====================
 
-    public onCandleData(cb: ConnectionCallbacks['onCandleData']): void               { this.callbacks.onCandleData       = cb; }
-    public onBarUpdate(cb: ConnectionCallbacks['onBarUpdate']): void                 { this.callbacks.onBarUpdate        = cb; }
-    public onTickData(cb: ConnectionCallbacks['onTickData']): void                   { this.callbacks.onTickData         = cb; }
-    public onAccountUpdate(cb: ConnectionCallbacks['onAccountUpdate']): void         { this.callbacks.onAccountUpdate    = cb; }
-    public onPositionsUpdate(cb: ConnectionCallbacks['onPositionsUpdate']): void     { this.callbacks.onPositionsUpdate  = cb; }
-    public onStrategyData(cb: ConnectionCallbacks['onStrategyData']): void           { this.callbacks.onStrategyData     = cb; }
-    public onTradeExecuted(cb: ConnectionCallbacks['onTradeExecuted']): void         { this.callbacks.onTradeExecuted    = cb; }
-    public onPositionModified(cb: ConnectionCallbacks['onPositionModified']): void   { this.callbacks.onPositionModified = cb; }
-    public onNotification(cb: ConnectionCallbacks['onNotification']): void           { this.callbacks.onNotification     = cb; }
-    public onConnectionStatus(cb: ConnectionCallbacks['onConnectionStatus']): void   { this.callbacks.onConnectionStatus = cb; }
-    public onMT5Status(cb: ConnectionCallbacks['onMT5Status']): void                 { this.callbacks.onMT5Status        = cb; }
-    public onWatchlistUpdate(cb: ConnectionCallbacks['onWatchlistUpdate']): void     { this.callbacks.onWatchlistUpdate  = cb; }
-    public onError(cb: ConnectionCallbacks['onError']): void                         { this.callbacks.onError            = cb; }
-    public onAutoTrading(cb: ConnectionCallbacks['onAutoTrading']): void             { this.callbacks.onAutoTrading      = cb; }
-    public onCacheCleared(cb: ConnectionCallbacks['onCacheCleared']): void           { this.callbacks.onCacheCleared     = cb; }
-    public onJournalData(cb: ConnectionCallbacks['onJournalData']): void             { this.callbacks.onJournalData      = cb; }
-    public onAvailableConfig(cb: ConnectionCallbacks['onAvailableConfig']): void     { this.callbacks.onAvailableConfig  = cb; }
-    public onIndicatorUpdate(cb: ConnectionCallbacks['onIndicatorUpdate']): void     { this.callbacks.onIndicatorUpdate  = cb; }
+    public onCandleData(cb: ConnectionCallbacks['onCandleData']): void                           { this.callbacks.onCandleData             = cb; }
+    public onBarUpdate(cb: ConnectionCallbacks['onBarUpdate']): void                             { this.callbacks.onBarUpdate              = cb; }
+    public onTickData(cb: ConnectionCallbacks['onTickData']): void                               { this.callbacks.onTickData               = cb; }
+    public onAccountUpdate(cb: ConnectionCallbacks['onAccountUpdate']): void                     { this.callbacks.onAccountUpdate          = cb; }
+    public onPositionsUpdate(cb: ConnectionCallbacks['onPositionsUpdate']): void                 { this.callbacks.onPositionsUpdate        = cb; }
+    public onStrategyData(cb: ConnectionCallbacks['onStrategyData']): void                       { this.callbacks.onStrategyData           = cb; }
+    public onTradeExecuted(cb: ConnectionCallbacks['onTradeExecuted']): void                     { this.callbacks.onTradeExecuted          = cb; }
+    public onPositionModified(cb: ConnectionCallbacks['onPositionModified']): void               { this.callbacks.onPositionModified       = cb; }
+    public onNotification(cb: ConnectionCallbacks['onNotification']): void                       { this.callbacks.onNotification           = cb; }
+    public onConnectionStatus(cb: ConnectionCallbacks['onConnectionStatus']): void               { this.callbacks.onConnectionStatus       = cb; }
+    public onMT5Status(cb: ConnectionCallbacks['onMT5Status']): void                             { this.callbacks.onMT5Status              = cb; }
+    public onWatchlistUpdate(cb: ConnectionCallbacks['onWatchlistUpdate']): void                 { this.callbacks.onWatchlistUpdate        = cb; }
+    public onError(cb: ConnectionCallbacks['onError']): void                                     { this.callbacks.onError                  = cb; }
+    public onAutoTrading(cb: ConnectionCallbacks['onAutoTrading']): void                         { this.callbacks.onAutoTrading            = cb; }
+    public onCacheCleared(cb: ConnectionCallbacks['onCacheCleared']): void                       { this.callbacks.onCacheCleared           = cb; }
+    public onJournalData(cb: ConnectionCallbacks['onJournalData']): void                         { this.callbacks.onJournalData            = cb; }
+    public onAvailableConfig(cb: ConnectionCallbacks['onAvailableConfig']): void                 { this.callbacks.onAvailableConfig        = cb; }
+    public onIndicatorUpdate(cb: ConnectionCallbacks['onIndicatorUpdate']): void                 { this.callbacks.onIndicatorUpdate        = cb; }
+    public onStrategyDrawingUpdate(cb: ConnectionCallbacks['onStrategyDrawingUpdate']): void     { this.callbacks.onStrategyDrawingUpdate  = cb; }
 
     // ==================== WEBSOCKET SETUP ====================
 
@@ -447,6 +449,12 @@ export class ConnectionManager {
             case 'indicator_update':
                 if (this.callbacks.onIndicatorUpdate) {
                     this.callbacks.onIndicatorUpdate(msg.data);
+                }
+                break;
+
+            case 'strategy_drawing_update':
+                if (this.callbacks.onStrategyDrawingUpdate) {
+                    this.callbacks.onStrategyDrawingUpdate(msg.data);
                 }
                 break;
 

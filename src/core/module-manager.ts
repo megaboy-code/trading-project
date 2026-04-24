@@ -15,8 +15,9 @@ import { AlertsModule }                        from '../alerts/alerts-module';
 import { JournalMiniModule }                   from '../journal/journal-mini';
 import { StrategiesModule }                    from '../strategies/strategy-module';
 import { OHLCData }                            from '../chart/chart-types';
-import { NotificationPayload, AvailableConfigPayload, AvailableItemData } from '../generated/MegaFlowzDecoder';
+import { NotificationPayload, AvailableConfigPayload, AvailableItemData, StrategyDrawingUpdatePayload } from '../generated/MegaFlowzDecoder';
 import { Severity }                            from '../generated/mega-flowz';
+import { hexToRgba }                           from '../chart/chart-utils';
 
 declare global {
     interface Window {}
@@ -150,10 +151,6 @@ export class ModuleManager {
                 timeframe
             });
 
-            // ✅ Fix 1 — removed chart-initial-data-loaded dispatch from here
-            // It now fires in ChartCore.onSeriesDataReady after double rAF
-            // so indicators wait for scale to fully initialize before setData()
-
             this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
         });
 
@@ -177,6 +174,73 @@ export class ModuleManager {
                 });
                 this.updateStrategiesBadge();
             }
+        });
+
+        // ── Strategy drawing update — route to chart drawing module ──
+        this.connectionManager.onStrategyDrawingUpdate((data: StrategyDrawingUpdatePayload) => {
+            const drawingModule = this.chart?.getDrawingModule();
+            if (!drawingModule) return;
+
+            data.drawings.forEach(drawing => {
+                const points = drawing.points.map(p => ({
+                    time:  p.timestamp,
+                    price: p.price
+                }));
+
+                const options = {
+                    fillColor:          hexToRgba(drawing.color, drawing.fill_opacity),
+                    borderColor:        hexToRgba(drawing.color, drawing.border_opacity),
+                    borderWidth:        drawing.line_width,
+                    locked:             true,
+                    editable:           false,
+                    defaultHoverCursor: 'default'
+                };
+
+                drawingModule.createOrUpdateLineTool(
+                    drawing.tool_type,
+                    points,
+                    options,
+                    drawing.id
+                );
+
+                drawingModule.injectStrategyMeta(
+                    drawing.id,
+                    drawing.symbol,
+                    drawing.timeframe,
+                    data.strategy_key
+                );
+            });
+
+            // ── Add strategy to legend once per strategy_key/symbol/timeframe ──
+            // ID format: STRATEGYKEY_SYMBOL_TIMEFRAME — matches chart-core.ts parse logic
+            const legendId = `${data.strategy_key}_${data.symbol}_${data.timeframe}`;
+            document.dispatchEvent(new CustomEvent('indicator-added', {
+                detail: {
+                    id:       legendId,
+                    name:     data.strategy_key,
+                    color:    data.drawings[0]?.color ?? '#00d394',
+                    icon:     'fa-robot',
+                    pane:     null,
+                    values:   [],
+                    settings: {}
+                }
+            }));
+
+            // ── Add strategy to strategies panel ──
+            this.strategiesInstance?.addStrategy({
+                id:        legendId,
+                name:      data.strategy_key,
+                symbol:    data.symbol,
+                tf:        data.timeframe,
+                status:    'running',
+                pnl:       null,
+                trades:    0,
+                winrate:   null,
+                volume:    0.01,
+                risk:      1.0,
+                iconColor: 'green'
+            });
+            this.updateStrategiesBadge();
         });
 
         // ── Watchlist ──
@@ -303,7 +367,7 @@ export class ModuleManager {
             ));
         });
 
-        // ── Available config — populates paramsMap + active strategies on refresh ──
+        // ── Available config ──
         this.connectionManager.onAvailableConfig((config: AvailableConfigPayload) => {
             document.dispatchEvent(new CustomEvent(
                 'available-config-received', {
@@ -335,7 +399,7 @@ export class ModuleManager {
             }
         });
 
-        // ── Strategy data — from explicit onStrategyData backend message ──
+        // ── Strategy data ──
         this.connectionManager.onStrategyData((type, data) => {
             if (type === 'list')   this.strategiesInstance?.setStrategies(data);
             if (type === 'update') this.strategiesInstance?.addStrategy(data);
@@ -505,11 +569,10 @@ export class ModuleManager {
             const tf  = timeframe || this.connectionManager.getCurrentTimeframe();
 
             const fullId = `${strategyType}_${sym}_${tf}`;
-            console.log('🔴 remove-strategy received:', { strategyType, symbol, timeframe });
-            console.log('🔴 fullId built:', fullId);
 
             this.connectionManager.removeStrategy(strategyType, sym, tf);
             this.chart?.getIndicatorManager()?.removeStrategyFromChart(fullId);
+            this.chart?.getDrawingModule()?.removeStrategyDrawings(strategyType, sym, tf);
             this.strategiesInstance?.removeStrategyById(fullId);
             this.updateStrategiesBadge();
         });

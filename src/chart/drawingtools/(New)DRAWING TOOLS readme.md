@@ -17,6 +17,8 @@ drawing-tf-manager.ts     — Handles TF/symbol switching and tool visibility.
 drawing-trade-arrows.ts   — Manages buy/sell trade arrow overlays.
 ui/drawing-toolbar.ts     — Main toolbar UI.
 ui/tool-quick-toolbar.ts  — Floating per-tool quick action toolbar.
+indicator-manager.ts      — Handles both indicators and backend strategy overlays.
+series-manager.ts         — Handles main price series creation and data gating.
 ```
 
 -----
@@ -70,6 +72,7 @@ interface ToolMeta {
     timeframe: string;   // which TF this tool was drawn on
     allTF:     boolean;  // show on all TFs for this symbol?
     deleted:   boolean;  // soft-deleted flag
+    strategy?: boolean;  // true = backend strategy tool, never persisted
 }
 ```
 
@@ -123,7 +126,7 @@ The engine handles cross-TF positioning internally. In `base-line-tool.ts`, `poi
 
 ```ts
 // geometry.ts
-const interval    = (Number(time1) - Number(time0));
+const interval     = (Number(time1) - Number(time0));
 const logicalIndex = timeDiff / interval;
 ```
 
@@ -140,7 +143,8 @@ onTimeframeChange()
   → saveDrawings()            — persist current state before switch
   → onTFUpdated()             — update _currentTimeframe
   → removeTradeArrows()       — trade arrows are TF-specific, remove them
-  → await 2x requestAnimationFrame
+  → purgeDeletedTools()       — hard remove soft-deleted ghosts from engine
+  → double requestAnimationFrame
   → applyTFVisibility()       — show/hide tools for new TF
 ```
 
@@ -152,6 +156,31 @@ The double `requestAnimationFrame` (~33ms) gives the scale time to fully initial
 
 **allTF tools do not flicker** because they are always visible — they simply reposition smoothly as the scale updates.
 
+### Why `purgeDeletedTools()` Is Called on TF Switch
+
+Soft-deleted tools remain as invisible ghosts in the engine during the session. On TF switch, the engine moves to a new context — no render cycle is actively touching those ghosts. This is the safest window to call `removeLineToolsById()` and fully evict them from the engine. After this call, the ghost IDs are also removed from `_metaMap` so they no longer exist anywhere.
+
+This includes soft-deleted **strategy drawing tools** — they follow the exact same purge path.
+
+-----
+
+## SeriesManager Data Gate — `_isDataReady`
+
+The frontend stack is fast (flatbuffer, uWebSocket, backend cache). On TF switch, the backend sends both the full historical dataset (`setData`) and live tick updates (`updateData`) simultaneously. On fast connections `updateData` can win the race and render one candle before `setData` clears and reloads the series, causing drawing tools to see a valid scale too early and trigger `onDataReady` before full data is loaded.
+
+**Fix — `_isDataReady` flag in `SeriesManager`:**
+
+```ts
+setData()    → _isDataReady = true  → fires onDataReady()
+updateData() → if (!_isDataReady) return   ← drop update, full data not ready yet
+createSeries() → _isDataReady = false      ← reset on series creation
+clearData()    → _isDataReady = false      ← reset on clear
+```
+
+`updateData()` silently drops incoming ticks until `setData()` has completed with full data. Since `setData()` contains the complete fresh dataset, dropped ticks are never needed — the next tick after `setData()` will be the correct continuation.
+
+`onDataReady` in `chart-drawing.ts` is only triggered from `setData()`, never from `updateData()`. This guarantees drawing tools always restore against a fully committed series.
+
 -----
 
 ## Save/Load Lifecycle
@@ -162,6 +191,7 @@ The double `requestAnimationFrame` (~33ms) gives the scale time to fully initial
 1. Read existing global storage
 1. Build a map of existing tools by ID
 1. For each engine tool: update map with current state + correct visibility from `shouldToolBeVisible()`
+1. Filter out strategy drawing tools (`_meta.strategy === true`) — never persisted
 1. Write merged map back to storage
 
 **Important:** visibility stored is the correct resolved value, not forced `visible: true`. This prevents tools loading with wrong visibility on the next session.
@@ -181,6 +211,22 @@ The double `requestAnimationFrame` (~33ms) gives the scale time to fully initial
 
 Same as `saveDrawings()` but also calls `removeLineToolsById()` on the engine to physically remove soft-deleted tools. Only called on `beforeunload`.
 
+### onDataReady()
+
+Called by `SeriesManager.setData()` after full data is committed. Directly calls `loadDrawings()` then `applyTFVisibility()`. No polling, no fixed delay — the gate is `_isDataReady` in `SeriesManager`.
+
+```ts
+public async onDataReady(): Promise<void> {
+    if (!this.lineTools || !this.isInitialized) return;
+    if (this._isSwitchingChartType) return;
+
+    await this.persistence.loadDrawings(...);
+    this.tfManager.applyTFVisibility(this._currentTimeframe);
+}
+```
+
+`waitForScaleReady()` was removed. It polled `getVisibleLogicalRange()` but returned true immediately on a single candle from a racing `updateData()` tick, making it unreliable on fast stacks. The `_isDataReady` gate is the correct fix.
+
 -----
 
 ## Soft Delete
@@ -194,9 +240,26 @@ Tools are never detached from the engine via `detachPrimitive()`.
 1. Set `visible: false` on the tool via `applyLineToolOptions()`
 1. Mark `deleted: true` in `_metaMap`
 1. Remove from storage immediately via `removeToolFromStorage()`
-1. On `purgeAndSave()` (page unload) — call `removeLineToolsById()` to clean engine
+1. On TF/symbol switch — `purgeDeletedTools()` calls `removeLineToolsById()` to hard evict from engine
+1. On `purgeAndSave()` (page unload) — same hard eviction as fallback
 
-This means deleted tools remain as invisible ghosts in the engine during the session. They are cleaned up on page unload. This is intentional.
+This means deleted tools remain as invisible ghosts in the engine until the next TF/symbol switch or page unload. This is intentional.
+
+### `purgeDeletedTools()`
+
+Called inside `onTimeframeChange()` and `onSymbolChange()` in `DrawingTFManager`. Loops `_metaMap` for all `deleted: true` entries, calls `removeLineToolsById()` on the engine, then removes those IDs from `_metaMap` entirely. After this call, the deleted tools no longer exist anywhere.
+
+```ts
+public purgeDeletedTools(): void {
+    const deletedIds: string[] = [];
+    this._metaMap.forEach((meta, id) => {
+        if (meta.deleted) deletedIds.push(id);
+    });
+    if (deletedIds.length === 0) return;
+    lt.removeLineToolsById(deletedIds);
+    deletedIds.forEach(id => this._metaMap.delete(id));
+}
+```
 
 -----
 
@@ -208,37 +271,27 @@ Two critical fixes exist inside the core engine’s `BaseLineTool` class. These 
 
 ```ts
 public updateAllViews(): void {
-    // ✅ Fix 1 — Skip updateAllViews() when hidden
     if (this._options?.visible === false) return;
     ...
 }
 ```
 
-**Why this matters:**
-
-Every frame, the engine calls `updateAllViews()` on every registered tool — including soft-deleted invisible ghosts. Without this guard, hidden tools still run their full view update cycle (pane views, price axis labels, time axis labels, stacking manager) on every render frame. With 15+ strategy tools and deleted user tools accumulating as ghosts, this becomes significant per-frame overhead.
-
-This fix makes hidden tools cost nothing per frame.
+Without this guard, hidden tools still run their full view update cycle on every render frame. With 15+ strategy tools and deleted user tools accumulating as ghosts, this becomes significant per-frame overhead.
 
 ### Fix 2 — Skip Hit-Test When Hidden
 
 ```ts
 public hitTest(x: number, y: number): PrimitiveHoveredItem | null {
-    // ✅ Fix 2 — Skip hit-test when hidden
     if (this._options?.visible === false) return null;
     ...
 }
 ```
 
-**Why this matters:**
-
-On every mouse move, the engine runs hit-testing against every registered tool to determine hover state and cursor style. Without this guard, invisible ghost tools still run their full geometric hit-test calculations on every `mousemove` event — including complex polygon intersection math for shapes like Rectangle, Circle, and FibRetracement.
-
-This fix makes hidden tools invisible to the interaction system entirely.
+Without this guard, invisible ghost tools still run their full geometric hit-test calculations on every `mousemove` event — including complex polygon intersection math for shapes like Rectangle, Circle, and FibRetracement.
 
 ### Why Both Fixes Are Needed Together
 
-The soft-delete strategy (keeping tools as invisible ghosts to avoid the `detachPrimitive()` performance bug) only works efficiently because of these two guards. Without them, accumulating ghost tools would cause exactly the kind of performance degradation we were trying to avoid by not detaching.
+The soft-delete strategy only works efficiently because of these two guards. Without them, accumulating ghost tools would cause exactly the kind of performance degradation we were trying to avoid by not detaching.
 
 **Do not remove these fixes. Do not upgrade the core package without verifying they are still present.**
 
@@ -251,25 +304,14 @@ When chart type changes, the series is replaced. This requires destroying and re
 ```ts
 public updateSeries(newSeries: ISeriesApi<SeriesType>): void {
     const savedDrawings = this.persistence.exportDrawings();
-    // destroy old plugin
     this.lineTools.destroy();
-    // create new plugin on new series
     this.lineTools = createLineToolsPlugin(this.chart, this.series);
-    // re-import drawings with correct visibility
     this.persistence.importDrawings(...);
-    // enforce visibility
     this.tfManager.applyTFVisibility(this._currentTimeframe);
 }
 ```
 
-The `_isSwitchingChartType` flag prevents `onDataReady()` from triggering a redundant `loadDrawings()` during this process:
-
-```ts
-public async onDataReady(): Promise<void> {
-    if (this._isSwitchingChartType) return; // ← skip during series swap
-    ...
-}
-```
+The `_isSwitchingChartType` flag prevents `onDataReady()` from triggering a redundant `loadDrawings()` during this process.
 
 Call `beginChartTypeSwitch()` before and `endChartTypeSwitch()` after the series swap from outside.
 
@@ -365,7 +407,7 @@ This is a library limitation. TradingView’s own charting library uses price + 
 
 ### Ghost Tools in Engine
 
-Soft-deleted tools remain as invisible ghosts in the engine until page unload. In theory, if a user creates and deletes hundreds of tools in one session without reloading, this could accumulate. In practice this is not a problem.
+Soft-deleted tools remain as invisible ghosts in the engine until the next TF/symbol switch or page unload. In theory, if a user creates and deletes hundreds of tools in one session without switching TF or reloading, this could accumulate. In practice this is not a problem.
 
 -----
 
@@ -378,15 +420,135 @@ Soft-deleted tools remain as invisible ghosts in the engine until page unload. I
 
 -----
 
-## Strategy Tools (Planned)
+## Backend Strategy Drawing Tools
 
-Backend-driven strategy tools are a separate layer from user drawings:
+Backend strategy drawing tools (e.g. SMC zones, ICT FVGs, labels, boxes) are a completely separate layer from user drawings. They are placed by the backend strategy system via the `lineTools` engine and tagged with `_meta.strategy: true`.
 
-- Never stored in `localStorage`
-- Read-only, not editable by user
-- Sent as one JSON payload on strategy deploy
-- Removed on strategy undeploy or symbol change
-- Use `_meta.strategy: true` flag to distinguish from user tools
-- `saveDrawings()` must filter them out
+### Key Rules
 
-A `DrawingStrategyTools` module is planned to handle this separately from `DrawingPersistence`.
+- Never stored in `localStorage` — `saveDrawings()` filters them out via `_meta.strategy === true`
+- Read-only — not movable, not editable by the user
+- Not toggleable per-TF — they are TF-specific by nature, deployed and removed as a unit
+- Identified in `_metaMap` by `_meta.strategy: true`
+
+### Tool ID Convention
+
+Every strategy drawing tool ID must follow this naming convention:
+
+```
+STRATEGYKEY_SYMBOL_TIMEFRAME_tooltype_index
+```
+
+Examples:
+
+```
+SMC_EURUSD_H1_zone_0
+SMC_EURUSD_H1_zone_1
+SMC_EURUSD_H1_label_0
+ICT_EURUSD_H1_fvg_0
+ICT_EURUSD_H1_fvg_1
+```
+
+This convention is mandatory. The regex-based removal system depends on it.
+
+### Legend Integration
+
+Each strategy appears in the legend exactly like an indicator — using the same `indicator-added` and `indicator-value-update` event system in `IndicatorManager`. The strategy icon is `fa-robot` to distinguish it from user indicators.
+
+Removing a strategy from the legend dispatches `legend-item-remove`. `chart-core.ts` intercepts this, identifies it as a strategy by the `fa-robot` icon, parses the ID using the convention above, and dispatches `remove-strategy`.
+
+### Soft Remove — User Removes Strategy from Legend
+
+When a user removes a strategy from the legend, the drawing tools must be soft-hidden immediately:
+
+1. Build regex from strategy key, symbol, timeframe:
+
+```ts
+const regex = new RegExp(`^${strategyKey}_${symbol}_${timeframe}_`);
+```
+
+1. `getLineToolsByIdRegex(regex)` — retrieve all matching drawing tools
+1. `applyLineToolOptions({ visible: false })` on each — soft hide immediately, no detach
+1. `deleteMeta(id)` on each ID — mark `deleted: true` in `_metaMap`
+1. Remove from legend immediately
+
+**Why soft hide instead of hard remove:**
+Same reason as user tool deletion — calling `detachPrimitive()` mid-session causes the known performance degradation bug in the core engine. Soft hide is safe, instantaneous, and costs nothing per frame due to the engine-level guards in `base-line-tool.ts`.
+
+### Hard Remove — On TF/Symbol Switch
+
+On TF or symbol switch, `purgeDeletedTools()` runs as part of the switch flow. It loops all `deleted: true` entries in `_metaMap` — which now includes all soft-deleted strategy drawing tools — and calls `removeLineToolsById()` on the engine. This is safe because the engine has moved to a new context and no render cycle is touching those tools.
+
+After this call, the strategy tool IDs are removed from `_metaMap` entirely. They no longer exist anywhere.
+
+This means strategy drawing tools follow the **exact same soft-delete → purge-on-switch lifecycle** as user drawing tools. No special case needed.
+
+### Deploy / Undeploy Flow
+
+```
+Strategy deployed
+  → backend sends drawing tool payload
+  → tools created via createOrUpdateLineTool() with IDs following convention
+  → _meta.strategy: true injected into _metaMap for each tool
+  → legend entry added via indicator-added event
+
+User removes strategy from legend
+  → getLineToolsByIdRegex(regex) — find all tools for this strategy
+  → applyLineToolOptions({ visible: false }) on each — soft hide
+  → deleteMeta(id) on each — mark deleted
+  → legend cleared immediately
+
+Next TF/symbol switch
+  → purgeDeletedTools() — hard removes all ghost strategy tools from engine
+  → _metaMap entries cleaned up
+```
+
+### saveDrawings() Filter
+
+`saveDrawings()` must never write strategy drawing tools to localStorage. Filter applied before writing:
+
+```ts
+.filter(t => !this._metaMap.get(t.id)?.strategy)
+```
+
+Strategy tools are session-only. They are redeployed by the backend on each session.
+
+-----
+
+## Indicator Manager — Backend Strategy Overlay Lines
+
+`IndicatorManager` handles both user indicators (EMA, SMA, RSI etc.) and backend strategy overlay lines (the `LineSeries` lines that strategies draw on the chart — signals, levels, etc.). These are completely separate from strategy drawing tools above.
+
+### Strategy Indicator Lines vs Strategy Drawing Tools
+
+|             |Strategy Indicator Lines           |Strategy Drawing Tools                                            |
+|-------------|-----------------------------------|------------------------------------------------------------------|
+|Managed by   |`IndicatorManager`                 |`lineTools` engine via `DrawingPersistence`                       |
+|Type         |`LineSeries`                       |Drawing tool primitives (zones, labels, boxes)                    |
+|Identified by|`isStrategy: true` in pool         |`_meta.strategy: true` in `_metaMap`                              |
+|Removed via  |`clearSeriesData()` → `setData([])`|`applyLineToolOptions({ visible: false })` → `purgeDeletedTools()`|
+|Persisted    |Never                              |Never                                                             |
+|Editable     |No                                 |No                                                                |
+|Movable      |No                                 |No                                                                |
+
+### Strategy Indicator Line Lifecycle
+
+Strategy indicator lines use `setData([])` to clear on TF/symbol switch — this is correct because `LineSeries` does not have the `detachPrimitive()` bug. The series are pooled and reused across switches.
+
+On TF switch, strategies are marked inactive via `indicator-tf-inactive` and their series data is cleared. On symbol switch, same behavior. They are reactivated when the backend sends new data for the new context.
+
+### Pending SetData Buffer
+
+Indicator data can arrive before the chart timescale is committed. `IndicatorManager` buffers all `setData` calls in `pendingSetData` and flushes them after `chart-initial-data-loaded` fires, through its own double `requestAnimationFrame`. This ensures indicator series coordinates commit cleanly against the stable timescale.
+
+```
+chart-initial-data-loaded fires
+  → resubscribe persisted indicators
+  → flushPendingSetData()
+      → double rAF
+      → series.setData(chartData) for each pending entry
+      → indicator.active = true
+  → chartReady = true (after own double rAF)
+```
+
+The `chartReady` flag gates single-point `updateData` calls — same concept as `_isDataReady` in `SeriesManager`. A single-point update on an inactive indicator is dropped to prevent stale ticks writing against an uncommitted timescale.

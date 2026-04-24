@@ -11,6 +11,7 @@ export interface ToolMeta {
     symbol:    string;
     allTF:     boolean;
     deleted:   boolean;
+    strategy?: boolean;  // true = backend strategy tool, never persisted
 }
 
 interface StoredTool {
@@ -118,6 +119,79 @@ export class DrawingPersistence {
         }
     }
 
+    // ✅ Strategy meta injection — marks tool as backend strategy
+    // strategy: true tools are never persisted to localStorage
+    // allTF: false — strategy tools are TF-specific by nature
+    public injectStrategyMeta(
+        toolId:      string,
+        symbol:      string,
+        timeframe:   string,
+        strategyKey: string
+    ): void {
+        this._metaMap.set(toolId, {
+            timeframe,
+            symbol,
+            allTF:    false,
+            deleted:  false,
+            strategy: true
+        });
+    }
+
+    // ✅ Soft delete all drawing tools belonging to a strategy
+    // Uses regex to match all tools for strategyKey_symbol_timeframe_*
+    // Marks deleted:true in _metaMap — purgeDeletedTools() hard removes on next TF/symbol switch
+    public softDeleteStrategyDrawings(
+        strategyKey: string,
+        symbol:      string,
+        timeframe:   string
+    ): void {
+        const lt = this.lineTools();
+        if (!lt || !this.isInitialized()) return;
+
+        try {
+            const regex = new RegExp(`^${strategyKey}_${symbol}_${timeframe}_`);
+
+            const json  = lt.exportLineTools();
+            const tools = JSON.parse(json);
+            if (!Array.isArray(tools)) return;
+
+            const matchingTools = tools.filter((t: any) =>
+                t?.id && regex.test(t.id)
+            );
+
+            if (matchingTools.length === 0) return;
+
+            matchingTools.forEach((tool: any) => {
+                // ✅ Hide immediately — no detach
+                lt.applyLineToolOptions({
+                    id:       tool.id,
+                    toolType: tool.toolType,
+                    options:  { ...tool.options, visible: false }
+                });
+
+                // ✅ Mark deleted in metaMap
+                const meta = this._metaMap.get(tool.id);
+                if (meta) {
+                    meta.deleted = true;
+                    this._metaMap.set(tool.id, meta);
+                } else {
+                    this._metaMap.set(tool.id, {
+                        timeframe,
+                        symbol,
+                        allTF:    false,
+                        deleted:  true,
+                        strategy: true
+                    });
+                }
+            });
+
+            console.log(`🗑️ Soft deleted ${matchingTools.length} strategy tools for ${strategyKey}_${symbol}_${timeframe}`);
+
+        } catch (error) {
+            console.error('❌ Failed to soft delete strategy drawings:', error);
+        }
+    }
+
     // ✅ Fix 1 — create meta if missing instead of silently returning
     public setAllTF(toolId: string, allTF: boolean): void {
         let meta = this._metaMap.get(toolId);
@@ -192,7 +266,8 @@ export class DrawingPersistence {
                         deleted:   false
                     };
 
-                    if (meta.deleted) {
+                    // ✅ Never persist strategy tools or deleted tools
+                    if (meta.deleted || meta.strategy) {
                         existingMap.delete(t.id);
                         return;
                     }
@@ -238,6 +313,12 @@ export class DrawingPersistence {
                         allTF:     true,
                         deleted:   false
                     };
+
+                    // ✅ Never persist strategy tools
+                    if (meta.strategy) {
+                        existingMap.delete(t.id);
+                        return;
+                    }
 
                     if (meta.deleted) {
                         deletedIds.push(t.id);
@@ -290,6 +371,7 @@ export class DrawingPersistence {
             const relevant = allTools.filter((t: StoredTool) => {
                 if (!t._meta)                    return false;
                 if (t._meta.deleted)             return false;
+                if (t._meta.strategy)            return false; // ✅ never load strategy tools from storage
                 if (t._meta.symbol !== symbol)   return false;
                 return t._meta.allTF || t._meta.timeframe === timeframe;
             });
