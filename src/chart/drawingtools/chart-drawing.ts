@@ -639,9 +639,8 @@ export class ChartDrawingModule {
   }
 
   // ================================================================
-  // ✅ NEW — refreshVisibility
-  // Called after strategy drawings are created to re-apply TF visibility
-  // so tools aren't hidden by stale applyTFVisibility run before meta existed
+  // ✅ refreshVisibility — re-apply TF visibility after strategy
+  // drawings are created so tools aren't hidden by stale run
   // ================================================================
 
   public refreshVisibility(): void {
@@ -793,9 +792,14 @@ export class ChartDrawingModule {
     return '[]';
   }
 
-  public createOrUpdateLineTool(type: string, points: any[], options: any, id: string): void {
+  // ✅ Now async — registers tool group before calling engine
+  public async createOrUpdateLineTool(type: string, points: any[], options: any, id: string): Promise<void> {
     if (!this.lineTools || !this.isInitialized) return;
     try {
+      // ✅ Ensure group registered before creating — strategy drawings bypass startDrawing()
+      const groupName = TOOL_GROUP_MAP[type];
+      if (groupName) await this.loadAndRegisterGroup(groupName);
+
       if (typeof this.lineTools.createOrUpdateLineTool === 'function') {
         this.lineTools.createOrUpdateLineTool(type, points, options, id);
         this.persistence.saveDrawings();
