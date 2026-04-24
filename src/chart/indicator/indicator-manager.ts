@@ -118,6 +118,14 @@ interface SavedLineSettings {
 }
 
 // ================================================================
+// PENDING SET DATA — buffer for data arriving before chart ready
+// ================================================================
+interface PendingSetData {
+    series:    ISeriesApi<SeriesType>;
+    chartData: Array<{ time: number; value: number }>;
+}
+
+// ================================================================
 // INDICATOR MANAGER
 // ================================================================
 export class IndicatorManager {
@@ -139,6 +147,14 @@ export class IndicatorManager {
 
     // ── Persisted line settings — key = indicator key (e.g. 'EMA') ──
     private savedSettings: Map<string, Map<string, SavedLineSettings>> = new Map();
+
+    // ── Pending setData — keyed by indicator id ──
+    // Buffers series data that arrived before chart-initial-data-loaded
+    // Flushed after chart-initial-data-loaded → own double rAF
+    private pendingSetData: Map<string, PendingSetData[]> = new Map();
+
+    // ── Chart ready flag — true after first chart-initial-data-loaded ──
+    private chartReady: boolean = false;
 
     private abortController: AbortController | null = null;
 
@@ -177,11 +193,18 @@ export class IndicatorManager {
         this.abortController = new AbortController();
         const { signal } = this.abortController;
 
-        // ── On chart initial data loaded — resubscribe persisted indicators ──
+        // ── chart-initial-data-loaded — SeriesManager double rAF completed ──
+        // This is the single source of truth gate for all rendering
+        // 1. Resubscribe persisted indicators
+        // 2. Flush any pending setData through own double rAF
         document.addEventListener('chart-initial-data-loaded', (e: Event) => {
             const { symbol, timeframe } = (e as CustomEvent).detail;
             if (!symbol || !timeframe) return;
 
+            // ── Reset chartReady — new candle set incoming ──
+            this.chartReady = false;
+
+            // ── Resubscribe persisted indicators ──
             this.activeSubs.forEach(sub => {
                 const period = this.periodOverrides.get(sub.key) ?? sub.period;
                 document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
@@ -193,6 +216,19 @@ export class IndicatorManager {
                     }
                 }));
             });
+
+            // ── Flush pending setData through own double rAF ──
+            // SeriesManager double rAF already done — timescale committed
+            // Own double rAF ensures indicator series coordinates also commit
+            this.flushPendingSetData();
+
+            // ── Mark chart ready for subsequent indicator arrivals ──
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.chartReady = true;
+                });
+            });
+
         }, { signal });
 
         document.addEventListener('indicator-settings-changed', (e: Event) => {
@@ -337,14 +373,32 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // DOUBLE RAF — wait for LWC timescale to fully commit
-    // Same pattern as drawing tools — prevents coordinate mismatch
-    // on symbol change and LTF → HTF switch
+    // FLUSH PENDING SET DATA
+    // Called after chart-initial-data-loaded (SeriesManager double rAF done)
+    // Runs own double rAF — indicator series coordinates commit cleanly
     // ================================================================
-    private doubleRaf(fn: () => void): void {
+    private flushPendingSetData(): void {
+        if (this.pendingSetData.size === 0) return;
+
+        // ── Snapshot and clear pending before rAF ──
+        const snapshot = new Map(this.pendingSetData);
+        this.pendingSetData.clear();
+
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                fn();
+                snapshot.forEach((entries, id) => {
+                    // ── Guard — indicator may have been removed ──
+                    const indicator = this.pool.get(id);
+                    if (!indicator) return;
+
+                    entries.forEach(({ series, chartData }) => {
+                        if (chartData.length > 0) {
+                            try { series.setData(chartData as any); } catch (e) {}
+                        }
+                    });
+
+                    indicator.active = true;
+                });
             });
         });
     }
@@ -393,7 +447,7 @@ export class IndicatorManager {
             timeframe: data.timeframe,
             lines:     new Map(),
             isStrategy,
-            active:    false  // ── stays false until doubleRaf completes ──
+            active:    false  // ── stays false until setData committed ──
         };
 
         if (!this.savedSettings.has(data.key)) {
@@ -408,11 +462,7 @@ export class IndicatorManager {
             color: string;
         }> = [];
 
-        const seriesAndData: Array<{
-            series:    ISeriesApi<SeriesType>;
-            chartData: Array<{ time: number; value: number }>;
-            lineName:  string;
-        }> = [];
+        const pendingEntries: PendingSetData[] = [];
 
         data.lines.forEach((line, index) => {
             const saved = keySaved.get(line.name);
@@ -451,8 +501,8 @@ export class IndicatorManager {
                     .map((t, i) => ({ time: t, value: line.values[i] }))
                     .filter(p => !isNaN(p.value) && p.value !== 0);
 
-                // ── Store series + data for deferred setData ──
-                seriesAndData.push({ series, chartData, lineName: line.name });
+                // ── Always buffer — flushed after chart-initial-data-loaded ──
+                pendingEntries.push({ series, chartData });
 
                 indicator.lines.set(line.name, {
                     name:                   line.name,
@@ -478,6 +528,16 @@ export class IndicatorManager {
 
         this.pool.set(id, indicator);
 
+        // ── Store pending — flushed on chart-initial-data-loaded ──
+        if (pendingEntries.length > 0) {
+            this.pendingSetData.set(id, pendingEntries);
+        }
+
+        // ── If chart already ready — flush immediately via own double rAF ──
+        if (this.chartReady) {
+            this.flushPendingSetData();
+        }
+
         // ── Track active sub — indicators only, not strategies ──
         if (!isStrategy) {
             const period = this.periodOverrides.get(data.key) ?? 0;
@@ -490,7 +550,7 @@ export class IndicatorManager {
             this.persistActiveSubs();
         }
 
-        // ── Dispatch legend immediately — data paints after doubleRaf ──
+        // ── Dispatch legend immediately ──
         if (this.legendIds.has(id)) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
@@ -509,21 +569,6 @@ export class IndicatorManager {
                 }
             }));
         }
-
-        // ── Double rAF — wait for LWC timescale to commit before setData ──
-        // Prevents flatline on symbol change and LTF → HTF switch
-        this.doubleRaf(() => {
-            // ── Guard — indicator may have been removed before rAF fires ──
-            if (!this.pool.has(id)) return;
-
-            seriesAndData.forEach(({ series, chartData }) => {
-                if (chartData.length > 0) {
-                    try { series.setData(chartData as any); } catch (e) {}
-                }
-            });
-
-            indicator.active = true;
-        });
     }
 
     // ================================================================
@@ -558,12 +603,15 @@ export class IndicatorManager {
                         .filter(p => !isNaN(p.value) && p.value !== 0);
 
                     if (chartData.length > 0) {
-                        // ── Double rAF for re-init setData too ──
-                        this.doubleRaf(() => {
-                            if (!this.pool.has(indicator.id)) return;
-                            try { activeLine.series.setData(chartData as any); } catch (e) {}
-                            indicator.active = true;
-                        });
+                        // ── Buffer re-init data same as create ──
+                        const existing = this.pendingSetData.get(indicator.id) ?? [];
+                        existing.push({ series: activeLine.series, chartData });
+                        this.pendingSetData.set(indicator.id, existing);
+
+                        // ── Flush immediately if chart already ready ──
+                        if (this.chartReady) {
+                            this.flushPendingSetData();
+                        }
                     }
                 } else {
                     const t = line.timestamps[0];
@@ -626,6 +674,10 @@ export class IndicatorManager {
     // ================================================================
     public onTimeframeChange(newTimeframe: string): void {
         this.currentTimeframe = newTimeframe;
+
+        // ── Reset chart ready — candles not yet arrived for new TF ──
+        this.chartReady = false;
+        this.pendingSetData.clear();
 
         const toUpdate: Array<{
             oldId:     string;
@@ -704,6 +756,10 @@ export class IndicatorManager {
     // ================================================================
     public onSymbolChange(newSymbol: string): void {
         this.currentSymbol = newSymbol;
+
+        // ── Reset chart ready — candles not yet arrived for new symbol ──
+        this.chartReady = false;
+        this.pendingSetData.clear();
 
         const toUpdate: Array<{
             oldId:     string;
@@ -787,6 +843,8 @@ export class IndicatorManager {
         this.savedSettings.clear();
         this.periodOverrides.clear();
         this.activeSubs.clear();
+        this.pendingSetData.clear();
+        this.chartReady = false;
     }
 
     // ================================================================
@@ -802,6 +860,7 @@ export class IndicatorManager {
         this.savedSettings.delete(indicator.key);
         this.periodOverrides.delete(indicator.key);
         this.activeSubs.delete(indicator.key);
+        this.pendingSetData.delete(id);
         this.persistPeriodOverrides();
         this.persistActiveSubs();
 
@@ -831,6 +890,7 @@ export class IndicatorManager {
         this.savedSettings.delete(indicator.key);
         this.periodOverrides.delete(indicator.key);
         this.activeSubs.delete(indicator.key);
+        this.pendingSetData.delete(id);
         this.persistPeriodOverrides();
         this.persistActiveSubs();
 
@@ -960,7 +1020,9 @@ export class IndicatorManager {
         this.savedSettings.clear();
         this.periodOverrides.clear();
         this.activeSubs.clear();
-        this.chart     = null;
-        this.mainChart = null;
+        this.pendingSetData.clear();
+        this.chartReady    = false;
+        this.chart         = null;
+        this.mainChart     = null;
     }
 }
