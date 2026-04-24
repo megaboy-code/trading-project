@@ -618,6 +618,32 @@ export class ChartDrawingModule {
   }
 
   // ================================================================
+  // STRATEGY DRAWING TOOLS
+  // ================================================================
+
+  // ✅ Called from ModuleManager after each createOrUpdateLineTool()
+  // Marks tool as backend strategy — never persisted, not editable
+  public injectStrategyMeta(
+    toolId:      string,
+    symbol:      string,
+    timeframe:   string,
+    strategyKey: string
+  ): void {
+    this.persistence.injectStrategyMeta(toolId, symbol, timeframe, strategyKey);
+  }
+
+  // ✅ Called from ModuleManager on remove-strategy event
+  // Soft hides all drawing tools for this strategy via regex
+  // Hard remove happens on next TF/symbol switch via purgeDeletedTools()
+  public removeStrategyDrawings(
+    strategyKey: string,
+    symbol:      string,
+    timeframe:   string
+  ): void {
+    this.persistence.softDeleteStrategyDrawings(strategyKey, symbol, timeframe);
+  }
+
+  // ================================================================
   // TOOL PROPERTY MANAGEMENT
   // ================================================================
 
@@ -911,7 +937,7 @@ export class ChartDrawingModule {
                 .filter((t: any) => t.points && t.points.length > 0)
                 .filter((t: any) => {
                   const meta = this.persistence.getMeta(t.id);
-                  return !meta?.deleted;
+                  return !meta?.deleted && !meta?.strategy;
                 })
                 .map((t: any) => ({
                   ...t,
