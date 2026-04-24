@@ -177,9 +177,9 @@ export class ModuleManager {
         });
 
         // ── Strategy drawing update — route to chart drawing module ──
-        // ✅ FIX — async callback + Promise.all to await all createOrUpdateLineTool
-        // calls before refreshVisibility() — forEach was not awaiting async calls
-        // causing refreshVisibility to fire before any tool was registered or drawn
+        // ✅ FIX 1 — async callback + Promise.all to await all createOrUpdateLineTool
+        // ✅ FIX 2 — injectStrategyMeta BEFORE createOrUpdateLineTool so saveDrawings()
+        // inside the engine sees strategy:true and never persists to localStorage
         this.connectionManager.onStrategyDrawingUpdate(async (data: StrategyDrawingUpdatePayload) => {
             const drawingModule = this.chart?.getDrawingModule();
             if (!drawingModule) return;
@@ -199,18 +199,20 @@ export class ModuleManager {
                     defaultHoverCursor: 'default'
                 };
 
-                await drawingModule.createOrUpdateLineTool(
-                    drawing.tool_type,
-                    points,
-                    options,
-                    drawing.id
-                );
-
+                // ✅ Inject meta FIRST — saveDrawings() inside createOrUpdateLineTool
+                // will see strategy:true and skip localStorage persistence
                 drawingModule.injectStrategyMeta(
                     drawing.id,
                     drawing.symbol,
                     drawing.timeframe,
                     data.strategy_key
+                );
+
+                await drawingModule.createOrUpdateLineTool(
+                    drawing.tool_type,
+                    points,
+                    options,
+                    drawing.id
                 );
             }));
 
