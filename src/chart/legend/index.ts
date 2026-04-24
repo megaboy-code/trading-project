@@ -146,9 +146,13 @@ export class ChartLegend {
         this.abortController = new AbortController();
         const { signal } = this.abortController;
 
+        // ── Only populate symbol map if config has symbols ──
+        // GET_ACTIVE_STRATEGIES response has empty symbols — skip
         document.addEventListener('available-config-received', (e: Event) => {
             const config = (e as CustomEvent).detail;
-            if (config?.symbols) setConfigSymbols(config.symbols);
+            if (config?.symbols && config.symbols.length > 0) {
+                setConfigSymbols(config.symbols);
+            }
         }, { signal });
 
         document.addEventListener('legend-item-remove', (e: Event) => {
