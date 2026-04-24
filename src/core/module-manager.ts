@@ -211,6 +211,9 @@ export class ModuleManager {
                 );
             });
 
+            // ✅ Re-apply visibility now that all strategy meta is injected
+            drawingModule.refreshVisibility();
+
             // ── Add strategy to legend once per strategy_key/symbol/timeframe ──
             // ID format: STRATEGYKEY_SYMBOL_TIMEFRAME — matches chart-core.ts parse logic
             const legendId = `${data.strategy_key}_${data.symbol}_${data.timeframe}`;
