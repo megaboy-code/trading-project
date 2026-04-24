@@ -337,6 +337,19 @@ export class IndicatorManager {
     }
 
     // ================================================================
+    // DOUBLE RAF — wait for LWC timescale to fully commit
+    // Same pattern as drawing tools — prevents coordinate mismatch
+    // on symbol change and LTF → HTF switch
+    // ================================================================
+    private doubleRaf(fn: () => void): void {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                fn();
+            });
+        });
+    }
+
+    // ================================================================
     // ON INDICATOR UPDATE
     // ================================================================
     public onIndicatorUpdate(data: IndicatorUpdatePayload): void {
@@ -380,7 +393,7 @@ export class IndicatorManager {
             timeframe: data.timeframe,
             lines:     new Map(),
             isStrategy,
-            active:    true
+            active:    false  // ── stays false until doubleRaf completes ──
         };
 
         if (!this.savedSettings.has(data.key)) {
@@ -393,6 +406,12 @@ export class IndicatorManager {
             label: string;
             value: string;
             color: string;
+        }> = [];
+
+        const seriesAndData: Array<{
+            series:    ISeriesApi<SeriesType>;
+            chartData: Array<{ time: number; value: number }>;
+            lineName:  string;
         }> = [];
 
         data.lines.forEach((line, index) => {
@@ -432,9 +451,8 @@ export class IndicatorManager {
                     .map((t, i) => ({ time: t, value: line.values[i] }))
                     .filter(p => !isNaN(p.value) && p.value !== 0);
 
-                if (chartData.length > 0) {
-                    series.setData(chartData as any);
-                }
+                // ── Store series + data for deferred setData ──
+                seriesAndData.push({ series, chartData, lineName: line.name });
 
                 indicator.lines.set(line.name, {
                     name:                   line.name,
@@ -472,7 +490,7 @@ export class IndicatorManager {
             this.persistActiveSubs();
         }
 
-        // ── legendIds uses full id (key_symbol_tf) ──
+        // ── Dispatch legend immediately — data paints after doubleRaf ──
         if (this.legendIds.has(id)) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
@@ -491,6 +509,21 @@ export class IndicatorManager {
                 }
             }));
         }
+
+        // ── Double rAF — wait for LWC timescale to commit before setData ──
+        // Prevents flatline on symbol change and LTF → HTF switch
+        this.doubleRaf(() => {
+            // ── Guard — indicator may have been removed before rAF fires ──
+            if (!this.pool.has(id)) return;
+
+            seriesAndData.forEach(({ series, chartData }) => {
+                if (chartData.length > 0) {
+                    try { series.setData(chartData as any); } catch (e) {}
+                }
+            });
+
+            indicator.active = true;
+        });
     }
 
     // ================================================================
@@ -501,8 +534,8 @@ export class IndicatorManager {
         data:      IndicatorUpdatePayload,
         isInitial: boolean
     ): void {
-        // ── Block any single-point update on inactive indicator (all types) ──
-        // Prevents stale 15m tick from flatlineing a 1D series after TF switch
+        // ── Block any single-point update on inactive indicator ──
+        // Prevents stale tick from writing against uncommitted timescale
         if (!indicator.active && !isInitial) return;
 
         const precision = getDecimalPrecision(data.symbol);
@@ -523,8 +556,14 @@ export class IndicatorManager {
                     const chartData = line.timestamps
                         .map((t, i) => ({ time: t, value: line.values[i] }))
                         .filter(p => !isNaN(p.value) && p.value !== 0);
+
                     if (chartData.length > 0) {
-                        activeLine.series.setData(chartData as any);
+                        // ── Double rAF for re-init setData too ──
+                        this.doubleRaf(() => {
+                            if (!this.pool.has(indicator.id)) return;
+                            try { activeLine.series.setData(chartData as any); } catch (e) {}
+                            indicator.active = true;
+                        });
                     }
                 } else {
                     const t = line.timestamps[0];
@@ -570,8 +609,6 @@ export class IndicatorManager {
                 }
             }));
         }
-
-        indicator.active = true;
     }
 
     // ================================================================
