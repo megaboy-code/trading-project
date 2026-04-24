@@ -210,6 +210,37 @@ export class ModuleManager {
                     data.strategy_key
                 );
             });
+
+            // ── Add strategy to legend once per strategy_key/symbol/timeframe ──
+            // ID format: STRATEGYKEY_SYMBOL_TIMEFRAME — matches chart-core.ts parse logic
+            const legendId = `${data.strategy_key}_${data.symbol}_${data.timeframe}`;
+            document.dispatchEvent(new CustomEvent('indicator-added', {
+                detail: {
+                    id:       legendId,
+                    name:     data.strategy_key,
+                    color:    data.drawings[0]?.color ?? '#00d394',
+                    icon:     'fa-robot',
+                    pane:     null,
+                    values:   [],
+                    settings: {}
+                }
+            }));
+
+            // ── Add strategy to strategies panel ──
+            this.strategiesInstance?.addStrategy({
+                id:        legendId,
+                name:      data.strategy_key,
+                symbol:    data.symbol,
+                tf:        data.timeframe,
+                status:    'running',
+                pnl:       null,
+                trades:    0,
+                winrate:   null,
+                volume:    0.01,
+                risk:      1.0,
+                iconColor: 'green'
+            });
+            this.updateStrategiesBadge();
         });
 
         // ── Watchlist ──
