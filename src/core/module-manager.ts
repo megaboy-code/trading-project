@@ -177,11 +177,14 @@ export class ModuleManager {
         });
 
         // ── Strategy drawing update — route to chart drawing module ──
-        this.connectionManager.onStrategyDrawingUpdate((data: StrategyDrawingUpdatePayload) => {
+        // ✅ FIX — async callback + Promise.all to await all createOrUpdateLineTool
+        // calls before refreshVisibility() — forEach was not awaiting async calls
+        // causing refreshVisibility to fire before any tool was registered or drawn
+        this.connectionManager.onStrategyDrawingUpdate(async (data: StrategyDrawingUpdatePayload) => {
             const drawingModule = this.chart?.getDrawingModule();
             if (!drawingModule) return;
 
-            data.drawings.forEach(drawing => {
+            await Promise.all(data.drawings.map(async (drawing) => {
                 const points = drawing.points.map(p => ({
                     time:  p.timestamp,
                     price: p.price
@@ -196,7 +199,7 @@ export class ModuleManager {
                     defaultHoverCursor: 'default'
                 };
 
-                drawingModule.createOrUpdateLineTool(
+                await drawingModule.createOrUpdateLineTool(
                     drawing.tool_type,
                     points,
                     options,
@@ -209,7 +212,7 @@ export class ModuleManager {
                     drawing.timeframe,
                     data.strategy_key
                 );
-            });
+            }));
 
             // ✅ Re-apply visibility now that all strategy meta is injected
             drawingModule.refreshVisibility();
