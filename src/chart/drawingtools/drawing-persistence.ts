@@ -77,9 +77,6 @@ export class DrawingPersistence {
 
     public shouldToolBeVisible(toolId: string, timeframe: string): boolean {
         const meta = this._metaMap.get(toolId);
-        if (toolId.startsWith('SMC_')) {
-            console.log('👁 SMC visibility check:', { toolId, meta, timeframe });
-        }
         if (!meta)        return true;
         if (meta.deleted) return false;
         if (meta.allTF)   return true;
