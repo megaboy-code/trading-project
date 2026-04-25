@@ -176,6 +176,12 @@ export class ChartLegend {
             const { id } = (e as CustomEvent).detail;
             this.removeItem(id);
         }, { signal });
+
+        // ── Detach strategy legend on TF switch — DOM only, no cascade ──
+        document.addEventListener('legend-item-detach', (e: Event) => {
+            const { id } = (e as CustomEvent).detail;
+            this.removeItem(id);
+        }, { signal });
     }
 
     // ==================== PUBLIC API ====================
