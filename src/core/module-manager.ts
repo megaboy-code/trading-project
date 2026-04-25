@@ -162,9 +162,34 @@ export class ModuleManager {
             this.connectionManager.sendCommand('INITIAL_DATA_RECEIVED');
         });
 
-        // ── Indicator update — direct to IndicatorManager ──
+        // ── Indicator update — direct to IndicatorManager + panel if strategy ──
         this.connectionManager.onIndicatorUpdate((data) => {
-            this.chart?.getIndicatorManager()?.onIndicatorUpdate(data);
+            const indicatorManager = this.chart?.getIndicatorManager();
+            if (!indicatorManager) return;
+
+            indicatorManager.onIndicatorUpdate(data);
+
+            // ── If strategy, add to panel — once per id ──
+            const params = indicatorManager.getParams(data.key);
+            if (params?.is_strategy) {
+                const id = `${data.key}_${data.symbol}_${data.timeframe}`;
+                if (!this.strategiesInstance?.hasStrategy(id)) {
+                    this.strategiesInstance?.addStrategy({
+                        id,
+                        name:      data.label,
+                        symbol:    data.symbol,
+                        tf:        data.timeframe,
+                        status:    'running',
+                        pnl:       null,
+                        trades:    0,
+                        winrate:   null,
+                        volume:    params.volume ?? 0.01,
+                        risk:      1.0,
+                        iconColor: 'green'
+                    });
+                    this.updateStrategiesBadge();
+                }
+            }
         });
 
         // ── Strategy drawing update — delegate to StrategyDrawingManager ──
@@ -509,7 +534,7 @@ export class ModuleManager {
                 detail: { id: fullId }
             }));
 
-            // ── Panel ──
+            // ── Panel — single owner of removeStrategyById ──
             this.strategiesInstance?.removeStrategyById(fullId);
             this.updateStrategiesBadge();
 
