@@ -190,13 +190,25 @@ export class ModuleManager {
                     price: p.price
                 }));
 
+                // ── Map backend fields to engine rectangle structure ──
                 const options = {
-                    fillColor:          hexToRgba(drawing.color, drawing.fill_opacity),
-                    borderColor:        hexToRgba(drawing.color, drawing.border_opacity),
-                    borderWidth:        drawing.line_width,
-                    locked:             true,
-                    editable:           false,
-                    defaultHoverCursor: 'default'
+                    rectangle: {
+                        background: {
+                            color: hexToRgba(drawing.color, drawing.fill_opacity)
+                        },
+                        border: {
+                            radius: 0,
+                            width:  drawing.line_width,
+                            style:  0,
+                            color:  hexToRgba(drawing.color, drawing.border_opacity)
+                        },
+                        extend: { left: false, right: false }
+                    },
+                    showPriceAxisLabels: false,
+                    showTimeAxisLabels:  false,
+                    locked:              true,
+                    editable:            false,
+                    defaultHoverCursor:  'default'
                 };
 
                 // ✅ Inject meta FIRST — saveDrawings() inside createOrUpdateLineTool
