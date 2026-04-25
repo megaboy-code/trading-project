@@ -180,14 +180,15 @@ export class ModuleManager {
         // ✅ FIX 1 — async callback + Promise.all to await all createOrUpdateLineTool
         // ✅ FIX 2 — injectStrategyMeta BEFORE createOrUpdateLineTool so saveDrawings()
         // inside the engine sees strategy:true and never persists to localStorage
+        // ✅ FIX 3 — use timestamp key (not time) for points — engine expects timestamp
         this.connectionManager.onStrategyDrawingUpdate(async (data: StrategyDrawingUpdatePayload) => {
             const drawingModule = this.chart?.getDrawingModule();
             if (!drawingModule) return;
 
             await Promise.all(data.drawings.map(async (drawing) => {
                 const points = drawing.points.map(p => ({
-                    time:  p.timestamp,
-                    price: p.price
+                    timestamp: p.timestamp,
+                    price:     p.price
                 }));
 
                 // ── Map backend fields to engine rectangle structure ──
