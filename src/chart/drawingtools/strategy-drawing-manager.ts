@@ -138,23 +138,24 @@ export class StrategyDrawingManager {
 
     // ================================================================
     // ON TF CHANGE — called from ModuleManager timeframe-changed
-    // ── Removes legend for old TF ──
-    // ── Re-adds legend for new TF if strategy was already deployed ──
+    // ── Detaches legend DOM only — no cascade into remove-strategy ──
+    // ── Drawing tools hide themselves via applyTFVisibility ──
+    // ── Hard remove only happens via X button → legend-item-remove ──
     // ================================================================
 
     public onTFChange(oldTF: string, newTF: string): void {
-        // ── Remove legend entries for old TF ──
-        const toRemove: string[] = [];
+        // ── Detach legend entries for old TF — DOM only, no cascade ──
+        const toDetach: string[] = [];
 
         this.deployedStrategyLegendIds.forEach(id => {
             if (id.endsWith(`_${oldTF}`)) {
-                toRemove.push(id);
+                toDetach.push(id);
             }
         });
 
-        toRemove.forEach(id => {
+        toDetach.forEach(id => {
             this.deployedStrategyLegendIds.delete(id);
-            document.dispatchEvent(new CustomEvent('legend-item-remove', {
+            document.dispatchEvent(new CustomEvent('legend-item-detach', {
                 detail: { id }
             }));
         });
