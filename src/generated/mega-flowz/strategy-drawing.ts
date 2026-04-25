@@ -78,29 +78,13 @@ color(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-fillOpacity():number {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
-  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-}
-
-mutate_fill_opacity(value:number):boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
-
-  if (offset === 0) {
-    return false;
-  }
-
-  this.bb!.writeFloat64(this.bb_pos + offset, value);
-  return true;
-}
-
 borderOpacity():number {
-  const offset = this.bb!.__offset(this.bb_pos, 18);
+  const offset = this.bb!.__offset(this.bb_pos, 16);
   return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
 }
 
 mutate_border_opacity(value:number):boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 18);
+  const offset = this.bb!.__offset(this.bb_pos, 16);
 
   if (offset === 0) {
     return false;
@@ -110,12 +94,28 @@ mutate_border_opacity(value:number):boolean {
   return true;
 }
 
-lineWidth():number {
+borderWidth():number {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+mutate_border_width(value:number):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt32(this.bb_pos + offset, value);
+  return true;
+}
+
+borderStyle():number {
   const offset = this.bb!.__offset(this.bb_pos, 20);
   return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
 }
 
-mutate_line_width(value:number):boolean {
+mutate_border_style(value:number):boolean {
   const offset = this.bb!.__offset(this.bb_pos, 20);
 
   if (offset === 0) {
@@ -126,8 +126,242 @@ mutate_line_width(value:number):boolean {
   return true;
 }
 
+borderRadius():number {
+  const offset = this.bb!.__offset(this.bb_pos, 22);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+mutate_border_radius(value:number):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 22);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt32(this.bb_pos + offset, value);
+  return true;
+}
+
+fillColor():string|null
+fillColor(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+fillColor(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 24);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+fillOpacity():number {
+  const offset = this.bb!.__offset(this.bb_pos, 26);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
+
+mutate_fill_opacity(value:number):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 26);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeFloat64(this.bb_pos + offset, value);
+  return true;
+}
+
+extendLeft():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 28);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_extend_left(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 28);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+extendRight():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 30);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_extend_right(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 30);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+text():string|null
+text(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+text(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 32);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+fontSize():number {
+  const offset = this.bb!.__offset(this.bb_pos, 34);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+mutate_font_size(value:number):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 34);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt32(this.bb_pos + offset, value);
+  return true;
+}
+
+fontColor():string|null
+fontColor(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+fontColor(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 36);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+fontBold():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 38);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_font_bold(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 38);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+fontItalic():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 40);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_font_italic(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 40);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+textAlignH():string|null
+textAlignH(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+textAlignH(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 42);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+textAlignV():string|null
+textAlignV(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+textAlignV(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 44);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+showPriceLabels():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 46);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_show_price_labels(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 46);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+showTimeLabels():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 48);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_show_time_labels(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 48);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+showMiddleLine():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 50);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+mutate_show_middle_line(value:boolean):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 50);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt8(this.bb_pos + offset, +value);
+  return true;
+}
+
+middleLineColor():string|null
+middleLineColor(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+middleLineColor(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 52);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+middleLineStyle():number {
+  const offset = this.bb!.__offset(this.bb_pos, 54);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+mutate_middle_line_style(value:number):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 54);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt32(this.bb_pos + offset, value);
+  return true;
+}
+
+middleLineWidth():number {
+  const offset = this.bb!.__offset(this.bb_pos, 56);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+mutate_middle_line_width(value:number):boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 56);
+
+  if (offset === 0) {
+    return false;
+  }
+
+  this.bb!.writeInt32(this.bb_pos + offset, value);
+  return true;
+}
+
 static startStrategyDrawing(builder:flatbuffers.Builder) {
-  builder.startObject(9);
+  builder.startObject(27);
 }
 
 static addId(builder:flatbuffers.Builder, idOffset:flatbuffers.Offset) {
@@ -158,16 +392,88 @@ static addColor(builder:flatbuffers.Builder, colorOffset:flatbuffers.Offset) {
   builder.addFieldOffset(5, colorOffset, 0);
 }
 
-static addFillOpacity(builder:flatbuffers.Builder, fillOpacity:number) {
-  builder.addFieldFloat64(6, fillOpacity, 0.0);
-}
-
 static addBorderOpacity(builder:flatbuffers.Builder, borderOpacity:number) {
-  builder.addFieldFloat64(7, borderOpacity, 0.0);
+  builder.addFieldFloat64(6, borderOpacity, 0.0);
 }
 
-static addLineWidth(builder:flatbuffers.Builder, lineWidth:number) {
-  builder.addFieldInt32(8, lineWidth, 0);
+static addBorderWidth(builder:flatbuffers.Builder, borderWidth:number) {
+  builder.addFieldInt32(7, borderWidth, 0);
+}
+
+static addBorderStyle(builder:flatbuffers.Builder, borderStyle:number) {
+  builder.addFieldInt32(8, borderStyle, 0);
+}
+
+static addBorderRadius(builder:flatbuffers.Builder, borderRadius:number) {
+  builder.addFieldInt32(9, borderRadius, 0);
+}
+
+static addFillColor(builder:flatbuffers.Builder, fillColorOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(10, fillColorOffset, 0);
+}
+
+static addFillOpacity(builder:flatbuffers.Builder, fillOpacity:number) {
+  builder.addFieldFloat64(11, fillOpacity, 0.0);
+}
+
+static addExtendLeft(builder:flatbuffers.Builder, extendLeft:boolean) {
+  builder.addFieldInt8(12, +extendLeft, +false);
+}
+
+static addExtendRight(builder:flatbuffers.Builder, extendRight:boolean) {
+  builder.addFieldInt8(13, +extendRight, +false);
+}
+
+static addText(builder:flatbuffers.Builder, textOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(14, textOffset, 0);
+}
+
+static addFontSize(builder:flatbuffers.Builder, fontSize:number) {
+  builder.addFieldInt32(15, fontSize, 0);
+}
+
+static addFontColor(builder:flatbuffers.Builder, fontColorOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(16, fontColorOffset, 0);
+}
+
+static addFontBold(builder:flatbuffers.Builder, fontBold:boolean) {
+  builder.addFieldInt8(17, +fontBold, +false);
+}
+
+static addFontItalic(builder:flatbuffers.Builder, fontItalic:boolean) {
+  builder.addFieldInt8(18, +fontItalic, +false);
+}
+
+static addTextAlignH(builder:flatbuffers.Builder, textAlignHOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(19, textAlignHOffset, 0);
+}
+
+static addTextAlignV(builder:flatbuffers.Builder, textAlignVOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(20, textAlignVOffset, 0);
+}
+
+static addShowPriceLabels(builder:flatbuffers.Builder, showPriceLabels:boolean) {
+  builder.addFieldInt8(21, +showPriceLabels, +false);
+}
+
+static addShowTimeLabels(builder:flatbuffers.Builder, showTimeLabels:boolean) {
+  builder.addFieldInt8(22, +showTimeLabels, +false);
+}
+
+static addShowMiddleLine(builder:flatbuffers.Builder, showMiddleLine:boolean) {
+  builder.addFieldInt8(23, +showMiddleLine, +false);
+}
+
+static addMiddleLineColor(builder:flatbuffers.Builder, middleLineColorOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(24, middleLineColorOffset, 0);
+}
+
+static addMiddleLineStyle(builder:flatbuffers.Builder, middleLineStyle:number) {
+  builder.addFieldInt32(25, middleLineStyle, 0);
+}
+
+static addMiddleLineWidth(builder:flatbuffers.Builder, middleLineWidth:number) {
+  builder.addFieldInt32(26, middleLineWidth, 0);
 }
 
 static endStrategyDrawing(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -175,7 +481,7 @@ static endStrategyDrawing(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createStrategyDrawing(builder:flatbuffers.Builder, idOffset:flatbuffers.Offset, toolTypeOffset:flatbuffers.Offset, symbolOffset:flatbuffers.Offset, timeframe:Timeframe, pointsOffset:flatbuffers.Offset, colorOffset:flatbuffers.Offset, fillOpacity:number, borderOpacity:number, lineWidth:number):flatbuffers.Offset {
+static createStrategyDrawing(builder:flatbuffers.Builder, idOffset:flatbuffers.Offset, toolTypeOffset:flatbuffers.Offset, symbolOffset:flatbuffers.Offset, timeframe:Timeframe, pointsOffset:flatbuffers.Offset, colorOffset:flatbuffers.Offset, borderOpacity:number, borderWidth:number, borderStyle:number, borderRadius:number, fillColorOffset:flatbuffers.Offset, fillOpacity:number, extendLeft:boolean, extendRight:boolean, textOffset:flatbuffers.Offset, fontSize:number, fontColorOffset:flatbuffers.Offset, fontBold:boolean, fontItalic:boolean, textAlignHOffset:flatbuffers.Offset, textAlignVOffset:flatbuffers.Offset, showPriceLabels:boolean, showTimeLabels:boolean, showMiddleLine:boolean, middleLineColorOffset:flatbuffers.Offset, middleLineStyle:number, middleLineWidth:number):flatbuffers.Offset {
   StrategyDrawing.startStrategyDrawing(builder);
   StrategyDrawing.addId(builder, idOffset);
   StrategyDrawing.addToolType(builder, toolTypeOffset);
@@ -183,9 +489,27 @@ static createStrategyDrawing(builder:flatbuffers.Builder, idOffset:flatbuffers.O
   StrategyDrawing.addTimeframe(builder, timeframe);
   StrategyDrawing.addPoints(builder, pointsOffset);
   StrategyDrawing.addColor(builder, colorOffset);
-  StrategyDrawing.addFillOpacity(builder, fillOpacity);
   StrategyDrawing.addBorderOpacity(builder, borderOpacity);
-  StrategyDrawing.addLineWidth(builder, lineWidth);
+  StrategyDrawing.addBorderWidth(builder, borderWidth);
+  StrategyDrawing.addBorderStyle(builder, borderStyle);
+  StrategyDrawing.addBorderRadius(builder, borderRadius);
+  StrategyDrawing.addFillColor(builder, fillColorOffset);
+  StrategyDrawing.addFillOpacity(builder, fillOpacity);
+  StrategyDrawing.addExtendLeft(builder, extendLeft);
+  StrategyDrawing.addExtendRight(builder, extendRight);
+  StrategyDrawing.addText(builder, textOffset);
+  StrategyDrawing.addFontSize(builder, fontSize);
+  StrategyDrawing.addFontColor(builder, fontColorOffset);
+  StrategyDrawing.addFontBold(builder, fontBold);
+  StrategyDrawing.addFontItalic(builder, fontItalic);
+  StrategyDrawing.addTextAlignH(builder, textAlignHOffset);
+  StrategyDrawing.addTextAlignV(builder, textAlignVOffset);
+  StrategyDrawing.addShowPriceLabels(builder, showPriceLabels);
+  StrategyDrawing.addShowTimeLabels(builder, showTimeLabels);
+  StrategyDrawing.addShowMiddleLine(builder, showMiddleLine);
+  StrategyDrawing.addMiddleLineColor(builder, middleLineColorOffset);
+  StrategyDrawing.addMiddleLineStyle(builder, middleLineStyle);
+  StrategyDrawing.addMiddleLineWidth(builder, middleLineWidth);
   return StrategyDrawing.endStrategyDrawing(builder);
 }
 }
