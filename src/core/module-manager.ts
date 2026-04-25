@@ -420,6 +420,15 @@ export class ModuleManager {
         document.addEventListener('symbol-changed', (e: Event) => {
             const { symbol } = (e as CustomEvent).detail;
             if (!symbol) return;
+
+            const oldSymbol = this.connectionManager.getCurrentSymbol();
+
+            // ── Guard — already on this symbol, skip cleanup ──
+            if (symbol === oldSymbol) return;
+
+            this.chart?.getIndicatorManager()?.onSymbolChange(symbol);
+            // ── Frontend handles drawing visibility on symbol switch ──
+            this.strategyDrawingManager?.onSymbolChange(oldSymbol, symbol);
             this.connectionManager.setSymbol(symbol);
             this.chart?.handleSymbolChange(symbol);
         });
@@ -427,11 +436,17 @@ export class ModuleManager {
         document.addEventListener('timeframe-changed', (e: Event) => {
             const { timeframe } = (e as CustomEvent).detail;
             if (!timeframe) return;
-            const oldTF = this.connectionManager.getCurrentTimeframe();
-            this.chart?.getIndicatorManager()?.onTimeframeChange(timeframe);
-            this.strategyDrawingManager?.onTFChange(oldTF, timeframe);
-            this.connectionManager.setTimeframe(timeframe);
-            this.chart?.handleTimeframeChange(timeframe);
+
+            const oldTF     = this.connectionManager.getCurrentTimeframe();
+            const newTF     = timeframe;
+
+            // ── Guard — already on this TF, skip cleanup ──
+            if (newTF === oldTF) return;
+
+            this.chart?.getIndicatorManager()?.onTimeframeChange(newTF);
+            this.strategyDrawingManager?.onTFChange(oldTF, newTF);
+            this.connectionManager.setTimeframe(newTF);
+            this.chart?.handleTimeframeChange(newTF);
         });
 
         document.addEventListener('resubscribe-indicator', (e: Event) => {
