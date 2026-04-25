@@ -29,7 +29,7 @@ export class StrategyDrawingManager {
     // ── Guard — prevent duplicate legend entries on incremental updates ──
     private deployedStrategyLegendIds = new Set<string>();
 
-    // ── Store deployed strategies for TF switch re-add ──
+    // ── Store deployed strategies for TF/symbol switch re-add ──
     private deployedStrategies: Map<string, DeployedStrategy> = new Map();
 
     constructor(
@@ -98,7 +98,7 @@ export class StrategyDrawingManager {
         if (!this.deployedStrategyLegendIds.has(legendId)) {
             this.deployedStrategyLegendIds.add(legendId);
 
-            // ── Store for TF switch re-add ──
+            // ── Store for TF/symbol switch re-add ──
             this.deployedStrategies.set(legendId, {
                 strategyKey: data.strategy_key,
                 symbol:      firstDrawing.symbol,
@@ -118,9 +118,6 @@ export class StrategyDrawingManager {
 
     // ================================================================
     // ON STRATEGY REMOVE — called from ModuleManager remove-strategy
-    // ── No legend-item-remove dispatch here ──
-    // ── chart-core already removed legend before dispatching remove-strategy ──
-    // ── module-manager dispatches legend-item-remove after calling this ──
     // ================================================================
 
     public onStrategyRemove(
@@ -163,6 +160,47 @@ export class StrategyDrawingManager {
         // ── Re-add legend entries for new TF if already deployed ──
         this.deployedStrategies.forEach((strategy, legendId) => {
             if (strategy.timeframe === newTF &&
+                !this.deployedStrategyLegendIds.has(legendId))
+            {
+                this.deployedStrategyLegendIds.add(legendId);
+                this.addLegendEntry(
+                    legendId,
+                    strategy.strategyKey,
+                    strategy.symbol,
+                    strategy.timeframe,
+                    strategy.color
+                );
+            }
+        });
+    }
+
+    // ================================================================
+    // ON SYMBOL CHANGE — called from ModuleManager symbol-changed
+    // ── Same pattern as onTFChange but matches by symbol ──
+    // ── Frontend handles drawing visibility — legend detach only ──
+    // ================================================================
+
+    public onSymbolChange(oldSymbol: string, newSymbol: string): void {
+        // ── Detach legend entries for old symbol — DOM only, no cascade ──
+        const toDetach: string[] = [];
+
+        this.deployedStrategyLegendIds.forEach(id => {
+            const strategy = this.deployedStrategies.get(id);
+            if (strategy && strategy.symbol === oldSymbol) {
+                toDetach.push(id);
+            }
+        });
+
+        toDetach.forEach(id => {
+            this.deployedStrategyLegendIds.delete(id);
+            document.dispatchEvent(new CustomEvent('legend-item-detach', {
+                detail: { id }
+            }));
+        });
+
+        // ── Re-add legend entries for new symbol if already deployed ──
+        this.deployedStrategies.forEach((strategy, legendId) => {
+            if (strategy.symbol === newSymbol &&
                 !this.deployedStrategyLegendIds.has(legendId))
             {
                 this.deployedStrategyLegendIds.add(legendId);
