@@ -20,9 +20,8 @@
 //
 // 5. Remove → dispatches 'remove-strategy' CustomEvent with
 //    { strategyType, symbol, timeframe }
-//    ModuleManager listens → connectionManager.removeStrategy()
-//    Also calls removeStrategyFromChart() + removeStrategyById()
-//    Legend remove dispatched from indicator-manager via legend-item-remove
+//    ModuleManager is sole owner of cleanup chain:
+//    removeStrategyFromChart() + removeStrategyById() + backend call
 //
 // 6. When strategy is deployed on current chart symbol+TF:
 //    Legend shows via indicator-added event from IndicatorManager
@@ -81,8 +80,6 @@ export class StrategiesModule {
         this.bindEvents();
         this.render();
 
-        // ── GET_ACTIVE_STRATEGIES sent in ws.onopen — no dispatch needed here ──
-
         console.log('✅ Strategies Module initialized');
     }
 
@@ -126,6 +123,10 @@ export class StrategiesModule {
             s.status = status;
             this.render();
         }
+    }
+
+    public hasStrategy(id: string): boolean {
+        return this.strategies.some(s => s.id === id);
     }
 
     public getCount(): number {
@@ -342,15 +343,13 @@ export class StrategiesModule {
             // ── Parse strategyType by stripping _symbol_tf from end of s.id ──
             const strategyType = s.id.replace(`_${s.symbol}_${s.tf}`, '');
 
+            // ── Dispatch only — module-manager owns full cleanup chain ──
             document.dispatchEvent(new CustomEvent('remove-strategy', {
                 detail: { strategyType, symbol: s.symbol, timeframe: s.tf }
             }));
 
             const item = detail.closest('.strat-item') as HTMLElement;
-            if (item) {
-                item.classList.add('removing');
-                setTimeout(() => this.removeStrategyById(s.id), 200);
-            }
+            if (item) item.classList.add('removing');
         });
 
         toggleRow.appendChild(removeBtn);
