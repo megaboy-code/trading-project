@@ -52,25 +52,7 @@ export class StrategyDrawingManager {
                 price:     p.price
             }));
 
-            const options = {
-                rectangle: {
-                    background: {
-                        color: hexToRgba(drawing.color, drawing.fill_opacity)
-                    },
-                    border: {
-                        radius: 0,
-                        width:  drawing.line_width,
-                        style:  0,
-                        color:  hexToRgba(drawing.color, drawing.border_opacity)
-                    },
-                    extend: { left: false, right: false }
-                },
-                showPriceAxisLabels: false,
-                showTimeAxisLabels:  false,
-                locked:              true,
-                editable:            false,
-                defaultHoverCursor:  'default'
-            };
+            const options = this.buildOptions(drawing);
 
             // ✅ Inject meta FIRST — saveDrawings() sees strategy:true
             // and skips localStorage persistence
@@ -114,6 +96,131 @@ export class StrategyDrawingManager {
                 firstDrawing.color ?? '#00d394'
             );
         }
+    }
+
+    // ================================================================
+    // BUILD OPTIONS — maps decoded drawing fields to tool options
+    // ================================================================
+
+    private buildOptions(drawing: any): any {
+        const borderColor = hexToRgba(drawing.color, drawing.border_opacity);
+        const fillColor   = drawing.fill_color
+            ? hexToRgba(drawing.fill_color, drawing.fill_opacity)
+            : hexToRgba(drawing.color,      drawing.fill_opacity);
+
+        const base: any = {
+            showPriceAxisLabels: drawing.show_price_labels,
+            showTimeAxisLabels:  drawing.show_time_labels,
+            locked:              true,
+            editable:            false,
+            defaultHoverCursor:  'default'
+        };
+
+        switch (drawing.tool_type) {
+
+            case 'Rectangle':
+                return {
+                    ...base,
+                    rectangle: {
+                        background: { color: fillColor },
+                        border: {
+                            color:  borderColor,
+                            width:  drawing.border_width,
+                            style:  drawing.border_style,
+                            radius: drawing.border_radius
+                        },
+                        extend: {
+                            left:  drawing.extend_left,
+                            right: drawing.extend_right
+                        }
+                    },
+                    text: this.buildTextOptions(drawing)
+                };
+
+            case 'ParallelChannel':
+                return {
+                    ...base,
+                    channelLine: {
+                        color: borderColor,
+                        width: drawing.border_width,
+                        style: drawing.border_style
+                    },
+                    showMiddleLine: drawing.show_middle_line,
+                    middleLine: {
+                        color: drawing.middle_line_color || borderColor,
+                        width: drawing.middle_line_width,
+                        style: drawing.middle_line_style
+                    },
+                    background: { color: fillColor },
+                    extend: {
+                        left:  drawing.extend_left,
+                        right: drawing.extend_right
+                    },
+                    text: this.buildTextOptions(drawing)
+                };
+
+            case 'TrendLine':
+            case 'Ray':
+            case 'ExtendedLine':
+            case 'HorizontalLine':
+            case 'HorizontalRay':
+            case 'VerticalLine':
+            case 'Arrow':
+                return {
+                    ...base,
+                    line: {
+                        color: borderColor,
+                        width: drawing.border_width,
+                        style: drawing.border_style
+                    },
+                    extend: {
+                        left:  drawing.extend_left,
+                        right: drawing.extend_right
+                    },
+                    text: this.buildTextOptions(drawing)
+                };
+
+            default:
+                // ── Fallback — rectangle layout ──
+                return {
+                    ...base,
+                    rectangle: {
+                        background: { color: fillColor },
+                        border: {
+                            color:  borderColor,
+                            width:  drawing.border_width,
+                            style:  drawing.border_style,
+                            radius: drawing.border_radius
+                        },
+                        extend: {
+                            left:  drawing.extend_left,
+                            right: drawing.extend_right
+                        }
+                    },
+                    text: this.buildTextOptions(drawing)
+                };
+        }
+    }
+
+    // ================================================================
+    // BUILD TEXT OPTIONS — shared across tool types
+    // ================================================================
+
+    private buildTextOptions(drawing: any): any {
+        if (!drawing.text) return undefined;
+        return {
+            value: drawing.text,
+            font: {
+                size:  drawing.font_size,
+                color: drawing.font_color || drawing.color,
+                bold:  drawing.font_bold,
+                style: drawing.font_italic ? 'italic' : 'normal'
+            },
+            align: {
+                h: drawing.text_align_h,
+                v: drawing.text_align_v
+            }
+        };
     }
 
     // ================================================================
