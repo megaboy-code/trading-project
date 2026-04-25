@@ -639,6 +639,35 @@ export class ChartDrawingModule {
   }
 
   // ================================================================
+  // SOFT DELETE BY ID — called for removed_ids from backend
+  // Hides immediately — hard delete happens on TF switch via purgeDeletedTools()
+  // ================================================================
+
+  public softDeleteDrawingById(id: string): void {
+    if (!this.lineTools || !this.isInitialized) return;
+    try {
+      const toolDataJson = this.lineTools.getLineToolByID(id);
+      if (!toolDataJson) return;
+
+      const parsed = JSON.parse(toolDataJson);
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+
+      // ── Hide immediately ──
+      this.lineTools.applyLineToolOptions({
+        id,
+        toolType: parsed[0].toolType,
+        options:  { ...parsed[0].options, visible: false }
+      });
+
+      // ── Mark deleted in metaMap — purgeDeletedTools() will hard remove on TF switch ──
+      this.persistence.deleteMeta(id);
+
+    } catch (error) {
+      console.error('❌ softDeleteDrawingById failed:', error);
+    }
+  }
+
+  // ================================================================
   // ✅ refreshVisibility — re-apply TF visibility after strategy
   // drawings are created so tools aren't hidden by stale run
   // ================================================================
@@ -792,17 +821,23 @@ export class ChartDrawingModule {
     return '[]';
   }
 
-  // ✅ Now async — registers tool group before calling engine
+  // ✅ Skip saveDrawings() for strategy tools — never persisted
+  // Strategy tools are resent by backend on reconnect
   public async createOrUpdateLineTool(type: string, points: any[], options: any, id: string): Promise<void> {
     if (!this.lineTools || !this.isInitialized) return;
     try {
-      // ✅ Ensure group registered before creating — strategy drawings bypass startDrawing()
       const groupName = TOOL_GROUP_MAP[type];
       if (groupName) await this.loadAndRegisterGroup(groupName);
 
       if (typeof this.lineTools.createOrUpdateLineTool === 'function') {
         this.lineTools.createOrUpdateLineTool(type, points, options, id);
-        this.persistence.saveDrawings();
+
+        // ── Skip save for strategy tools — never persisted ──
+        // Strategy tools are resent by backend on reconnect ──
+        const meta = this.persistence.getMeta(id);
+        if (!meta?.strategy) {
+          this.persistence.saveDrawings();
+        }
       }
     } catch (error) {
       console.error('❌ Failed to create/update line tool:', error);
