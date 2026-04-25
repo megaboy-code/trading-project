@@ -87,9 +87,6 @@ export class ChartModule {
             }
         };
 
-        // ✅ Fix 1 — dispatch chart-initial-data-loaded after double rAF resolves
-        // in SeriesManager.setData() — indicators now map timestamps against a
-        // fully initialized scale — prevents wrong indicator rendering on TF switch
         this.mainChart.onSeriesDataReady = () => {
             this.drawingModule?.onDataReady();
 
@@ -648,15 +645,17 @@ export class ChartModule {
                 return;
             }
 
-            // ── If item already gone — module-manager dispatched this after removal ──
-            // ── Skip to avoid re-triggering remove-strategy loop ──
             const item = this.chartLegend?.getItem(id);
-            if (!item) {
-                this.chartLegend?.removeItem(id);
-                return;
-            }
+
+            // ── Item already gone — module-manager dispatched this after removal ──
+            // ── Skip to avoid re-triggering remove-strategy loop ──
+            if (!item) return;
 
             if (item.icon === 'fa-robot') {
+                // ── Remove item FIRST before dispatching remove-strategy ──
+                // ── So module-manager's legend-item-remove dispatch finds it gone ──
+                this.chartLegend?.removeItem(id);
+
                 const lastUnderscore       = id.lastIndexOf('_');
                 const secondLastUnderscore = id.lastIndexOf('_', lastUnderscore - 1);
                 const strategyType         = id.substring(0, secondLastUnderscore);
