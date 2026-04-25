@@ -243,15 +243,48 @@ export interface StrategyDrawingPointData {
 }
 
 export interface StrategyDrawingData {
+    // ── Identity ──
     id:             string;
     tool_type:      string;
     symbol:         string;
     timeframe:      string;
+
+    // ── Geometry ──
     points:         StrategyDrawingPointData[];
+
+    // ── Border ──
     color:          string;
-    fill_opacity:   number;
     border_opacity: number;
-    line_width:     number;
+    border_width:   number;
+    border_style:   number;
+    border_radius:  number;
+
+    // ── Fill ──
+    fill_color:     string;
+    fill_opacity:   number;
+
+    // ── Extension ──
+    extend_left:    boolean;
+    extend_right:   boolean;
+
+    // ── Text/Label ──
+    text:           string;
+    font_size:      number;
+    font_color:     string;
+    font_bold:      boolean;
+    font_italic:    boolean;
+    text_align_h:   string;
+    text_align_v:   string;
+
+    // ── Visibility ──
+    show_price_labels: boolean;
+    show_time_labels:  boolean;
+
+    // ── Parallel channel specific ──
+    show_middle_line:   boolean;
+    middle_line_color:  string;
+    middle_line_style:  number;
+    middle_line_width:  number;
 }
 
 export interface StrategyDrawingUpdatePayload {
@@ -776,15 +809,48 @@ export class MegaFlowzDecoder {
                         }
 
                         drawings.push({
-                            id:             d.id()            ?? '',
-                            tool_type:      d.toolType()      ?? '',
-                            symbol:         d.symbol()        ?? '',
+                            // ── Identity ──
+                            id:             d.id()           ?? '',
+                            tool_type:      d.toolType()     ?? '',
+                            symbol:         d.symbol()       ?? '',
                             timeframe:      tfToString(d.timeframe()),
+
+                            // ── Geometry ──
                             points,
-                            color:          d.color()         ?? '#2962ff',
-                            fill_opacity:   d.fillOpacity(),
+
+                            // ── Border ──
+                            color:          d.color()        ?? '#2962ff',
                             border_opacity: d.borderOpacity(),
-                            line_width:     d.lineWidth()
+                            border_width:   d.borderWidth(),
+                            border_style:   d.borderStyle(),
+                            border_radius:  d.borderRadius(),
+
+                            // ── Fill ──
+                            fill_color:     d.fillColor()    ?? '',
+                            fill_opacity:   d.fillOpacity(),
+
+                            // ── Extension ──
+                            extend_left:    d.extendLeft(),
+                            extend_right:   d.extendRight(),
+
+                            // ── Text/Label ──
+                            text:           d.text()         ?? '',
+                            font_size:      d.fontSize(),
+                            font_color:     d.fontColor()    ?? '',
+                            font_bold:      d.fontBold(),
+                            font_italic:    d.fontItalic(),
+                            text_align_h:   d.textAlignH()   ?? 'left',
+                            text_align_v:   d.textAlignV()   ?? 'middle',
+
+                            // ── Visibility ──
+                            show_price_labels: d.showPriceLabels(),
+                            show_time_labels:  d.showTimeLabels(),
+
+                            // ── Parallel channel specific ──
+                            show_middle_line:  d.showMiddleLine(),
+                            middle_line_color: d.middleLineColor() ?? '',
+                            middle_line_style: d.middleLineStyle(),
+                            middle_line_width: d.middleLineWidth()
                         });
                     }
 
