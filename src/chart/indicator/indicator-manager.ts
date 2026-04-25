@@ -953,6 +953,10 @@ export class IndicatorManager {
         return this.pool.has(id);
     }
 
+    public isStrategy(id: string): boolean {
+        return this.pool.get(id)?.isStrategy ?? false;
+    }
+
     public getSavedSettings(key: string): Map<string, SavedLineSettings> | null {
         return this.savedSettings.get(key) ?? null;
     }
