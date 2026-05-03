@@ -188,16 +188,32 @@ export interface AvailableSymbolData {
 }
 
 // ================================================================
-// SMC SETTINGS — frontend builds settings panel dynamically
-// Only populated for SMC strategy item
+// PERIOD FIELD — one input row in settings modal
+// type: "number" | "select"
+// options: only populated when type = "select"
 // ================================================================
-export interface SMCSettingsData {
-    min_gap_pct:      number;
-    max_fvg:          number;
-    mitigation_mode:  string;    // current value
-    mitigation_modes: string[];  // ["touch", "fifty", "full"] — dropdown options
+export interface PeriodFieldData {
+    field:   string;
+    label:   string;
+    type:    string;
+    min:     number;
+    max:     number;
+    step:    number;
+    value:   string;
+    options: string[];
 }
 
+// ================================================================
+// LINE LABEL ENTRY — maps line name to display label
+// ================================================================
+export interface LineLabelEntryData {
+    key:   string;
+    value: string;
+}
+
+// ================================================================
+// AVAILABLE ITEM — backend driven, frontend renders dynamically
+// ================================================================
 export interface AvailableItemData {
     key:           string;
     label:         string;
@@ -219,8 +235,8 @@ export interface AvailableItemData {
     price_type:    string;
     symbol:        string;
     timeframe:     string;
-    // ── SMC only — null for all other strategies/indicators ──
-    smc_settings:  SMCSettingsData | null;
+    period_fields: PeriodFieldData[];
+    line_labels:   Record<string, string>;
 }
 
 export interface AvailableConfigPayload {
@@ -256,31 +272,20 @@ export interface StrategyDrawingPointData {
 }
 
 export interface StrategyDrawingData {
-    // ── Identity ──
     id:             string;
     tool_type:      string;
     symbol:         string;
     timeframe:      string;
-
-    // ── Geometry ──
     points:         StrategyDrawingPointData[];
-
-    // ── Border ──
     color:          string;
     border_opacity: number;
     border_width:   number;
     border_style:   number;
     border_radius:  number;
-
-    // ── Fill ──
     fill_color:     string;
     fill_opacity:   number;
-
-    // ── Extension ──
     extend_left:    boolean;
     extend_right:   boolean;
-
-    // ── Text/Label ──
     text:           string;
     font_size:      number;
     font_color:     string;
@@ -288,12 +293,8 @@ export interface StrategyDrawingData {
     font_italic:    boolean;
     text_align_h:   string;
     text_align_v:   string;
-
-    // ── Visibility ──
     show_price_labels: boolean;
     show_time_labels:  boolean;
-
-    // ── Parallel channel specific ──
     show_middle_line:   boolean;
     middle_line_color:  string;
     middle_line_style:  number;
@@ -303,7 +304,7 @@ export interface StrategyDrawingData {
 export interface StrategyDrawingUpdatePayload {
     strategy_key: string;
     drawings:     StrategyDrawingData[];
-    removed_ids:  string[]; // mitigated — soft delete on frontend
+    removed_ids:  string[];
 }
 
 // ================================================================
@@ -374,21 +375,39 @@ function extractCandle(c: any): CandleData {
 // ================================================================
 
 function extractAvailableItem(item: AvailableItem): AvailableItemData {
-    // ── Extract SMC settings if present ──
-    let smc_settings: SMCSettingsData | null = null;
-    const smc = item.smcSettings();
-    if (smc) {
-        const modes: string[] = [];
-        for (let i = 0; i < smc.mitigationModesLength(); i++) {
-            const m = smc.mitigationModes(i);
-            if (m) modes.push(m);
+
+    // ── Period fields ──
+    const period_fields: PeriodFieldData[] = [];
+    for (let i = 0; i < item.periodFieldsLength(); i++) {
+        const f = item.periodFields(i);
+        if (!f) continue;
+
+        const options: string[] = [];
+        for (let j = 0; j < f.optionsLength(); j++) {
+            const opt = f.options(j);
+            if (opt) options.push(opt);
         }
-        smc_settings = {
-            min_gap_pct:      smc.minGapPct(),
-            max_fvg:          smc.maxFvg(),
-            mitigation_mode:  smc.mitigationMode() ?? 'touch',
-            mitigation_modes: modes
-        };
+
+        period_fields.push({
+            field:   f.field()   ?? '',
+            label:   f.label()   ?? '',
+            type:    f.type()    ?? 'number',
+            min:     f.min(),
+            max:     f.max(),
+            step:    f.step(),
+            value:   f.value()   ?? '',
+            options
+        });
+    }
+
+    // ── Line labels — array of entries → Record ──
+    const line_labels: Record<string, string> = {};
+    for (let i = 0; i < item.lineLabelsLength(); i++) {
+        const e = item.lineLabels(i);
+        if (!e) continue;
+        const k = e.key();
+        const v = e.value();
+        if (k) line_labels[k] = v ?? '';
     }
 
     return {
@@ -412,7 +431,8 @@ function extractAvailableItem(item: AvailableItem): AvailableItemData {
         price_type:    item.priceType()   ?? 'close',
         symbol:        item.symbol()      ?? '',
         timeframe:     item.timeframe()   ?? '',
-        smc_settings
+        period_fields,
+        line_labels
     };
 }
 
@@ -779,7 +799,6 @@ export class MegaFlowzDecoder {
                         });
                     }
 
-                    // ── removed_ids — mitigated drawings to soft delete ──
                     const removed_ids: string[] = [];
                     for (let i = 0; i < p.removedIdsLength(); i++) {
                         const id = p.removedIds(i);
