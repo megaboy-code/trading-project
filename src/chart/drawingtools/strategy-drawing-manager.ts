@@ -188,6 +188,12 @@ export class StrategyDrawingManager {
                     text: this.buildTextOptions(drawing)
                 };
 
+            case 'Text':
+                return {
+                    ...base,
+                    text: this.buildTextOptions(drawing)
+                };
+
             default:
                 // ── Fallback — rectangle layout ──
                 return {
@@ -212,6 +218,8 @@ export class StrategyDrawingManager {
 
     // ================================================================
     // BUILD TEXT OPTIONS — shared across tool types
+    // Uses box.alignment.horizontal + box.alignment.vertical
+    // Matches renderer path: options.text.box.alignment.horizontal/vertical
     // ================================================================
 
     private buildTextOptions(drawing: any): any {
@@ -224,9 +232,11 @@ export class StrategyDrawingManager {
                 bold:  drawing.font_bold,
                 style: drawing.font_italic ? 'italic' : 'normal'
             },
-            align: {
-                h: drawing.text_align_h,
-                v: drawing.text_align_v
+            box: {
+                alignment: {
+                    horizontal: drawing.text_align_h,
+                    vertical:   drawing.text_align_v
+                }
             }
         };
     }
