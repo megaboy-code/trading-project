@@ -6,6 +6,8 @@
 // One series per line in IndicatorUpdate.lines[]
 // Colors and line width owned by frontend
 // Persistence — active subs + period overrides in localStorage
+// Single owner of all legend adds — indicators + strategies
+// Settings modal owned here — reads paramsMap directly
 // ================================================================
 
 import { LineSeries, ISeriesApi, SeriesType } from 'lightweight-charts';
@@ -67,6 +69,11 @@ interface ActiveIndicator {
     active:     boolean;
 }
 
+// ================================================================
+// INDICATOR PARAMS — full config from backend
+// period_fields — drives input rows in settings modal
+// line_labels   — drives line display names in settings modal
+// ================================================================
 interface IndicatorParams {
     period:        number;
     fast_period:   number;
@@ -82,6 +89,8 @@ interface IndicatorParams {
     price_type:    string;
     is_strategy:   boolean;
     description:   string;
+    period_fields: Array<{ field: string; label: string }>;
+    line_labels:   Record<string, string>;
 }
 
 export interface IndicatorUpdatePayload {
@@ -160,10 +169,10 @@ export class IndicatorManager {
 
     // ==================== SETUP ====================
 
-    public setChart(chart: any):             void { this.chart            = chart; }
-    public setMainChart(mainChart: any):     void { this.mainChart        = mainChart; }
-    public setSymbol(symbol: string):        void { this.currentSymbol    = symbol; }
-    public setTimeframe(timeframe: string):  void { this.currentTimeframe = timeframe; }
+    public setChart(chart: any):            void { this.chart            = chart; }
+    public setMainChart(mainChart: any):    void { this.mainChart        = mainChart; }
+    public setSymbol(symbol: string):       void { this.currentSymbol    = symbol; }
+    public setTimeframe(timeframe: string): void { this.currentTimeframe = timeframe; }
 
     public initialize(): void {
         try {
@@ -189,6 +198,7 @@ export class IndicatorManager {
         this.abortController = new AbortController();
         const { signal } = this.abortController;
 
+        // ── Chart initial data loaded — resubscribe all active subs ──
         document.addEventListener('chart-initial-data-loaded', (e: Event) => {
             const { symbol, timeframe } = (e as CustomEvent).detail;
             if (!symbol || !timeframe) return;
@@ -198,12 +208,7 @@ export class IndicatorManager {
             this.activeSubs.forEach(sub => {
                 const period = this.periodOverrides.get(sub.key) ?? sub.period;
                 document.dispatchEvent(new CustomEvent('resubscribe-indicator', {
-                    detail: {
-                        key:      sub.key,
-                        symbol,
-                        timeframe,
-                        period
-                    }
+                    detail: { key: sub.key, symbol, timeframe, period }
                 }));
             });
 
@@ -217,11 +222,13 @@ export class IndicatorManager {
 
         }, { signal });
 
+        // ── Settings changed — live preview ──
         document.addEventListener('indicator-settings-changed', (e: Event) => {
             const { indicatorId, lines } = (e as CustomEvent).detail;
             if (indicatorId && lines) this.updateLines(indicatorId, lines);
         }, { signal });
 
+        // ── Period changed — resubscribe ──
         document.addEventListener('indicator-period-changed', (e: Event) => {
             const { indicatorId, periodOverrides } = (e as CustomEvent).detail;
             if (!indicatorId || !periodOverrides) return;
@@ -268,6 +275,7 @@ export class IndicatorManager {
             }));
         }, { signal });
 
+        // ── Available config — populate paramsMap ──
         document.addEventListener('available-config-received', (e: Event) => {
             const config = (e as CustomEvent).detail;
             if (!config) return;
@@ -289,15 +297,127 @@ export class IndicatorManager {
                     d_period:      item.d_period      ?? 0,
                     slowing:       item.slowing       ?? 0,
                     deviation:     item.deviation     ?? 0.0,
-                    overbought:    item.overbought     ?? 0,
+                    overbought:    item.overbought    ?? 0,
                     oversold:      item.oversold      ?? 0,
                     volume:        item.volume        ?? 0.0,
                     price_type:    item.price_type    ?? 'close',
                     is_strategy:   item.is_strategy   ?? false,
-                    description:   item.description   ?? ''
+                    description:   item.description   ?? '',
+                    // ── New fields from decoder ──
+                    period_fields: item.period_fields ?? [],
+                    line_labels:   item.line_labels   ?? {}
                 });
             });
         }, { signal });
+
+        // ── Settings modal request — owned here ──
+        // chart-core fires this, indicator-manager handles it
+        document.addEventListener('indicator-settings-request', (e: Event) => {
+            const { indicatorId, triggerRect } = (e as CustomEvent).detail;
+            if (!indicatorId) return;
+            this.openSettingsModal(indicatorId, triggerRect);
+        }, { signal });
+
+        // ── Strategy legend add — fired by strategy-drawing-manager ──
+        // Guard: skip if legendId already exists
+        document.addEventListener('strategy-legend-add', (e: Event) => {
+            const { legendId, strategyKey, symbol, timeframe, color } =
+                (e as CustomEvent).detail;
+            if (!legendId || !strategyKey) return;
+
+            // ── Guard — prevent duplicate legend entries ──
+            if (this.legendIds.has(legendId)) return;
+
+            this.legendIds.add(legendId);
+
+            const params = this.paramsMap.get(strategyKey);
+
+            document.dispatchEvent(new CustomEvent('indicator-added', {
+                detail: {
+                    id:       legendId,
+                    name:     strategyKey,
+                    color,
+                    icon:     'fa-robot',
+                    pane:     null,
+                    values:   [],
+                    settings: params ? this.getEffectiveSettings(strategyKey) : {}
+                }
+            }));
+        }, { signal });
+
+        // ── Strategy legend remove — fired by strategy-drawing-manager ──
+        document.addEventListener('strategy-legend-remove', (e: Event) => {
+            const { legendId } = (e as CustomEvent).detail;
+            if (!legendId) return;
+            this.legendIds.delete(legendId);
+        }, { signal });
+    }
+
+    // ================================================================
+    // OPEN SETTINGS MODAL — owned by indicator-manager
+    // Reads paramsMap directly — no dependency on chart-ui
+    // ================================================================
+    private openSettingsModal(indicatorId: string, triggerRect?: DOMRect): void {
+        const indicator = this.pool.get(indicatorId);
+
+        // ── Strategy legend — no series in pool, build item from paramsMap ──
+        const isStrategyLegend = !indicator && this.legendIds.has(indicatorId);
+
+        let item: any;
+
+        if (indicator) {
+            const params  = this.paramsMap.get(indicator.key);
+            const keySaved = this.savedSettings.get(indicator.key);
+
+            const savedLines: Record<string, any> = {};
+            if (keySaved) {
+                keySaved.forEach((v, k) => { savedLines[k] = v; });
+            }
+
+            const values = Array.from(indicator.lines.values()).map(line => ({
+                key:   line.name,
+                label: this.getLineLabel(indicator.key, line.name),
+                value: line.lastValue.toFixed(getDecimalPrecision(indicator.symbol)),
+                color: line.color
+            }));
+
+            item = {
+                id:       indicatorId,
+                name:     indicator.label,
+                color:    values[0]?.color ?? LINE_COLORS[0],
+                icon:     indicator.isStrategy ? 'fa-robot' : undefined,
+                pane:     null,
+                values,
+                settings: {
+                    ...this.getEffectiveSettings(indicator.key),
+                    savedLines
+                }
+            };
+
+        } else if (isStrategyLegend) {
+            // ── Extract key from legendId: strategyKey_symbol_tf ──
+            const parts       = indicatorId.split('_');
+            const strategyKey = parts.slice(0, -2).join('_');
+            const params      = this.paramsMap.get(strategyKey);
+
+            item = {
+                id:       indicatorId,
+                name:     strategyKey,
+                color:    LINE_COLORS[0],
+                icon:     'fa-robot',
+                pane:     null,
+                values:   [],
+                settings: params ? this.getEffectiveSettings(strategyKey) : {}
+            };
+        } else {
+            return;
+        }
+
+        import('./ui/indicator-settings-modal').then(
+            ({ IndicatorSettingsModal }) => {
+                new IndicatorSettingsModal(item, triggerRect).open();
+            }
+        );
     }
 
     // ================================================================
@@ -322,28 +442,37 @@ export class IndicatorManager {
     }
 
     // ================================================================
-    // GET PERIOD LABEL
+    // GET LINE LABEL — reads from paramsMap line_labels
+    // ================================================================
+    private getLineLabel(key: string, lineName: string): string {
+        const params = this.paramsMap.get(key);
+        if (!params) return '';
+        return params.line_labels[lineName] ?? '';
+    }
+
+    // ================================================================
+    // GET PERIOD LABEL — for legend value display
     // ================================================================
     private getPeriodLabel(key: string, lineName: string): string {
         const params = this.paramsMap.get(key);
         if (!params) return '';
 
-        if (lineName === 'ema' || lineName === 'sma' || lineName === 'line') {
-            const period = this.periodOverrides.get(key) ?? params.period;
+        const lineLabel = params.line_labels[lineName] ?? lineName;
+        const override  = this.periodOverrides.get(key);
+
+        // ── Only show period label for single-period indicators ──
+        if (params.period_fields.length === 1 &&
+            params.period_fields[0].field === 'period')
+        {
+            const period = override ?? params.period;
             return period > 0 ? `(${period})` : '';
-        }
-        if (lineName === 'fast') {
-            return params.fast_period > 0 ? `(${params.fast_period})` : '';
-        }
-        if (lineName === 'slow') {
-            return params.slow_period > 0 ? `(${params.slow_period})` : '';
         }
 
         return '';
     }
 
     // ================================================================
-    // GET EFFECTIVE SETTINGS
+    // GET EFFECTIVE SETTINGS — merges params + period overrides
     // ================================================================
     private getEffectiveSettings(key: string): Record<string, any> {
         const params = this.paramsMap.get(key);
@@ -523,6 +652,7 @@ export class IndicatorManager {
             this.persistActiveSubs();
         }
 
+        // ── Guard — prevent duplicate legend entries ──
         if (this.legendIds.has(id)) {
             document.dispatchEvent(new CustomEvent('indicator-value-update', {
                 detail: { id, values: legendValues }
@@ -610,17 +740,21 @@ export class IndicatorManager {
         }
 
         if (!indicator.active && indicator.isStrategy) {
-            document.dispatchEvent(new CustomEvent('indicator-added', {
-                detail: {
-                    id:       indicator.id,
-                    name:     indicator.label,
-                    color:    legendValues[0]?.color,
-                    icon:     'fa-robot',
-                    pane:     null,
-                    values:   legendValues,
-                    settings: this.getEffectiveSettings(indicator.key)
-                }
-            }));
+            // ── Guard — prevent duplicate legend entries ──
+            if (!this.legendIds.has(indicator.id)) {
+                this.legendIds.add(indicator.id);
+                document.dispatchEvent(new CustomEvent('indicator-added', {
+                    detail: {
+                        id:       indicator.id,
+                        name:     indicator.label,
+                        color:    legendValues[0]?.color,
+                        icon:     'fa-robot',
+                        pane:     null,
+                        values:   legendValues,
+                        settings: this.getEffectiveSettings(indicator.key)
+                    }
+                }));
+            }
         }
     }
 
@@ -679,6 +813,7 @@ export class IndicatorManager {
         });
 
         toHide.forEach(id => {
+            this.legendIds.delete(id);
             document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
                 detail: { id, deployedTF: this.pool.get(id)?.timeframe }
             }));
@@ -760,6 +895,7 @@ export class IndicatorManager {
         });
 
         toHide.forEach(id => {
+            this.legendIds.delete(id);
             document.dispatchEvent(new CustomEvent('indicator-tf-inactive', {
                 detail: { id }
             }));
@@ -838,9 +974,6 @@ export class IndicatorManager {
 
     // ================================================================
     // REMOVE STRATEGY FROM CHART — frontend only, no backend call
-    // ── No legend-item-remove dispatch here ──
-    // ── chart-core removes legend before dispatching remove-strategy ──
-    // ── module-manager dispatches legend-item-remove after calling this ──
     // ================================================================
     public removeStrategyFromChart(id: string): void {
         const indicator = this.pool.get(id);
@@ -907,11 +1040,11 @@ export class IndicatorManager {
 
             const apply: any = {};
 
-            if (opts.color                  !== undefined) { apply.color                  = opts.color;                  line.color                  = opts.color; }
-            if (opts.lineWidth              !== undefined) { apply.lineWidth              = opts.lineWidth;               line.width                  = opts.lineWidth; }
-            if (opts.priceLineVisible       !== undefined) { apply.priceLineVisible       = opts.priceLineVisible;        line.priceLineVisible       = opts.priceLineVisible; }
-            if (opts.lastValueVisible       !== undefined) { apply.lastValueVisible       = opts.lastValueVisible;        line.lastValueVisible       = opts.lastValueVisible; }
-            if (opts.crosshairMarkerVisible !== undefined) { apply.crosshairMarkerVisible = opts.crosshairMarkerVisible;  line.crosshairMarkerVisible = opts.crosshairMarkerVisible; }
+            if (opts.color                  !== undefined) { apply.color                  = opts.color;                 line.color                  = opts.color; }
+            if (opts.lineWidth              !== undefined) { apply.lineWidth              = opts.lineWidth;              line.width                  = opts.lineWidth; }
+            if (opts.priceLineVisible       !== undefined) { apply.priceLineVisible       = opts.priceLineVisible;       line.priceLineVisible       = opts.priceLineVisible; }
+            if (opts.lastValueVisible       !== undefined) { apply.lastValueVisible       = opts.lastValueVisible;       line.lastValueVisible       = opts.lastValueVisible; }
+            if (opts.crosshairMarkerVisible !== undefined) { apply.crosshairMarkerVisible = opts.crosshairMarkerVisible; line.crosshairMarkerVisible = opts.crosshairMarkerVisible; }
 
             try { line.series.applyOptions(apply); } catch (e) {}
 

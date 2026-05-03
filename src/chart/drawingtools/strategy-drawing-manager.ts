@@ -1,7 +1,9 @@
 // ================================================================
 // 🤖 STRATEGY DRAWING MANAGER
-// Owns full lifecycle of strategy drawing tools + legend entries
-// Called by ModuleManager — no drawing logic leaks into it
+// Owns full lifecycle of strategy drawing tools only
+// Legend owned by indicator-manager — fires events, never touches legend directly
+// strategy-legend-add  → indicator-manager adds legend entry with guard
+// strategy-legend-remove → indicator-manager cleans legendIds
 // ================================================================
 
 import { hexToRgba } from '../chart-utils';
@@ -27,10 +29,7 @@ interface DeployedStrategy {
 
 export class StrategyDrawingManager {
 
-    // ── Guard — prevent duplicate legend entries on incremental updates ──
-    private deployedStrategyLegendIds = new Set<string>();
-
-    // ── Store deployed strategies for TF/symbol switch re-add ──
+    // ── Deployed strategies — source of truth for TF/symbol switch ──
     private deployedStrategies: Map<string, DeployedStrategy> = new Map();
 
     constructor(
@@ -54,8 +53,7 @@ export class StrategyDrawingManager {
 
             const options = this.buildOptions(drawing);
 
-            // ✅ Inject meta FIRST — saveDrawings() sees strategy:true
-            // and skips localStorage persistence
+            // ── Inject meta FIRST — saveDrawings() sees strategy:true ──
             this.drawingModule.injectStrategyMeta(
                 drawing.id,
                 drawing.symbol,
@@ -71,24 +69,22 @@ export class StrategyDrawingManager {
             );
         }));
 
-        // ── Soft delete removed_ids — hide immediately ──
-        // Hard delete happens on TF switch via purgeDeletedTools()
+        // ── Soft delete removed_ids ──
         for (const id of data.removed_ids ?? []) {
             this.drawingModule.softDeleteDrawingById(id);
         }
 
-        // ✅ Re-apply visibility after all tools placed + removals applied
+        // ── Re-apply visibility after all tools placed + removals ──
         this.drawingModule.refreshVisibility();
 
-        // ── Legend + panel — only once per strategy per TF ──
+        // ── Panel + legend — only once per strategy per TF ──
         if (!firstDrawing) return;
 
         const legendId = `${data.strategy_key}_${firstDrawing.symbol}_${firstDrawing.timeframe}`;
 
-        if (!this.deployedStrategyLegendIds.has(legendId)) {
-            this.deployedStrategyLegendIds.add(legendId);
-
-            // ── Store for TF/symbol switch re-add ──
+        // ── Store for TF/symbol switch re-add ──
+        // ── Always update even if already stored — color may change ──
+        if (!this.deployedStrategies.has(legendId)) {
             this.deployedStrategies.set(legendId, {
                 strategyKey: data.strategy_key,
                 symbol:      firstDrawing.symbol,
@@ -96,12 +92,21 @@ export class StrategyDrawingManager {
                 color:       firstDrawing.color ?? '#00d394'
             });
 
-            this.addLegendEntry(
+            // ── Fire event — indicator-manager owns legend add + guard ──
+            this.fireLegendAdd(
                 legendId,
                 data.strategy_key,
                 firstDrawing.symbol,
                 firstDrawing.timeframe,
                 firstDrawing.color ?? '#00d394'
+            );
+
+            // ── Panel — strategies module owns panel entry ──
+            this.addPanelEntry(
+                legendId,
+                data.strategy_key,
+                firstDrawing.symbol,
+                firstDrawing.timeframe
             );
         }
     }
@@ -195,7 +200,6 @@ export class StrategyDrawingManager {
                 };
 
             default:
-                // ── Fallback — rectangle layout ──
                 return {
                     ...base,
                     rectangle: {
@@ -217,9 +221,7 @@ export class StrategyDrawingManager {
     }
 
     // ================================================================
-    // BUILD TEXT OPTIONS — shared across tool types
-    // Uses box.alignment.horizontal + box.alignment.vertical
-    // Matches renderer path: options.text.box.alignment.horizontal/vertical
+    // BUILD TEXT OPTIONS
     // ================================================================
 
     private buildTextOptions(drawing: any): any {
@@ -252,117 +254,123 @@ export class StrategyDrawingManager {
     ): void {
         const legendId = `${strategyKey}_${symbol}_${timeframe}`;
 
-        this.deployedStrategyLegendIds.delete(legendId);
         this.deployedStrategies.delete(legendId);
+
+        // ── Fire remove event — indicator-manager cleans legendIds ──
+        document.dispatchEvent(new CustomEvent('strategy-legend-remove', {
+            detail: { legendId }
+        }));
 
         this.drawingModule.removeStrategyDrawings(strategyKey, symbol, timeframe);
     }
 
     // ================================================================
-    // ON TF CHANGE — called from ModuleManager timeframe-changed
-    // ── Detaches legend DOM only — no cascade into remove-strategy ──
-    // ── Drawing tools hide themselves via applyTFVisibility ──
-    // ── Hard remove only happens via X button → legend-item-remove ──
+    // ON TF CHANGE — drawing tools hide via applyTFVisibility
+    // Legend detach — fire event, indicator-manager handles
+    // Re-add legend for new TF if already deployed
     // ================================================================
 
     public onTFChange(oldTF: string, newTF: string): void {
-        // ── Detach legend entries for old TF — DOM only, no cascade ──
-        const toDetach: string[] = [];
-
-        this.deployedStrategyLegendIds.forEach(id => {
-            if (id.endsWith(`_${oldTF}`)) {
-                toDetach.push(id);
+        // ── Detach legend entries for old TF ──
+        this.deployedStrategies.forEach((strategy, legendId) => {
+            if (strategy.timeframe === oldTF) {
+                document.dispatchEvent(new CustomEvent('legend-item-detach', {
+                    detail: { id: legendId }
+                }));
+                // ── Tell indicator-manager to clean its legendIds ──
+                document.dispatchEvent(new CustomEvent('strategy-legend-remove', {
+                    detail: { legendId }
+                }));
             }
-        });
-
-        toDetach.forEach(id => {
-            this.deployedStrategyLegendIds.delete(id);
-            document.dispatchEvent(new CustomEvent('legend-item-detach', {
-                detail: { id }
-            }));
         });
 
         // ── Re-add legend entries for new TF if already deployed ──
         this.deployedStrategies.forEach((strategy, legendId) => {
-            if (strategy.timeframe === newTF &&
-                !this.deployedStrategyLegendIds.has(legendId))
-            {
-                this.deployedStrategyLegendIds.add(legendId);
-                this.addLegendEntry(
+            if (strategy.timeframe === newTF) {
+                this.fireLegendAdd(
                     legendId,
                     strategy.strategyKey,
                     strategy.symbol,
                     strategy.timeframe,
                     strategy.color
                 );
+
+                this.addPanelEntry(
+                    legendId,
+                    strategy.strategyKey,
+                    strategy.symbol,
+                    strategy.timeframe
+                );
             }
         });
     }
 
     // ================================================================
-    // ON SYMBOL CHANGE — called from ModuleManager symbol-changed
-    // ── Same pattern as onTFChange but matches by symbol ──
-    // ── Frontend handles drawing visibility — legend detach only ──
+    // ON SYMBOL CHANGE — same pattern as onTFChange but by symbol
     // ================================================================
 
     public onSymbolChange(oldSymbol: string, newSymbol: string): void {
-        // ── Detach legend entries for old symbol — DOM only, no cascade ──
-        const toDetach: string[] = [];
-
-        this.deployedStrategyLegendIds.forEach(id => {
-            const strategy = this.deployedStrategies.get(id);
-            if (strategy && strategy.symbol === oldSymbol) {
-                toDetach.push(id);
+        // ── Detach legend entries for old symbol ──
+        this.deployedStrategies.forEach((strategy, legendId) => {
+            if (strategy.symbol === oldSymbol) {
+                document.dispatchEvent(new CustomEvent('legend-item-detach', {
+                    detail: { id: legendId }
+                }));
+                document.dispatchEvent(new CustomEvent('strategy-legend-remove', {
+                    detail: { legendId }
+                }));
             }
-        });
-
-        toDetach.forEach(id => {
-            this.deployedStrategyLegendIds.delete(id);
-            document.dispatchEvent(new CustomEvent('legend-item-detach', {
-                detail: { id }
-            }));
         });
 
         // ── Re-add legend entries for new symbol if already deployed ──
         this.deployedStrategies.forEach((strategy, legendId) => {
-            if (strategy.symbol === newSymbol &&
-                !this.deployedStrategyLegendIds.has(legendId))
-            {
-                this.deployedStrategyLegendIds.add(legendId);
-                this.addLegendEntry(
+            if (strategy.symbol === newSymbol) {
+                this.fireLegendAdd(
                     legendId,
                     strategy.strategyKey,
                     strategy.symbol,
                     strategy.timeframe,
                     strategy.color
                 );
+
+                this.addPanelEntry(
+                    legendId,
+                    strategy.strategyKey,
+                    strategy.symbol,
+                    strategy.timeframe
+                );
             }
         });
     }
 
     // ================================================================
-    // PRIVATE — add legend + panel entry
+    // PRIVATE — fire legend add event
+    // indicator-manager owns the guard — no duplicate check here
     // ================================================================
 
-    private addLegendEntry(
+    private fireLegendAdd(
         legendId:    string,
         strategyKey: string,
         symbol:      string,
         timeframe:   string,
         color:       string
     ): void {
-        document.dispatchEvent(new CustomEvent('indicator-added', {
-            detail: {
-                id:       legendId,
-                name:     strategyKey,
-                color,
-                icon:     'fa-robot',
-                pane:     null,
-                values:   [],
-                settings: {}
-            }
+        document.dispatchEvent(new CustomEvent('strategy-legend-add', {
+            detail: { legendId, strategyKey, symbol, timeframe, color }
         }));
+    }
 
+    // ================================================================
+    // PRIVATE — add panel entry
+    // Strategies panel is separate from legend — always add
+    // ================================================================
+
+    private addPanelEntry(
+        legendId:    string,
+        strategyKey: string,
+        symbol:      string,
+        timeframe:   string
+    ): void {
         this.strategiesInstance?.addStrategy({
             id:        legendId,
             name:      strategyKey,
