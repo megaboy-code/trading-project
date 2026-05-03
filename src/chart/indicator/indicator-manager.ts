@@ -413,7 +413,7 @@ export class IndicatorManager {
             return;
         }
 
-        import('./ui/indicator-settings-modal').then(
+        import('../ui/indicator-settings-modal').then(
             ({ IndicatorSettingsModal }) => {
                 new IndicatorSettingsModal(item, triggerRect).open();
             }
