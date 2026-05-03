@@ -273,6 +273,8 @@ export class ChartModule {
     }
 
     private initializeChartUI(): void {
+        // ── chart-ui gets only what it needs for rendering UI ──
+        // ── no params, no settings — those stay in indicator-manager ──
         this.chartUI = new ChartUI(
             {
                 onSymbolChange:    (symbol)    => this.handleSymbolChange(symbol),
@@ -595,35 +597,15 @@ export class ChartModule {
             if (oldId && newId) this.chartLegend?.updateItemId(oldId, newId);
         }, { signal });
 
+        // ── Settings request — delegate to indicator-manager ──
+        // chart-ui no longer in this chain
         document.addEventListener('legend-item-settings', (e: Event) => {
             const { id, triggerRect } = (e as CustomEvent).detail;
             if (!id) return;
 
-            const item = this.chartLegend?.getItem(id);
-            if (!item) return;
-
-            const key    = id.split('_')[0];
-            const config = this.chartUI?.getConfigByKey(key);
-
-            if (config) {
-                item.settings = {
-                    ...config,
-                    ...item.settings
-                };
-            }
-
-            const saved = this.indicatorManager?.getSavedSettings(key);
-            if (saved) {
-                const savedLines: Record<string, any> = {};
-                saved.forEach((v, k) => { savedLines[k] = v; });
-                item.settings = { ...item.settings, savedLines };
-            }
-
-            import('./ui/indicator-settings-modal').then(
-                ({ IndicatorSettingsModal }) => {
-                    new IndicatorSettingsModal(item, triggerRect).open();
-                }
-            );
+            document.dispatchEvent(new CustomEvent('indicator-settings-request', {
+                detail: { indicatorId: id, triggerRect }
+            }));
         }, { signal });
 
         document.addEventListener('legend-item-toggle', (e: Event) => {
@@ -647,13 +629,11 @@ export class ChartModule {
 
             const item = this.chartLegend?.getItem(id);
 
-            // ── Item already gone — module-manager dispatched this after removal ──
-            // ── Skip to avoid re-triggering remove-strategy loop ──
+            // ── Item already gone — skip to avoid re-triggering loop ──
             if (!item) return;
 
             if (item.icon === 'fa-robot') {
-                // ── Remove item FIRST before dispatching remove-strategy ──
-                // ── So module-manager's legend-item-remove dispatch finds it gone ──
+                // ── Remove legend item FIRST ──
                 this.chartLegend?.removeItem(id);
 
                 const lastUnderscore       = id.lastIndexOf('_');
