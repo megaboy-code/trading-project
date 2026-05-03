@@ -2,6 +2,7 @@
 // ⚡ CHART UI - Professional controls (symbol, timeframe, chart type, indicators)
 // Config-driven — all symbols, timeframes, indicators from backend
 // Frontend owns visuals only — flags, icons, badges, categories
+// Params, settings, period_fields, line_labels — indicator-manager owns those
 // ================================================================
 
 import { buildFlagStack, applySymbolFlags, stripBrokerSuffix } from '../../core/symbol-icons';
@@ -26,6 +27,8 @@ const categoryMap: Record<string, string[]> = {
 
 // ================================================================
 // LOCAL CONFIG INTERFACES
+// chart-ui only needs key, label, description, badge, type, is_strategy
+// All params owned by indicator-manager via paramsMap
 // ================================================================
 
 interface ConfigSymbol {
@@ -34,24 +37,12 @@ interface ConfigSymbol {
 }
 
 interface ConfigItem {
-    key:           string;
-    label:         string;
-    description:   string;
-    badge:         string;
-    type:          string;
-    is_strategy:   boolean;
-    period:        number;
-    fast_period:   number;
-    slow_period:   number;
-    signal_period: number;
-    k_period:      number;
-    d_period:      number;
-    slowing:       number;
-    deviation:     number;
-    overbought:    number;
-    oversold:      number;
-    volume:        number;
-    price_type:    string;
+    key:         string;
+    label:       string;
+    description: string;
+    badge:       string;
+    type:        string;
+    is_strategy: boolean;
 }
 
 interface AvailableConfig {
@@ -125,10 +116,12 @@ export class ChartUI {
 
     // ================================================================
     // AVAILABLE CONFIG
+    // chart-ui reads only: key, label, description, badge, type, is_strategy
+    // All params stripped — indicator-manager owns them
     // ================================================================
 
     private handleAvailableConfig(e: Event): void {
-        const incoming = (e as CustomEvent).detail as AvailableConfig;
+        const incoming = (e as CustomEvent).detail as any;
         if (!incoming) return;
 
         if (!this.config) {
@@ -146,73 +139,37 @@ export class ChartUI {
         if (incoming.timeframes_visible?.length) this.config.timeframes_visible = incoming.timeframes_visible;
         if (incoming.timeframes_more?.length)    this.config.timeframes_more    = incoming.timeframes_more;
 
+        // ── Strip all params — keep only UI fields ──
         if (incoming.indicators?.length) {
-            this.config.indicators = incoming.indicators.map(i => ({
-                key:           i.key,
-                label:         i.label,
-                description:   i.description,
-                badge:         i.badge,
-                type:          i.type          ?? '',
-                is_strategy:   i.is_strategy   ?? false,
-                period:        i.period        ?? 0,
-                fast_period:   i.fast_period   ?? 0,
-                slow_period:   i.slow_period   ?? 0,
-                signal_period: i.signal_period ?? 0,
-                k_period:      i.k_period      ?? 0,
-                d_period:      i.d_period      ?? 0,
-                slowing:       i.slowing       ?? 0,
-                deviation:     i.deviation     ?? 0.0,
-                overbought:    i.overbought    ?? 0,
-                oversold:      i.oversold      ?? 0,
-                volume:        i.volume        ?? 0.0,
-                price_type:    i.price_type    ?? 'close'
+            this.config.indicators = incoming.indicators.map((i: any) => ({
+                key:         i.key,
+                label:       i.label,
+                description: i.description,
+                badge:       i.badge,
+                type:        i.type        ?? '',
+                is_strategy: i.is_strategy ?? false
             }));
-            console.log('first indicator period:', this.config.indicators[0]?.period, 'incoming period:', incoming.indicators[0]?.period);
         }
 
         if (incoming.strategies?.length) {
-            this.config.strategies = incoming.strategies.map(i => ({
-                key:           i.key,
-                label:         i.label,
-                description:   i.description,
-                badge:         i.badge,
-                type:          i.type          ?? '',
-                is_strategy:   i.is_strategy   ?? false,
-                period:        i.period        ?? 0,
-                fast_period:   i.fast_period   ?? 0,
-                slow_period:   i.slow_period   ?? 0,
-                signal_period: i.signal_period ?? 0,
-                k_period:      i.k_period      ?? 0,
-                d_period:      i.d_period      ?? 0,
-                slowing:       i.slowing       ?? 0,
-                deviation:     i.deviation     ?? 0.0,
-                overbought:    i.overbought    ?? 0,
-                oversold:      i.oversold      ?? 0,
-                volume:        i.volume        ?? 0.0,
-                price_type:    i.price_type    ?? 'close'
+            this.config.strategies = incoming.strategies.map((i: any) => ({
+                key:         i.key,
+                label:       i.label,
+                description: i.description,
+                badge:       i.badge,
+                type:        i.type        ?? '',
+                is_strategy: i.is_strategy ?? false
             }));
         }
 
         if (incoming.patterns?.length) {
-            this.config.patterns = incoming.patterns.map(i => ({
-                key:           i.key,
-                label:         i.label,
-                description:   i.description,
-                badge:         i.badge,
-                type:          i.type          ?? '',
-                is_strategy:   i.is_strategy   ?? false,
-                period:        i.period        ?? 0,
-                fast_period:   i.fast_period   ?? 0,
-                slow_period:   i.slow_period   ?? 0,
-                signal_period: i.signal_period ?? 0,
-                k_period:      i.k_period      ?? 0,
-                d_period:      i.d_period      ?? 0,
-                slowing:       i.slowing       ?? 0,
-                deviation:     i.deviation     ?? 0.0,
-                overbought:    i.overbought    ?? 0,
-                oversold:      i.oversold      ?? 0,
-                volume:        i.volume        ?? 0.0,
-                price_type:    i.price_type    ?? 'close'
+            this.config.patterns = incoming.patterns.map((i: any) => ({
+                key:         i.key,
+                label:       i.label,
+                description: i.description,
+                badge:       i.badge,
+                type:        i.type        ?? '',
+                is_strategy: i.is_strategy ?? false
             }));
         }
 
@@ -220,24 +177,6 @@ export class ChartUI {
         this.renderSymbolRows();
         this.renderIndicatorRows();
         this.updateIndicatorCounts();
-    }
-
-    // ================================================================
-    // GET CONFIG BY KEY — called by chart-core for settings modal
-    // Searches indicators, strategies, patterns by key
-    // ================================================================
-
-    public getConfigByKey(key: string): Record<string, any> | null {
-        if (!this.config) return null;
-
-        const allItems = [
-            ...this.config.indicators,
-            ...this.config.strategies,
-            ...this.config.patterns
-        ];
-
-        const found = allItems.find(i => i.key === key);
-        return found ? { ...found } : null;
     }
 
     // ================================================================
@@ -362,26 +301,30 @@ export class ChartUI {
 
         if (cat === 'favorites') {
             const allItems = [
-                ...this.config.indicators.map(i => ({ ...i, type: 'indicator' })),
-                ...this.config.strategies.map(i => ({ ...i, type: 'strategy' })),
-                ...this.config.patterns.map(i  => ({ ...i, type: 'pattern'  })),
+                ...this.config.indicators.map(i => ({ ...i, _cat: 'indicator' })),
+                ...this.config.strategies.map(i => ({ ...i, _cat: 'strategy'  })),
+                ...this.config.patterns.map(i  => ({ ...i, _cat: 'pattern'   })),
             ];
 
             const favItems = allItems.filter(i => favorites.includes(i.key));
 
             if (favItems.length === 0) {
-                document.getElementById('indEmptyFavorites')?.style.setProperty('display', 'flex');
+                document.getElementById('indEmptyFavorites')
+                    ?.style.setProperty('display', 'flex');
                 return;
             }
 
-            document.getElementById('indEmptyFavorites')?.style.setProperty('display', 'none');
+            document.getElementById('indEmptyFavorites')
+                ?.style.setProperty('display', 'none');
+
             favItems.forEach(item => {
-                list.appendChild(this.createIndRow(item, item.type, true));
+                list.appendChild(this.createIndRow(item, item._cat, true));
             });
             return;
         }
 
-        document.getElementById('indEmptyFavorites')?.style.setProperty('display', 'none');
+        document.getElementById('indEmptyFavorites')
+            ?.style.setProperty('display', 'none');
 
         let items: ConfigItem[] = [];
         if (cat === 'indicators') items = this.config.indicators;
@@ -441,7 +384,9 @@ export class ChartUI {
             const cat = item.dataset.cat;
             if (!cat) return;
 
-            nav.querySelectorAll('.ind-nav-item').forEach(el => el.classList.remove('active'));
+            nav.querySelectorAll('.ind-nav-item').forEach(el =>
+                el.classList.remove('active')
+            );
             item.classList.add('active');
 
             this.activeIndCat = cat;
@@ -566,7 +511,9 @@ export class ChartUI {
                 const value = row.dataset.value;
                 if (!value) return;
 
-                modalBody.querySelectorAll('.symbol-modal-row').forEach(el => el.classList.remove('active'));
+                modalBody.querySelectorAll('.symbol-modal-row').forEach(el =>
+                    el.classList.remove('active')
+                );
                 row.classList.add('active');
 
                 this.updateSymbolPill(value);
@@ -608,7 +555,10 @@ export class ChartUI {
         const modalBody = document.getElementById('symbolModalBody');
         if (modalBody) {
             modalBody.querySelectorAll('.symbol-modal-row').forEach(el => {
-                el.classList.toggle('active', (el as HTMLElement).dataset.value === this.currentSymbol);
+                el.classList.toggle(
+                    'active',
+                    (el as HTMLElement).dataset.value === this.currentSymbol
+                );
             });
         }
     }
@@ -705,7 +655,9 @@ export class ChartUI {
 
     private loadSymbolFavorites(): string[] {
         try {
-            return JSON.parse(localStorage.getItem(SYMBOL_FAVORITES_KEY) || '[]');
+            return JSON.parse(
+                localStorage.getItem(SYMBOL_FAVORITES_KEY) || '[]'
+            );
         } catch { return []; }
     }
 
@@ -727,7 +679,9 @@ export class ChartUI {
 
         this.saveSymbolFavorites(favs);
 
-        document.querySelectorAll(`.symbol-star-btn[data-value="${value}"]`).forEach(btn => {
+        document.querySelectorAll(
+            `.symbol-star-btn[data-value="${value}"]`
+        ).forEach(btn => {
             btn.classList.toggle('active', favs.includes(value));
         });
     }
@@ -813,16 +767,24 @@ export class ChartUI {
     }
 
     private updateTimeframeButtons(timeframe: string): void {
-        document.querySelectorAll('.tf-btn:not(.tf-more-btn)').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tf-more-item').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.tf-btn:not(.tf-more-btn)').forEach(btn =>
+            btn.classList.remove('active')
+        );
+        document.querySelectorAll('.tf-more-item').forEach(item =>
+            item.classList.remove('active')
+        );
 
-        const matchingBtn = document.querySelector(`.tf-btn[data-tf="${timeframe}"]`) as HTMLElement;
+        const matchingBtn = document.querySelector(
+            `.tf-btn[data-tf="${timeframe}"]`
+        ) as HTMLElement;
         if (matchingBtn) {
             matchingBtn.classList.add('active');
             return;
         }
 
-        const matchingMoreItem = document.querySelector(`.tf-more-item[data-tf="${timeframe}"]`) as HTMLElement;
+        const matchingMoreItem = document.querySelector(
+            `.tf-more-item[data-tf="${timeframe}"]`
+        ) as HTMLElement;
         if (matchingMoreItem) {
             matchingMoreItem.classList.add('active');
             const tfMoreBtn = document.getElementById('tfMoreBtn');
@@ -862,7 +824,9 @@ export class ChartUI {
                 const label = item.dataset.label;
                 if (!type) return;
 
-                chartTypeDropdown.querySelectorAll('.chart-type-item').forEach(el => el.classList.remove('active'));
+                chartTypeDropdown.querySelectorAll('.chart-type-item').forEach(el =>
+                    el.classList.remove('active')
+                );
                 item.classList.add('active');
 
                 this.updateChartTypePill(type, icon, label);
@@ -904,7 +868,10 @@ export class ChartUI {
         if (chartTypeText) chartTypeText.textContent = finalLabel;
 
         document.querySelectorAll('.chart-type-item').forEach(item => {
-            item.classList.toggle('active', (item as HTMLElement).dataset.type === type);
+            item.classList.toggle(
+                'active',
+                (item as HTMLElement).dataset.type === type
+            );
         });
     }
 
@@ -1003,7 +970,10 @@ export class ChartUI {
         const nav = document.getElementById('indicatorsLeftNav');
         if (!nav) return;
         nav.querySelectorAll('.ind-nav-item').forEach(el => {
-            el.classList.toggle('active', (el as HTMLElement).dataset.cat === cat);
+            el.classList.toggle(
+                'active',
+                (el as HTMLElement).dataset.cat === cat
+            );
         });
     }
 
@@ -1063,12 +1033,18 @@ export class ChartUI {
 
     // ================================================================
     // STRATEGY DEPLOY
+    // chart-ui fires the event only — no params knowledge here
+    // indicator-manager owns paramsMap — backend drives params
     // ================================================================
 
     private deployStrategyFromModal(key: string): void {
         if (!this.config) {
             document.dispatchEvent(new CustomEvent('show-notification', {
-                detail: { type: 'error', title: 'Strategy Error', message: 'Config not loaded yet' }
+                detail: {
+                    type:    'error',
+                    title:   'Strategy Error',
+                    message: 'Config not loaded yet'
+                }
             }));
             return;
         }
@@ -1077,7 +1053,11 @@ export class ChartUI {
 
         if (!strategy) {
             document.dispatchEvent(new CustomEvent('show-notification', {
-                detail: { type: 'error', title: 'Strategy Error', message: `Unknown strategy: ${key}` }
+                detail: {
+                    type:    'error',
+                    title:   'Strategy Error',
+                    message: `Unknown strategy: ${key}`
+                }
             }));
             return;
         }
