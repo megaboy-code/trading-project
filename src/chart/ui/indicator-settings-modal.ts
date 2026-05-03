@@ -20,24 +20,6 @@ interface LineSettings {
     crosshairMarkerVisible: boolean;
 }
 
-const LINE_DISPLAY_NAMES: Record<string, string> = {
-    'ema':  'Line',
-    'sma':  'Line',
-    'fast': 'Fast Line',
-    'slow': 'Slow Line',
-    'line': 'Line',
-};
-
-const PERIOD_LABELS: Record<string, string> = {
-    period:        'Period',
-    fast_period:   'Fast Period',
-    slow_period:   'Slow Period',
-    signal_period: 'Signal Period',
-    k_period:      'K Period',
-    d_period:      'D Period',
-    slowing:       'Slowing',
-};
-
 export class IndicatorSettingsModal {
     private modal:        HTMLElement | null = null;
     private item:         LegendItem;
@@ -67,7 +49,7 @@ export class IndicatorSettingsModal {
             }> | undefined;
 
         this.lineSettings = (item.values || []).map(v => {
-            const name  = (v as any).key || v.label || 'ema';
+            const name  = (v as any).key || v.label || 'line';
             const saved = savedLines?.[name];
             return {
                 name,
@@ -80,9 +62,9 @@ export class IndicatorSettingsModal {
         });
 
         if (this.lineSettings.length === 0) {
-            const saved = savedLines?.['ema'];
+            const saved = savedLines?.['line'];
             this.lineSettings.push({
-                name:                   'ema',
+                name:                   'line',
                 color:                  saved?.color                  ?? item.color ?? '#00d394',
                 lineWidth:              saved?.width                  ?? 1,
                 priceLineVisible:       saved?.priceLineVisible       ?? false,
@@ -294,22 +276,24 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // PERIOD INPUTS — apply only
+    // PERIOD INPUTS — backend driven via period_fields
     // ================================================================
     private createPeriodInputs(): HTMLElement | null {
         const settings = this.item.settings as Record<string, any> | undefined;
         if (!settings) return null;
 
-        const fields = Object.keys(PERIOD_LABELS).filter(
-            k => typeof settings[k] === 'number' && settings[k] > 0
-        );
+        const periodFields: Array<{ field: string; label: string }> =
+            settings.period_fields ?? [];
 
-        if (fields.length === 0) return null;
+        if (periodFields.length === 0) return null;
 
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `margin-bottom: 4px;`;
 
-        fields.forEach(field => {
+        periodFields.forEach(({ field, label }) => {
+            const value = settings[field];
+            if (typeof value !== 'number' || value <= 0) return;
+
             const row = document.createElement('div');
             row.style.cssText = `
                 display: flex;
@@ -320,18 +304,18 @@ export class IndicatorSettingsModal {
                 gap: 8px;
             `;
 
-            const label = document.createElement('span');
-            label.style.cssText = `
+            const labelEl = document.createElement('span');
+            labelEl.style.cssText = `
                 font-size: var(--text-lg);
                 color: var(--text-secondary);
                 font-weight: 500;
                 flex: 1;
             `;
-            label.textContent = PERIOD_LABELS[field];
+            labelEl.textContent = label;
 
             const input   = document.createElement('input');
             input.type    = 'number';
-            input.value   = String(settings[field]);
+            input.value   = String(value);
             input.min     = '1';
             input.max     = '999';
             input.step    = '1';
@@ -353,7 +337,7 @@ export class IndicatorSettingsModal {
 
             this.periodInputs[field] = input;
 
-            row.appendChild(label);
+            row.appendChild(labelEl);
             row.appendChild(input);
             wrapper.appendChild(row);
         });
@@ -362,9 +346,13 @@ export class IndicatorSettingsModal {
     }
 
     // ================================================================
-    // LINE ROW — color live, width apply only
+    // LINE ROW — label from backend line_labels, color live, width apply only
     // ================================================================
     private createLineRow(line: LineSettings, index: number): HTMLElement {
+        const settings   = this.item.settings as Record<string, any> | undefined;
+        const lineLabels: Record<string, string> = settings?.line_labels ?? {};
+        const lineLabel  = lineLabels[line.name] || 'Line';
+
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `
             display: flex;
@@ -382,7 +370,7 @@ export class IndicatorSettingsModal {
             font-weight: 500;
             flex: 1;
         `;
-        label.textContent = LINE_DISPLAY_NAMES[line.name] ?? 'Line';
+        label.textContent = lineLabel;
 
         // ── Width — apply only ──
         const widthInput   = document.createElement('input');
@@ -436,7 +424,6 @@ export class IndicatorSettingsModal {
                         : hex;
                     this.lineSettings[index].color = newColor;
                     preview.style.backgroundColor  = this.toDisplayColor(newColor);
-                    // ── Live preview ──
                     this.dispatchLivePreview();
                 }
             });
@@ -492,7 +479,6 @@ export class IndicatorSettingsModal {
                 accent-color: var(--accent-info);
             `;
             checkbox.addEventListener('change', () => {
-                // ── Apply to all lines + live dispatch ──
                 this.lineSettings.forEach(line => {
                     (line as any)[opt.key] = checkbox.checked;
                 });
