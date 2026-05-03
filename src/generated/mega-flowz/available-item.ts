@@ -2,7 +2,8 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { SMCSettings } from '../mega-flowz/smcsettings.js';
+import { LineLabelEntry } from '../mega-flowz/line-label-entry.js';
+import { PeriodField } from '../mega-flowz/period-field.js';
 
 
 export class AvailableItem {
@@ -271,13 +272,28 @@ timeframe(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-smcSettings(obj?:SMCSettings):SMCSettings|null {
+periodFields(index: number, obj?:PeriodField):PeriodField|null {
   const offset = this.bb!.__offset(this.bb_pos, 44);
-  return offset ? (obj || new SMCSettings()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+  return offset ? (obj || new PeriodField()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+periodFieldsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 44);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
+lineLabels(index: number, obj?:LineLabelEntry):LineLabelEntry|null {
+  const offset = this.bb!.__offset(this.bb_pos, 46);
+  return offset ? (obj || new LineLabelEntry()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+lineLabelsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 46);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
 static startAvailableItem(builder:flatbuffers.Builder) {
-  builder.startObject(21);
+  builder.startObject(22);
 }
 
 static addKey(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset) {
@@ -360,8 +376,36 @@ static addTimeframe(builder:flatbuffers.Builder, timeframeOffset:flatbuffers.Off
   builder.addFieldOffset(19, timeframeOffset, 0);
 }
 
-static addSmcSettings(builder:flatbuffers.Builder, smcSettingsOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(20, smcSettingsOffset, 0);
+static addPeriodFields(builder:flatbuffers.Builder, periodFieldsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(20, periodFieldsOffset, 0);
+}
+
+static createPeriodFieldsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startPeriodFieldsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
+static addLineLabels(builder:flatbuffers.Builder, lineLabelsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(21, lineLabelsOffset, 0);
+}
+
+static createLineLabelsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startLineLabelsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
 }
 
 static endAvailableItem(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -369,4 +413,30 @@ static endAvailableItem(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
+static createAvailableItem(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, labelOffset:flatbuffers.Offset, descriptionOffset:flatbuffers.Offset, badgeOffset:flatbuffers.Offset, typeOffset:flatbuffers.Offset, isStrategy:boolean, period:number, fastPeriod:number, slowPeriod:number, signalPeriod:number, kPeriod:number, dPeriod:number, slowing:number, deviation:number, overbought:number, oversold:number, volume:number, priceTypeOffset:flatbuffers.Offset, symbolOffset:flatbuffers.Offset, timeframeOffset:flatbuffers.Offset, periodFieldsOffset:flatbuffers.Offset, lineLabelsOffset:flatbuffers.Offset):flatbuffers.Offset {
+  AvailableItem.startAvailableItem(builder);
+  AvailableItem.addKey(builder, keyOffset);
+  AvailableItem.addLabel(builder, labelOffset);
+  AvailableItem.addDescription(builder, descriptionOffset);
+  AvailableItem.addBadge(builder, badgeOffset);
+  AvailableItem.addType(builder, typeOffset);
+  AvailableItem.addIsStrategy(builder, isStrategy);
+  AvailableItem.addPeriod(builder, period);
+  AvailableItem.addFastPeriod(builder, fastPeriod);
+  AvailableItem.addSlowPeriod(builder, slowPeriod);
+  AvailableItem.addSignalPeriod(builder, signalPeriod);
+  AvailableItem.addKPeriod(builder, kPeriod);
+  AvailableItem.addDPeriod(builder, dPeriod);
+  AvailableItem.addSlowing(builder, slowing);
+  AvailableItem.addDeviation(builder, deviation);
+  AvailableItem.addOverbought(builder, overbought);
+  AvailableItem.addOversold(builder, oversold);
+  AvailableItem.addVolume(builder, volume);
+  AvailableItem.addPriceType(builder, priceTypeOffset);
+  AvailableItem.addSymbol(builder, symbolOffset);
+  AvailableItem.addTimeframe(builder, timeframeOffset);
+  AvailableItem.addPeriodFields(builder, periodFieldsOffset);
+  AvailableItem.addLineLabels(builder, lineLabelsOffset);
+  return AvailableItem.endAvailableItem(builder);
+}
 }
